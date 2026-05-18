@@ -129,10 +129,13 @@ const BALL_R = 0.7;
 
 // 物理挙動の調整
 const SPIN_FRICTION_X = 0.95;  
-const SPIN_FRICTION_Y = 0.996; // 【調整】縦スピン（押し引き）の空中・移動中の減衰をさらに抑え、超持続化
+const SPIN_FRICTION_Y = 0.996; 
 const RESTITUTION = 0.975;     
 const POCKET_RADIUS = 1.95;   
 const STOP_THRESHOLD = 0.005; 
+
+// === 追加：空気抵抗係数 ===
+const AIR_DRAG_COEF = 0.015; // 速度の2乗に比例して減速させる係数（ゲームプレイに合わせて微調整してください）
 
 let scene, camera, overviewCamera, renderer, cueBall, hitMarker, tableCloth;
 let balls = [];
@@ -350,6 +353,20 @@ class BilliardBall {
         
         this.mesh.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), this.spinX * 0.05 * dtFactor);
         
+        // === 追加：空気抵抗の適用 ===
+        if (speed > 0) {
+            // 空気抵抗力は速度の2乗に比例: F = C * v^2
+            let dragForce = AIR_DRAG_COEF * (speed * speed) * dtFactor;
+            
+            // 速度ベクトルから空気抵抗分を差し引くための係数を計算（逆走防止のため 0 以下にはしない）
+            let airDragFactor = Math.max(0, 1.0 - (dragForce / speed));
+            
+            this.vx *= airDragFactor;
+            this.vz *= airDragFactor;
+        }
+        // ============================
+
+        // 最後にラシャ（床面）の摩擦を適用
         this.vx *= currentFriction; 
         this.vz *= currentFriction;
         
