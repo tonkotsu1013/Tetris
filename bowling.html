@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>3D Bowling - Player & ZR Mode</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; color: white; display: none; }
+        
+        #start-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; pointer-events: auto; z-index: 100; }
+        #start-screen h1 { font-size: 60px; color: #ffd700; text-shadow: 0 0 20px rgba(255,215,0,0.8); margin-bottom: 20px; }
+        .start-btn { padding: 15px 30px; font-size: 20px; background: #e94560; color: white; border: none; border-radius: 10px; cursor: pointer; margin: 10px; font-weight: bold; }
+        .start-btn:hover { background: #ff5773; }
+
+        #score-panel { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 10px; border: 2px solid #555; pointer-events: auto; }
+        .score-table { border-collapse: collapse; text-align: center; font-size: 14px; margin-bottom: 10px; background: #222;}
+        .score-table td { border: 1px solid #777; width: 30px; height: 25px; }
+        .frame-num { background: #444; font-weight: bold; color: #fff;}
+        .player-label { background: #333; font-weight: bold; font-size: 12px; color: #ffd700; }
+        .total-score { font-size: 18px; color: #ffcc00; text-align: right; }
+        
+        #controls { position: absolute; bottom: 80px; left: 20px; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 5px; font-size: 13px; pointer-events: auto; line-height: 1.6;}
+        #turn-indicator { position: absolute; top: 20px; left: 20px; font-size: 30px; font-weight: bold; color: #00d4ff; text-shadow: 0 0 10px #00d4ff; }
+        #message-overlay { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 80px; font-weight: bold; color: #ffd700; text-shadow: 0 0 20px rgba(255,215,0,0.8); display: none; text-align: center; }
+        #gameover-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); color: #fff; display: none; flex-direction: column; justify-content: center; align-items: center; font-size: 40px; z-index: 90; pointer-events: auto; }
+        
+        #action-btn { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); pointer-events: all; cursor: pointer; padding: 12px 24px; background: #4caf50; color: white; border: none; border-radius: 5px; font-weight: bold; display: none; }
+    </style>
+</head>
+<body>
+
+<div id="start-screen">
+    <h1>3D BOWLING</h1>
+    <p>コントローラー対応</p>
+    <div>
+        <button class="start-btn" onclick="startGame(1)">1人プレイ</button>
+        <button class="start-btn" onclick="startGame(2)">2人対戦プレイ</button>
+    </div>
+</div>
+
+<div id="gameover-overlay">
+    <div>GAME OVER</div>
+    <div id="final-score-display"></div>
+    <button onclick="location.reload()" style="margin-top:20px; padding:10px 20px; font-size: 20px;">リトライ</button>
+</div>
+
+<div id="ui">
+    <div id="turn-indicator">PLAYER 1 TURN</div>
+    
+    <div id="score-panel">
+        <table class="score-table" id="score-board-1">
+            <tr class="frame-num">
+                <td rowspan="3" class="player-label">P1</td>
+                <td colspan="2">1</td><td colspan="2">2</td><td colspan="2">3</td><td colspan="2">4</td><td colspan="2">5</td><td colspan="2">6</td><td colspan="2">7</td><td colspan="2">8</td><td colspan="2">9</td><td colspan="3">10</td>
+            </tr>
+            <tr id="roll-row-0">
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+            </tr>
+            <tr id="frame-score-row-0" style="height: 25px; font-weight: bold; color: #00d4ff;">
+                <td colspan="2"></td><td colspan="2"></td><td colspan="2"></td><td colspan="2"></td><td colspan="2"></td><td colspan="2"></td><td colspan="2"></td><td colspan="2"></td><td colspan="2"></td><td colspan="3"></td>
+            </tr>
+        </table>
+        <div class="total-score" id="total-score-p1">P1 TOTAL: <span id="total-val-0">0</span></div>
+
+        <table class="score-table" id="score-board-2" style="display: none;">
+            <tr class="frame-num">
+                <td rowspan="3" class="player-label">P2</td>
+                <td colspan="2">1</td><td colspan="2">2</td><td colspan="2">3</td><td colspan="2">4</td><td colspan="2">5</td><td colspan="2">6</td><td colspan="2">7</td><td colspan="2">8</td><td colspan="2">9</td><td colspan="3">10</td>
+            </tr>
+            <tr id="roll-row-1">
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+            </tr>
+            <tr id="frame-score-row-1" style="height: 25px; font-weight: bold; color: #ff5773;">
+                <td colspan="2"></td><td colspan="2"></td><td colspan="2"></td><td colspan="2"></td><td colspan="2"></td><td colspan="2"></td><td colspan="2"></td><td colspan="2"></td><td colspan="2"></td><td colspan="3"></td>
+            </tr>
+        </table>
+        <div class="total-score" id="total-score-p2" style="display: none;">P2 TOTAL: <span id="total-val-1">0</span></div>
+    </div>
+
+    <div id="controls">
+        <strong>操作方法</strong><br>
+        [Lスティック] / [←][→]：左右移動<br>
+        [Rスティック] / [A][D]：投球角度の調整<br>
+        [ZR長押し + Rスティック上]：構え＆投球（Rスティック左右で回転）<br>
+        [クリック長押し + 上スワイプ]：構え＆投球（マウス操作）
+    </div>
+    <div id="message-overlay">STRIKE!</div>
+    <button id="action-btn" onclick="resetForNextRoll()">次へ</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+
+<script>
+    let scene, camera, renderer, world;
+    let ballBody, ballMesh, guideLine;
+    let pins = [];
+    let isDragging = false, canThrow = true, isGameActive = false;
+    let startPos = { x: 0, y: 0 };
+    let keys = {};
+    let ballAngle = 0;
+    
+    // コントローラー状態
+    let gamepadIndex = null;
+    let isZrPressed = false;
+    let isAPressed = false; 
+    let isAiming = false; // 構え状態
+
+    // ゲーム管理 (対戦対応)
+    let numPlayers = 1;
+    let currentPlayer = 0; // 0=P1, 1=P2
+    let currentFrameIdx = 0;
+    
+    // スコア管理: [プレイヤー][フレーム][投球結果]
+    let frames = []; 
+    let pinsStatus = Array(10).fill(true);
+    let strikeCounts = [0, 0];
+
+    // アバター（人）
+    let playerModel, playerArm, playerTorso;
+    let isThrowingAnimation = false;
+    let throwAnimTime = 0;
+
+    const PIN_POSITIONS = [];
+    const spacing = 0.5;
+    for (let i = 0; i < 4; i++) {
+        for (let j = 0; j <= i; j++) {
+            PIN_POSITIONS.push({ x: (j - i / 2) * spacing, z: -25 - (i * spacing) });
+        }
+    }
+
+    function init() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a1a);
+        camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        world = new CANNON.World();
+        world.gravity.set(0, -9.82, 0);
+
+        createEnvironment();
+        createHall();
+        createBall();
+        createPins();
+        createGuideLine();
+        createPlayerModel(); 
+        resetCamera();
+
+        window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
+        window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+        
+        window.addEventListener('mousedown', (e) => { 
+            if(isGameActive && canThrow && e.target.tagName !== 'BUTTON'){ 
+                isDragging = true; 
+                isAiming = true; // クリックで構える
+                startPos = {x:e.clientX, y:e.clientY}; 
+            }
+        });
+        window.addEventListener('mouseup', onMouseUp);
+
+        // Gamepad イベント
+        window.addEventListener("gamepadconnected", (e) => {
+            console.log("Gamepad connected:", e.gamepad.id);
+            gamepadIndex = e.gamepad.index;
+        });
+        window.addEventListener("gamepaddisconnected", (e) => {
+            if (gamepadIndex === e.gamepad.index) gamepadIndex = null;
+        });
+    }
+
+    function startGame(players) {
+        numPlayers = players;
+        frames = Array.from({length: players}, () => Array.from({length: 10}, () => []));
+        
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('ui').style.display = 'block';
+        
+        isGameActive = true;
+        updateTurnUI();
+        init();
+        animate();
+    }
+
+    function createPlayerModel() {
+        playerModel = new THREE.Group();
+        const shirtMat = new THREE.MeshPhongMaterial({ color: 0x2a52be }); // 服（青）
+        const skinMat = new THREE.MeshPhongMaterial({ color: 0xffccaa });  // 肌
+        const pantsMat = new THREE.MeshPhongMaterial({ color: 0x1a1a1a }); // ズボン
+
+        // 胴体
+        playerTorso = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.8, 0.3), shirtMat);
+        playerTorso.position.y = 1.2;
+        playerModel.add(playerTorso);
+
+        // 頭
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.2), skinMat);
+        head.position.y = 1.7;
+        playerModel.add(head);
+
+        // 左脚
+        const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.1, 0.8), pantsMat);
+        leftLeg.position.set(-0.15, 0.4, 0);
+        playerModel.add(leftLeg);
+
+        // 右脚
+        const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.1, 0.8), pantsMat);
+        rightLeg.position.set(0.15, 0.4, 0);
+        playerModel.add(rightLeg);
+
+        // 左腕
+        const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.7), shirtMat);
+        leftArm.position.set(-0.35, 1.2, 0);
+        leftArm.rotation.z = 0.2;
+        playerModel.add(leftArm);
+
+        // 右腕（投げる腕：肩を軸にするグループ）
+        playerArm = new THREE.Group();
+        playerArm.position.set(0.35, 1.45, 0); // 肩の関節位置
+        
+        const rightArmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.7), skinMat);
+        rightArmMesh.position.y = -0.35; // 下に伸ばす
+        playerArm.add(rightArmMesh);
+        
+        // 服の袖
+        const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.3), shirtMat);
+        sleeve.position.y = -0.15;
+        playerArm.add(sleeve);
+
+        playerModel.add(playerArm);
+
+        // 初期配置
+        playerModel.position.set(0, 0, 9.5); 
+        scene.add(playerModel);
+    }
+
+    function createEnvironment() {
+        const wallMat = new THREE.MeshPhongMaterial({ color: 0x111122 });
+        const backWall = new THREE.Mesh(new THREE.BoxGeometry(40, 20, 1), wallMat);
+        backWall.position.set(0, 5, -35);
+        scene.add(backWall);
+
+        const ceiling = new THREE.Mesh(new THREE.BoxGeometry(40, 1, 60), wallMat);
+        ceiling.position.set(0, 10, -10);
+        scene.add(ceiling);
+
+        for (let i = 0; i < 8; i++) {
+            createPerson(-4 - Math.random() * 2, -10 - (i * 3)); // 左側
+            createPerson(4 + Math.random() * 2, -10 - (i * 3));  // 右側
+        }
+    }
+
+    function createPerson(x, z) {
+        const bodyColor = new THREE.Color().setHSL(Math.random(), 0.7, 0.5);
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1), new THREE.MeshPhongMaterial({ color: bodyColor }));
+        body.position.set(x, 0.5, z);
+        scene.add(body);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.25), new THREE.MeshPhongMaterial({ color: 0xffccaa }));
+        head.position.set(x, 1.2, z);
+        scene.add(head);
+    }
+
+    function createHall() {
+        const laneMat = new THREE.MeshPhongMaterial({ color: 0xcc9966 });
+        const lane = new THREE.Mesh(new THREE.BoxGeometry(4, 0.5, 50), laneMat);
+        lane.position.set(0, -0.25, -12.5);
+        lane.receiveShadow = true;
+        scene.add(lane);
+        
+        const laneBody = new CANNON.Body({ mass: 0 });
+        laneBody.addShape(new CANNON.Box(new CANNON.Vec3(2, 0.25, 25)));
+        laneBody.position.set(0, -0.25, -12.5);
+        world.addBody(laneBody);
+
+        [-2.3, 2.3].forEach(gx => {
+            const g = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, 50), new THREE.MeshPhongMaterial({ color: 0x111111 }));
+            g.position.set(gx, -0.4, -12.5);
+            scene.add(g);
+        });
+
+        const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambient);
+        const spot = new THREE.SpotLight(0xffffff, 0.8);
+        spot.position.set(0, 15, 5);
+        spot.castShadow = true;
+        scene.add(spot);
+    }
+
+    function createGuideLine() {
+        const geometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-15)]);
+        const material = new THREE.LineDashedMaterial({ color: 0xffff00, dashSize: 0.5, gapSize: 0.3 });
+        guideLine = new THREE.Line(geometry, material);
+        guideLine.computeLineDistances();
+        scene.add(guideLine);
+    }
+
+    function createBall() {
+        ballMesh = new THREE.Mesh(new THREE.SphereGeometry(0.38, 32, 32), new THREE.MeshPhongMaterial({ color: 0x3a86ff, shininess: 100 }));
+        ballMesh.castShadow = true;
+        scene.add(ballMesh);
+
+        ballBody = new CANNON.Body({ mass: 5 });
+        ballBody.addShape(new CANNON.Sphere(0.38));
+        ballBody.position.set(0, 0.38, 8.5); 
+        ballBody.linearDamping = 0.08; 
+        world.addBody(ballBody);
+    }
+
+    function createPins() {
+        pins.forEach(p => { if(p.mesh.parent) scene.remove(p.mesh); world.remove(p.body); });
+        pins = [];
+        PIN_POSITIONS.forEach((pos, i) => {
+            if (!pinsStatus[i]) return;
+
+            const pMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.15, 0.8), new THREE.MeshPhongMaterial({ color: 0xffffff }));
+            pMesh.castShadow = true;
+            scene.add(pMesh);
+            
+            const pBody = new CANNON.Body({ mass: 1.15 }); 
+            pBody.addShape(new CANNON.Box(new CANNON.Vec3(0.15, 0.4, 0.15)));
+            pBody.position.set(pos.x, 0.4, pos.z);
+            pBody.angularDamping = 0.5;
+            pBody.linearDamping = 0.5;
+            world.addBody(pBody);
+            pins.push({ mesh: pMesh, body: pBody, id: i });
+        });
+    }
+
+    function performThrow(diffX, diffY) {
+        canThrow = false;
+        isAiming = false;
+        
+        const power = Math.min(diffY * 0.12, 30); 
+        const vx = Math.sin(ballAngle) * -power;
+        const vz = Math.cos(ballAngle) * -power;
+        
+        ballBody.velocity.set(vx, 0, vz);
+        ballBody.angularVelocity.set(0, diffX * 0.05, 0); // diffXを元に回転（カーブ）をかける
+        
+        guideLine.visible = false;
+        
+        // 投球アニメーション開始
+        isThrowingAnimation = true;
+        throwAnimTime = 0;
+
+        setTimeout(processScore, 4000); 
+    }
+
+    function onMouseUp(e) {
+        if (!isGameActive || !canThrow || e.target.tagName === 'BUTTON') return;
+        if (isDragging) {
+            isDragging = false;
+            isAiming = false;
+            const diffY = startPos.y - e.clientY;
+            const diffX = e.clientX - startPos.x;
+
+            if (diffY > 50) { 
+                performThrow(diffX, diffY);
+            }
+        }
+    }
+
+    function processScore() {
+        let knockedThisRoll = 0;
+        pins.forEach(p => {
+            const up = new CANNON.Vec3(0, 1, 0);
+            const pinUp = p.body.quaternion.vmult(new CANNON.Vec3(0, 1, 0));
+            if (pinUp.dot(up) < 0.75 || p.body.position.y < -0.1) {
+                if (pinsStatus[p.id]) {
+                    pinsStatus[p.id] = false;
+                    knockedThisRoll++;
+                }
+            }
+        });
+
+        frames[currentPlayer][currentFrameIdx].push(knockedThisRoll);
+        
+        const totalKnocked = frames[currentPlayer][currentFrameIdx].reduce((a, b) => a + b, 0);
+        const rollCount = frames[currentPlayer][currentFrameIdx].length;
+
+        // メッセージ表示
+        if (knockedThisRoll === 10 && rollCount === 1 && currentFrameIdx < 9) {
+            strikeCounts[currentPlayer]++;
+            const sc = strikeCounts[currentPlayer];
+            if(sc === 1) showMessage("STRIKE!");
+            else if(sc === 2) showMessage("DOUBLE!");
+            else if(sc === 3) showMessage("TURKEY!");
+            else showMessage(sc + " FOURTH!");
+        } else if (totalKnocked === 10 && rollCount === 2) {
+            showMessage("SPARE!");
+            strikeCounts[currentPlayer] = 0;
+        } else {
+            showMessage(knockedThisRoll + " PINS");
+            strikeCounts[currentPlayer] = 0;
+        }
+
+        renderScoreBoard();
+        document.getElementById('action-btn').style.display = 'block';
+    }
+
+    function showMessage(txt) {
+        const el = document.getElementById("message-overlay");
+        el.innerText = txt;
+        el.style.display = "block";
+        setTimeout(() => el.style.display = "none", 2000);
+    }
+
+    function renderScoreBoard() {
+        for (let p = 0; p < numPlayers; p++) {
+            const rollCells = document.getElementById(`roll-row-${p}`).cells;
+            const frameCells = document.getElementById(`frame-score-row-${p}`).cells;
+            let total = 0;
+
+            for (let i = 0; i <= (p === currentPlayer ? currentFrameIdx : (p < currentPlayer ? currentFrameIdx : currentFrameIdx - 1)); i++) {
+                if (i < 0) continue;
+                const f = frames[p][i];
+                if (!f || f.length === 0) continue;
+
+                if (i < 9) {
+                    rollCells[i * 2].innerText = f[0] === 10 ? "X" : (f[0] === 0 ? "-" : f[0] || "");
+                    rollCells[i * 2 + 1].innerText = f[1] !== undefined ? (f[0] + f[1] === 10 ? "/" : (f[1] === 0 ? "-" : f[1])) : "";
+                } else {
+                    rollCells[18].innerText = f[0] === 10 ? "X" : (f[0] === 0 ? "-" : f[0]);
+                    rollCells[19].innerText = f[1] === 10 ? "X" : (f[0] + f[1] === 10 && f[0] !== 10 ? "/" : (f[1] === 0 ? "-" : f[1]));
+                    rollCells[20].innerText = f[2] === 10 ? "X" : (f[2] === 0 ? "-" : f[2]);
+                }
+
+                let frameScore = calculateFrameScore(p, i);
+                if (frameScore !== null) {
+                    total += frameScore;
+                    frameCells[i].innerText = total;
+                }
+            }
+            document.getElementById(`total-val-${p}`).innerText = total;
+        }
+    }
+
+    function calculateFrameScore(p, idx) {
+        const f = frames[p][idx];
+        if (!f || f.length === 0) return null;
+
+        let score = f.reduce((a, b) => a + b, 0);
+        if (idx === 9) return f.length >= 2 ? score : null;
+
+        if (f[0] === 10) {
+            let next1 = getNextRoll(p, idx, 1);
+            let next2 = getNextRoll(p, idx, 2);
+            if (next1 === null || next2 === null) return null;
+            return 10 + next1 + next2;
+        }
+        if (f[0] + f[1] === 10) {
+            let next1 = getNextRoll(p, idx, 1);
+            if (next1 === null) return null;
+            return 10 + next1;
+        }
+        
+        return f.length === 2 ? score : null;
+    }
+
+    function getNextRoll(p, frameIdx, count) {
+        let rolls = [];
+        for (let i = frameIdx + 1; i < 10; i++) {
+            rolls.push(...frames[p][i]);
+        }
+        return rolls[count - 1] !== undefined ? rolls[count - 1] : null;
+    }
+
+    function resetForNextRoll() {
+        if (!isGameActive) return;
+        document.getElementById('action-btn').style.display = 'none';
+
+        const f = frames[currentPlayer][currentFrameIdx];
+        const isLastFrame = currentFrameIdx === 9;
+        
+        let turnEnded = false;
+        if (!isLastFrame) {
+            if (f[0] === 10 || f.length === 2) turnEnded = true;
+        } else {
+            if (f.length === 3 || (f.length === 2 && f[0] + f[1] < 10)) turnEnded = true;
+        }
+
+        if (turnEnded) {
+            if (numPlayers === 2) {
+                if (currentPlayer === 0) {
+                    currentPlayer = 1;
+                } else {
+                    currentPlayer = 0;
+                    currentFrameIdx++;
+                }
+            } else {
+                currentFrameIdx++;
+            }
+            pinsStatus.fill(true); 
+            
+            if (currentFrameIdx > 9) {
+                isGameActive = false;
+                let resultText = numPlayers === 1 ? 
+                    `Score: ${document.getElementById("total-val-0").innerText}` : 
+                    `P1: ${document.getElementById("total-val-0").innerText} vs P2: ${document.getElementById("total-val-1").innerText}`;
+                document.getElementById('final-score-display').innerText = resultText;
+                document.getElementById('gameover-overlay').style.display = 'flex';
+                return;
+            }
+        } else if (pinsStatus.every(s => !s)) {
+            pinsStatus.fill(true); 
+        }
+
+        updateTurnUI();
+        ballBody.position.set(0, 0.38, 8.5);
+        ballBody.velocity.set(0,0,0);
+        ballBody.angularVelocity.set(0,0,0);
+        ballBody.quaternion.set(0,0,0,1);
+        ballAngle = 0;
+        canThrow = true;
+        guideLine.visible = true;
+        
+        // アバターリセット
+        playerModel.position.x = 0;
+        playerArm.rotation.x = 0;
+        playerTorso.rotation.x = 0;
+        playerModel.position.y = 0;
+        isThrowingAnimation = false;
+        isAiming = false;
+
+        createPins();
+        resetCamera();
+    }
+
+    function updateTurnUI() {
+        const indicator = document.getElementById("turn-indicator");
+        indicator.innerText = `PLAYER ${currentPlayer + 1} TURN`;
+        indicator.style.color = currentPlayer === 0 ? "#00d4ff" : "#ff5773";
+        indicator.style.textShadow = `0 0 10px ${currentPlayer === 0 ? "#00d4ff" : "#ff5773"}`;
+
+        // 2人プレイ時は現在投げている人のスコアだけ表示する
+        if (numPlayers === 2) {
+            document.getElementById('score-board-1').style.display = currentPlayer === 0 ? 'table' : 'none';
+            document.getElementById('total-score-p1').style.display = currentPlayer === 0 ? 'block' : 'none';
+            document.getElementById('score-board-2').style.display = currentPlayer === 1 ? 'table' : 'none';
+            document.getElementById('total-score-p2').style.display = currentPlayer === 1 ? 'block' : 'none';
+        } else {
+            document.getElementById('score-board-1').style.display = 'table';
+            document.getElementById('total-score-p1').style.display = 'block';
+            document.getElementById('score-board-2').style.display = 'none';
+            document.getElementById('total-score-p2').style.display = 'none';
+        }
+    }
+
+    function resetCamera() {
+        // アバターが完全に見えるようにカメラを後ろへ引く
+        camera.position.set(0, 5, 22); 
+        camera.lookAt(0, 1, -10);
+    }
+
+    function updateGamepadInput() {
+        if (gamepadIndex === null) return;
+        const gp = navigator.getGamepads()[gamepadIndex];
+        if (!gp) return;
+
+        if (!isGameActive) {
+            if (gp.buttons[0].pressed) {
+                if(!isAPressed) {
+                    isAPressed = true;
+                    startGame(1);
+                }
+            } else {
+                isAPressed = false;
+            }
+            return;
+        }
+
+        if (!canThrow && document.getElementById('action-btn').style.display === 'block') {
+            if (gp.buttons[0].pressed) {
+                if (!isAPressed) {
+                    isAPressed = true;
+                    resetForNextRoll();
+                }
+            } else {
+                isAPressed = false;
+            }
+            return;
+        }
+
+        if (!canThrow) return;
+
+        // 左スティック (移動)
+        if (Math.abs(gp.axes[0]) > 0.1) {
+            const moveAmt = gp.axes[0] * 0.05;
+            const newX = ballBody.position.x + moveAmt;
+            if (newX > -1.6 && newX < 1.6) {
+                ballBody.position.x = newX;
+                playerModel.position.x = ballBody.position.x;
+            }
+        }
+
+        // ZRボタン (ボタンインデックス7) で構え・投球
+        if (gp.buttons[7].pressed) {
+            isAiming = true; // 構えポーズをとる
+            
+            // Rスティックを上 (Y軸マイナス方向) に倒すと投球
+            if (gp.axes[3] < -0.6) {
+                if (!isZrPressed) { 
+                    isZrPressed = true;
+                    isAiming = false;
+                    
+                    // Rスティックの左右 (X軸) で回転(カーブ)量を決定
+                    let stickX = Math.abs(gp.axes[2]) > 0.1 ? gp.axes[2] : 0;
+                    let diffX = stickX * 300; 
+                    
+                    // スティックの倒し具合でパワーを決定 (基本パワー + α)
+                    let diffY = Math.abs(gp.axes[3]) * 200 + 50; 
+                    
+                    performThrow(diffX, diffY);
+                }
+            } else {
+                isZrPressed = false;
+            }
+        } else {
+            isAiming = false;
+            isZrPressed = false;
+            
+            // ZRを押していない時は Rスティック左右で基本角度を調整
+            if (Math.abs(gp.axes[2]) > 0.1) {
+                ballAngle += gp.axes[2] * -0.005; 
+            }
+        }
+    }
+
+    function animate() {
+        if (!isGameActive) return;
+        requestAnimationFrame(animate);
+        world.step(1/60);
+
+        updateGamepadInput(); 
+
+        if (canThrow) {
+            if (keys['arrowleft'] && ballBody.position.x > -1.6) {
+                ballBody.position.x -= 0.04;
+                playerModel.position.x = ballBody.position.x;
+            }
+            if (keys['arrowright'] && ballBody.position.x < 1.6) {
+                ballBody.position.x += 0.04;
+                playerModel.position.x = ballBody.position.x;
+            }
+            if (keys['a']) ballAngle += 0.002; 
+            if (keys['d']) ballAngle -= 0.002;
+            
+            guideLine.position.copy(ballBody.position);
+            guideLine.rotation.y = ballAngle;
+        } else {
+            // スピンによる横移動（カーブ）
+            ballBody.velocity.x += ballBody.angularVelocity.y * 0.002;
+
+            if (ballBody.position.z > -20) {
+                camera.position.z = ballBody.position.z + 13.5; // カメラも追従
+                camera.position.x = ballBody.position.x * 0.5;
+                camera.lookAt(ballBody.position.x, 0, ballBody.position.z - 5);
+            }
+        }
+
+        // アバターの姿勢制御（アニメーション）
+        if (isAiming && canThrow) {
+            // 構え（しゃがんで腕を引く）
+            playerModel.position.y = -0.3; 
+            if(playerTorso) playerTorso.rotation.x = 0.3; 
+            if(playerArm) playerArm.rotation.x = -Math.PI / 3; 
+        } else if (isThrowingAnimation) {
+            // 投球（腕を振り抜く）
+            playerModel.position.y = 0;
+            if(playerTorso) playerTorso.rotation.x = 0;
+            
+            throwAnimTime += 0.08;
+            if(playerArm) playerArm.rotation.x = -Math.PI / 3 + (Math.PI * 1.2 * Math.min(throwAnimTime, 1));
+            
+            if (throwAnimTime > 1.2) isThrowingAnimation = false; 
+        } else {
+            // 直立（通常時）
+            playerModel.position.y = 0;
+            if(playerTorso) playerTorso.rotation.x = 0;
+            if(playerArm) playerArm.rotation.x = 0;
+        }
+
+        ballMesh.position.copy(ballBody.position);
+        ballMesh.quaternion.copy(ballBody.quaternion);
+        pins.forEach(p => {
+            p.mesh.position.copy(p.body.position);
+            p.mesh.quaternion.copy(p.body.quaternion);
+        });
+
+        renderer.render(scene, camera);
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Block Blast - Advanced Cyber Horizon</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Plus+Jakarta+Sans:wght@500;800&display=swap');
+
+    :root {
+        --bg-color: #010308;
+        --panel-bg: rgba(6, 10, 28, 0.85);
+        --grid-line: rgba(255, 255, 255, 0.08); 
+        --grid-dot: rgba(0, 255, 204, 0.4);
+        --text-main: #f1f5f9;
+        --text-sub: #64748b;
+        --accent: #00ffcc;
+    }
+
+    body {
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: 10px;
+        user-select: none;
+        -webkit-user-select: none;
+        box-sizing: border-box;
+        touch-action: manipulation;
+        overflow: hidden;
+        position: relative;
+    }
+
+    /* ---------------- 背景レイヤー ---------------- */
+    .bg-gradient {
+        position: fixed;
+        inset: 0;
+        background: radial-gradient(circle at 50% 45%, #0c1b3d 0%, #010308 100%);
+        z-index: -3;
+        pointer-events: none;
+    }
+
+    #bg-canvas {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        z-index: -1; /* グリッドや星をより見えやすくするため前面寄りに配置 */
+        pointer-events: none;
+    }
+
+    #effect-canvas {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        pointer-events: none;
+        z-index: 990;
+    }
+
+    #flash-overlay {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background-color: #ffffff;
+        opacity: 0;
+        pointer-events: none;
+        z-index: 1000;
+    }
+
+    /* ---------------- 全体レイアウト ---------------- */
+    .game-container {
+        display: flex;
+        flex-direction: row;
+        gap: 24px;
+        justify-content: center;
+        align-items: center;
+        max-width: 920px;
+        width: 100%;
+        position: relative;
+        z-index: 10;
+    }
+
+    .main-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: var(--panel-bg);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 24px 32px 32px 32px;
+        border-radius: 24px;
+        box-shadow: 
+            0 40px 100px rgba(0, 0, 0, 0.85),
+            inset 0 1px 1px rgba(255, 255, 255, 0.1),
+            0 0 60px rgba(0, 85, 255, 0.05);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+    }
+
+    .side-panel {
+        background: var(--panel-bg);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 24px;
+        border-radius: 24px;
+        box-shadow: 0 40px 100px rgba(0, 0, 0, 0.85), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        width: 200px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        height: 480px;
+        box-sizing: border-box;
+    }
+
+    h1 {
+        margin: 0;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 32px;
+        font-weight: 900;
+        letter-spacing: 6px;
+        background: linear-gradient(90deg, #00ffcc, #00aaff, #00ffcc);
+        background-size: 200% auto;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: chromaShine 6s linear infinite;
+    }
+    @keyframes chromaShine {
+        0% { background-position: 0% center; }
+        100% { background-position: 200% center; }
+    }
+
+    .subtitle {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 9px;
+        color: var(--accent);
+        margin-bottom: 20px;
+        text-transform: uppercase;
+        letter-spacing: 4px;
+        font-weight: 700;
+        opacity: 0.8;
+    }
+
+    .score-container {
+        display: flex;
+        gap: 12px;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+
+    .score-box {
+        flex: 1;
+        background: rgba(0, 0, 0, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        padding: 10px;
+        border-radius: 14px;
+        text-align: center;
+    }
+    
+    .score-box .label {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 8px;
+        color: var(--text-sub);
+        font-weight: 700;
+        letter-spacing: 2px;
+        margin-bottom: 4px;
+    }
+
+    .score-box .value {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 24px;
+        font-weight: 900;
+        color: #ffffff;
+        text-shadow: 0 0 12px rgba(255,255,255,0.15);
+        transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    /* ---------------- グリッドボード ---------------- */
+    #board {
+        display: grid;
+        grid-template-columns: repeat(8, 44px);
+        gap: 0px; 
+        background-color: rgba(1, 3, 8, 0.92);
+        padding: 12px;
+        border-radius: 16px;
+        box-shadow: 
+            inset 0 4px 24px rgba(0, 0, 0, 0.95),
+            0 0 0 1px rgba(255, 255, 255, 0.08);
+        margin-bottom: 24px;
+        position: relative;
+    }
+
+    .cell {
+        width: 44px;
+        height: 44px;
+        background-color: transparent;
+        box-sizing: border-box;
+        border-right: 1px solid var(--grid-line);
+        border-bottom: 1px solid var(--grid-line);
+        position: relative;
+    }
+
+    .cell::before {
+        content: '';
+        position: absolute;
+        right: -1.5px;
+        bottom: -1.5px;
+        width: 2px;
+        height: 2px;
+        background-color: var(--grid-dot);
+        border-radius: 50%;
+        z-index: 2;
+        pointer-events: none;
+    }
+
+    .cell:nth-child(8n) { border-right: none; }
+    .cell:nth-child(8n)::before { display: none; }
+    .cell:nth-last-child(-n+8) { border-bottom: none; }
+    .cell:nth-last-child(-n+8)::before { display: none; }
+
+    /* ---------------- ブロックの見た目 ---------------- */
+    .shape-type-0  { --c1:#2adeff; --c2:#0055ff; --c3:#0022aa; --glow:rgba(0,85,255,0.4); }
+    .shape-type-1  { --c1:#3bf7ff; --c2:#00aaff; --c3:#005580; --glow:rgba(0,170,255,0.4); }
+    .shape-type-2  { --c1:#3bfff3; --c2:#00cbb7; --c3:#006055; --glow:rgba(0,203,183,0.4); }
+    .shape-type-3  { --c1:#46ff93; --c2:#00b54b; --c3:#005a22; --glow:rgba(0,181,75,0.4); }
+    .shape-type-4  { --c1:#96ff3b; --c2:#52c800; --c3:#286400; --glow:rgba(82,200,0,0.4); }
+    .shape-type-5  { --c1:#e0ff3b; --c2:#a2ca00; --c3:#516500; --glow:rgba(162,202,0,0.4); }
+    .shape-type-6  { --c1:#ffdf3b; --c2:#ca9c00; --c3:#6b5200; --glow:rgba(202,156,0,0.4); }
+    .shape-type-7  { --c1:#ffb03b; --c2:#cc6a00; --c3:#663500; --glow:rgba(204,106,0,0.4); }
+    .shape-type-8  { --c1:#ff763b; --c2:#ce2c00; --c3:#6d1700; --glow:rgba(206,44,0,0.4); }
+    .shape-type-9  { --c1:#ff3b76; --c2:#cd0042; --c3:#6d0023; --glow:rgba(205,0,66,0.4); }
+    .shape-type-10 { --c1:#ff3be0; --c2:#cc00a6; --c3:#660053; --glow:rgba(204,0,166,0.4); }
+    .shape-type-11 { --c1:#cc3bff; --c2:#8c00cb; --c3:#430061; --glow:rgba(140,0,203,0.4); }
+    .shape-type-12 { --c1:#7c3bff; --c2:#4600cc; --c3:#20005d; --glow:rgba(70,0,204,0.4); }
+    .shape-type-13 { --c1:#a06fff; --c2:#651fff; --c3:#3200b3; --glow:rgba(101,31,255,0.4); }
+    .shape-type-14 { --c1:#70a1ff; --c2:#1e90ff; --c3:#005ecb; --glow:rgba(30,144,255,0.4); }
+    .shape-type-15 { --c1:#ffffff; --c2:#a4b0be; --c3:#57606f; --glow:rgba(164,176,190,0.3); }
+    .shape-type-16 { --c1:#ffb6c1; --c2:#ff1493; --c3:#8b0a50; --glow:rgba(255,20,147,0.4); }
+
+    .cell.filled {
+        background: linear-gradient(135deg, var(--c1) 0%, var(--c2) 55%, var(--c3) 100%) !important;
+        box-shadow: 
+            inset 0 2px 0px rgba(255, 255, 255, 0.4),
+            inset 0 -3px 5px rgba(0, 0, 0, 0.6),
+            0 4px 12px var(--glow);
+        border: 1px solid rgba(255,255,255,0.2) !important;
+        border-radius: 4px;
+    }
+
+    .shape-cell.filled {
+        background: linear-gradient(135deg, var(--c1) 0%, var(--c2) 60%, var(--c3) 100%);
+        box-shadow: 
+            inset 0 2px 0px rgba(255, 255, 255, 0.4),
+            inset 0 -2px 4px rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 3px !important;
+    }
+
+    .cell.just-placed {
+        animation: cell-press 0.15s ease-out;
+    }
+    @keyframes cell-press {
+        0% { transform: scale(0.92); filter: brightness(1.3); }
+        100% { transform: scale(1); filter: brightness(1); }
+    }
+
+    .cell.hover-active {
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .cell.spark {
+        animation: spark-subtle 0.1s ease-in-out infinite alternate;
+    }
+    @keyframes spark-subtle {
+        0% { filter: brightness(1.2); opacity: 0.8; }
+        100% { filter: brightness(1.8); opacity: 1; }
+    }
+
+    .cell.preview {
+        background: rgba(0, 255, 204, 0.25) !important;
+        box-shadow: inset 0 0 6px rgba(0, 255, 204, 0.5) !important;
+    }
+    .cell.preview-error {
+        background-color: rgba(255, 0, 60, 0.25) !important;
+    }
+
+    /* ---------------- トレイ ---------------- */
+    #tray {
+        display: flex;
+        gap: 12px;
+        height: 100px;
+        width: 100%;
+        justify-content: center;
+    }
+
+    .tray-slot {
+        flex: 1;
+        max-width: 100px;
+        height: 100px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-radius: 14px;
+        background-color: rgba(0, 0, 0, 0.5);
+        box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        touch-action: none;
+    }
+
+    .shape-grid {
+        display: grid;
+        gap: 2px;
+        cursor: grab;
+        padding: 4px;
+        border-radius: 6px;
+        transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.2);
+    }
+    .shape-grid:hover { transform: scale(1.06); }
+
+    .shape-cell {
+        width: 16px;
+        height: 16px;
+        box-sizing: border-box;
+    }
+    .shape-cell.empty { background-color: transparent; }
+
+    .drag-clone {
+        position: fixed;
+        pointer-events: none;
+        z-index: 1100;
+        opacity: 0.95;
+        filter: drop-shadow(0 16px 24px rgba(0, 0, 0, 0.6));
+    }
+    .drag-clone .shape-cell {
+        width: 44px;
+        height: 44px;
+        border-radius: 4px !important;
+    }
+
+    /* ---------------- サイドパネル ---------------- */
+    .ranking-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--accent);
+        margin-bottom: 16px;
+        text-align: center;
+        width: 100%;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        padding-bottom: 10px;
+        letter-spacing: 3px;
+        opacity: 0.9;
+    }
+
+    .ranking-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        width: 100%;
+    }
+
+    .ranking-list li {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 8px;
+        border-bottom: 1px solid rgba(255,255,255,0.02);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 13px;
+        color: #94a3b8;
+    }
+
+    .ranking-list li:first-child {
+        color: var(--accent);
+        background: rgba(0, 255, 204, 0.04);
+        border-radius: 8px;
+        font-weight: bold;
+    }
+
+    /* ---------------- モーダル ---------------- */
+    #modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(1, 2, 6, 0.9);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        z-index: 1200;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal-content {
+        background: rgba(8, 12, 26, 0.98);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 40px;
+        border-radius: 24px;
+        text-align: center;
+        box-shadow: 0 30px 80px rgba(0,0,0,0.85);
+        max-width: 320px;
+        width: 100%;
+        animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.15);
+    }
+    @keyframes pop-in {
+        0% { transform: scale(0.9); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-content h2 {
+        font-family: 'Orbitron', sans-serif;
+        color: #ff0066;
+        font-size: 32px;
+        font-weight: 900;
+        margin-top: 0;
+        letter-spacing: 4px;
+        text-shadow: 0 0 20px rgba(255, 0, 102, 0.3);
+    }
+
+    .final-score { font-size: 18px; margin: 24px 0; color: #94a3b8; font-weight: bold;}
+
+    button {
+        width: 100%;
+        padding: 16px;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 14px;
+        font-weight: 900;
+        background: linear-gradient(135deg, #00ffcc 0%, #0066ff 100%);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        box-shadow: 0 8px 20px rgba(0, 102, 255, 0.3);
+        letter-spacing: 2px;
+        transition: all 0.2s ease;
+    }
+    button:hover { 
+        filter: brightness(1.1); 
+        box-shadow: 0 10px 24px rgba(0, 255, 204, 0.4); 
+        transform: translateY(-1px);
+    }
+
+    @media (max-width: 800px) {
+        .game-container { flex-direction: column; gap: 16px; }
+        .side-panel { width: 100%; height: auto; padding: 16px; }
+        .ranking-title, .ranking-list { display: none; }
+        #board { grid-template-columns: repeat(8, 36px); padding: 10px; }
+        .cell { width: 36px; height: 36px; }
+        .drag-clone .shape-cell { width: 36px; height: 36px; }
+    }
+</style>
+</head>
+<body>
+
+<div class="bg-gradient"></div>
+<canvas id="bg-canvas"></canvas>
+<canvas id="effect-canvas"></canvas>
+<div id="flash-overlay"></div>
+
+<div class="game-container">
+    <div class="main-panel" id="main-panel">
+        <h1>BLOCK BLAST</h1>
+        <div class="subtitle">Cyber Horizon</div>
+        
+        <div class="score-container">
+            <div class="score-box">
+                <div class="label">SCORE</div>
+                <div id="score" class="value">0</div>
+            </div>
+            <div class="score-box">
+                <div class="label">BEST</div>
+                <div id="best-score" class="value" style="color: var(--accent);">0</div>
+            </div>
+        </div>
+
+        <div id="board"></div>
+        <div id="tray"></div>
+    </div>
+
+    <div class="side-panel">
+        <div class="ranking-title">RECORDS</div>
+        <ul class="ranking-list" id="ranking-list"></ul>
+    </div>
+</div>
+
+<div id="modal-overlay">
+    <div class="modal-content">
+        <h2>TERMINATED</h2>
+        <div class="final-score">SCORE: <br><span id="final-score-val" style="color:var(--accent); font-family: 'Orbitron', monospace; font-size: 36px; display:inline-block; margin-top:10px; text-shadow: 0 0 12px rgba(0,255,204,0.3);">0</span></div>
+        <button onclick="initGame()">REBOOT SYSTEM</button>
+    </div>
+</div>
+
+<script>
+    const BOARD_SIZE = 8;
+    let board = [];      
+    let score = 0;
+    let tray = [null, null, null];
+    let comboCount = 0;
+    let draggingIndex = -1;
+    let activeClone = null;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+    let effectQueue = [];
+    let isProcessingQueue = false;
+
+    const SHAPES = [
+        [[1]], [[1,1]], [[1],[1]], [[1,1,1]], [[1],[1],[1]], [[1,1,1,1]], [[1],[1],[1],[1]],
+        [[1,1],[1,1]], [[1,1,1],[1,1,1],[1,1,1]],
+        [[1,0],[1,1]], [[0,1],[1,1]], [[1,1],[1,0]], [[1,1],[0,1]],
+        [[1,0,0],[1,0,0],[1,1,1]], [[0,0,1],[0,0,1],[1,1,1]], [[1,1,1],[1,0,0],[1,0,0]], [[1,1,1],[0,0,1],[0,0,1]]
+    ];
+
+    const PALETTE = [
+        { c2: '#0055ff' }, { c2: '#00aaff' }, { c2: '#00cbb7' }, { c2: '#00b54b' },
+        { c2: '#52c800' }, { c2: '#a2ca00' }, { c2: '#ca9c00' }, { c2: '#cc6a00' },
+        { c2: '#ce2c00' }, { c2: '#cd0042' }, { c2: '#cc00a6' }, { c2: '#8c00cb' },
+        { c2: '#4600cc' }, { c2: '#651fff' }, { c2: '#1e90ff' }, { c2: '#a4b0be' },
+        { c2: '#ff1493' }
+    ];
+
+    const mainPanel = document.getElementById('main-panel');
+    const boardElement = document.getElementById('board');
+    const trayElement = document.getElementById('tray');
+    const scoreElement = document.getElementById('score');
+    const bestScoreElement = document.getElementById('best-score');
+    const modalOverlay = document.getElementById('modal-overlay');
+    const finalScoreVal = document.getElementById('final-score-val');
+    const rankingList = document.getElementById('ranking-list');
+    
+    const bgCanvas = document.getElementById('bg-canvas');
+    const bgCtx = bgCanvas.getContext('2d');
+    const canvas = document.getElementById('effect-canvas');
+    const ctx = canvas.getContext('2d');
+    const flashOverlay = document.getElementById('flash-overlay');
+
+    let particles = [];
+    let scanWaves = []; 
+    let spaceStars = []; 
+    let textEffects = [];
+    let lasers = [];
+    let bgGridOffset = 0; 
+
+    function resizeCanvas() {
+        bgCanvas.width = canvas.width = window.innerWidth;
+        bgCanvas.height = canvas.height = window.innerHeight;
+        initSpaceStars();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    function initSpaceStars() {
+        spaceStars = [];
+        for (let i = 0; i < 45; i++) { 
+            spaceStars.push({
+                x: Math.random() * bgCanvas.width,
+                y: Math.random() * bgCanvas.height,
+                size: Math.random() * 1.5 + 0.5,
+                speedY: -(Math.random() * 0.04 + 0.01),
+                alpha: Math.random() * 0.4 + 0.1
+            });
+        }
+    }
+
+    let highScores = JSON.parse(localStorage.getItem('blockBlastNeonScores')) || [0, 0, 0, 0, 0];
+
+    function updateRankingUI() {
+        rankingList.innerHTML = '';
+        highScores.forEach((s, index) => {
+            const li = document.createElement('li');
+            li.innerHTML = `<span>#${index + 1}</span> <span>${s}</span>`;
+            rankingList.appendChild(li);
+        });
+        bestScoreElement.innerText = highScores[0] || 0;
+    }
+
+    function saveScore() {
+        if (score > 0) {
+            highScores.push(score);
+            highScores.sort((a, b) => b - a);
+            highScores = highScores.slice(0, 5);
+            localStorage.setItem('blockBlastNeonScores', JSON.stringify(highScores));
+            updateRankingUI();
+        }
+    }
+
+    function updateScoreDisplay(newScore) {
+        score = newScore;
+        scoreElement.innerText = score;
+        scoreElement.style.transform = 'scale(1.1)';
+        setTimeout(() => { scoreElement.style.transform = 'scale(1)'; }, 100);
+    }
+
+    function initGame() {
+        board = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(0));
+        updateScoreDisplay(0);
+        draggingIndex = -1;
+        comboCount = 0;
+        effectQueue = [];
+        isProcessingQueue = false;
+        modalOverlay.style.display = 'none';
+        
+        particles = [];
+        scanWaves = [];
+        textEffects = [];
+        lasers = [];
+        
+        resizeCanvas();
+        updateRankingUI();
+        createBoardUI();
+        fillTray();
+    }
+
+    function createBoardUI() {
+        boardElement.innerHTML = '';
+        for (let r = 0; r < BOARD_SIZE; r++) {
+            for (let c = 0; c < BOARD_SIZE; c++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.row = r;
+                cell.dataset.col = c;
+                boardElement.appendChild(cell);
+            }
+        }
+        updateBoardUI();
+    }
+
+    function updateBoardUI() {
+        const cells = boardElement.children;
+        for (let i = 0; i < cells.length; i++) {
+            const r = Math.floor(i / BOARD_SIZE);
+            const c = i % BOARD_SIZE;
+            if (cells[i].classList.contains('spark')) continue;
+            
+            cells[i].className = 'cell';
+            if (board[r][c] > 0) {
+                const shapeId = board[r][c] - 1;
+                cells[i].classList.add('filled', `shape-type-${shapeId}`);
+            }
+        }
+    }
+
+    function getRandomShapeData() {
+        const id = Math.floor(Math.random() * SHAPES.length);
+        return { id: id, matrix: SHAPES[id] };
+    }
+
+    function fillTray() {
+        for (let i = 0; i < 3; i++) {
+            if (tray[i] === null) tray[i] = getRandomShapeData();
+        }
+        renderTray();
+        checkGameOver();
+    }
+
+    function renderTray() {
+        trayElement.innerHTML = '';
+        for (let i = 0; i < 3; i++) {
+            const slot = document.createElement('div');
+            slot.className = 'tray-slot';
+            
+            if (tray[i] !== null) {
+                const shapeData = tray[i];
+                const matrix = shapeData.matrix;
+                const grid = document.createElement('div');
+                grid.className = 'shape-grid';
+                grid.dataset.shapeId = shapeData.id;
+                grid.style.gridTemplateColumns = `repeat(${matrix[0].length}, 16px)`;
+                
+                for (let r = 0; r < matrix.length; r++) {
+                    for (let c = 0; c < matrix[0].length; c++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'shape-cell ' + (matrix[r][c] ? `filled shape-type-${shapeData.id}` : 'empty');
+                        grid.appendChild(cell);
+                    }
+                }
+                
+                grid.addEventListener('pointerdown', (e) => startDrag(e, i, grid));
+                slot.appendChild(grid);
+            }
+            trayElement.appendChild(slot);
+        }
+    }
+
+    function startDrag(e, index, originalGrid) {
+        if (tray[index] === null) return;
+        e.preventDefault();
+        
+        draggingIndex = index;
+        const slots = trayElement.children;
+        if(slots[index]) slots[index].style.opacity = '0.15';
+
+        const sampleCell = boardElement.children[0];
+        const cellSize = sampleCell ? sampleCell.getBoundingClientRect().width : 44;
+        
+        const shapeData = tray[index];
+        const matrix = shapeData.matrix;
+        
+        let minX = matrix[0].length, maxX = 0;
+        let maxY = 0;
+        for(let r=0; r<matrix.length; r++) {
+            for(let c=0; c<matrix[0].length; c++) {
+                if(matrix[r][c]) {
+                    if(c < minX) minX = c;
+                    if(c > maxX) maxX = c;
+                    if(r > maxY) maxY = r;
+                }
+            }
+        }
+        
+        const blockCenterX = minX + (maxX - minX + 1) / 2;
+        dragOffsetX = blockCenterX * cellSize;
+        dragOffsetY = (maxY + 1.4) * cellSize; 
+
+        activeClone = originalGrid.cloneNode(true);
+        activeClone.classList.add('drag-clone');
+        activeClone.style.gridTemplateColumns = `repeat(${matrix[0].length}, ${cellSize}px)`;
+        
+        const cloneCells = activeClone.querySelectorAll('.shape-cell');
+        cloneCells.forEach(cc => {
+            cc.style.width = `${cellSize}px`;
+            cc.style.height = `${cellSize}px`;
+            if(!cc.classList.contains('empty')) {
+                cc.style.boxShadow = 'inset 0 2px 0px rgba(255,255,255,0.4), inset 0 -3px 5px rgba(0,0,0,0.6), 0 8px 15px rgba(0,0,0,0.5)';
+            }
+        });
+
+        document.body.appendChild(activeClone);
+        moveClone(e.clientX, e.clientY);
+        
+        window.addEventListener('pointermove', onDrag);
+        window.addEventListener('pointerup', endDrag);
+        updatePreviewAtPosition(e.clientX, e.clientY);
+    }
+
+    function onDrag(e) {
+        if (draggingIndex === -1 || !activeClone) return;
+        moveClone(e.clientX, e.clientY);
+        updatePreviewAtPosition(e.clientX, e.clientY);
+    }
+
+    function moveClone(clientX, clientY) {
+        activeClone.style.left = `${clientX - dragOffsetX}px`;
+        activeClone.style.top = `${clientY - dragOffsetY}px`;
+    }
+
+    function updatePreviewAtPosition(clientX, clientY) {
+        clearPreview();
+        const cell = getBoardCellFromPixel(clientX, clientY);
+        
+        if (cell) cell.classList.add('hover-active');
+        if (!cell) return;
+
+        const r = parseInt(cell.dataset.row);
+        const c = parseInt(cell.dataset.col);
+        const shapeData = tray[draggingIndex];
+        const matrix = shapeData.matrix;
+        const isValid = canPlace(matrix, r, c);
+
+        for (let sr = 0; sr < matrix.length; sr++) {
+            for (let sc = 0; sc < matrix[0].length; sc++) {
+                if (matrix[sr][sc]) {
+                    const br = r + sr;
+                    const bc = c + sc;
+                    if (br < BOARD_SIZE && bc < BOARD_SIZE) {
+                        const cellIndex = br * BOARD_SIZE + bc;
+                        const targetCell = boardElement.children[cellIndex];
+                        if (board[br][bc] === 0) {
+                            targetCell.classList.add(isValid ? 'preview' : 'preview-error');
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    function endDrag(e) {
+        window.removeEventListener('pointermove', onDrag);
+        window.removeEventListener('pointerup', endDrag);
+        
+        if (draggingIndex === -1) return;
+
+        const slots = trayElement.children;
+        if(slots[draggingIndex]) slots[draggingIndex].style.opacity = '1';
+
+        const cell = getBoardCellFromPixel(e.clientX, e.clientY);
+        let placed = false;
+
+        if (cell) {
+            const r = parseInt(cell.dataset.row);
+            const c = parseInt(cell.dataset.col);
+            const shapeData = tray[draggingIndex];
+
+            if (canPlace(shapeData.matrix, r, c)) {
+                placeShapeAt(r, c, shapeData);
+                placed = true;
+            }
+        }
+
+        if (activeClone) { activeClone.remove(); activeClone = null; }
+        clearPreview();
+        draggingIndex = -1;
+
+        if (placed) {
+            if (tray.every(s => s === null)) { fillTray(); } else { renderTray(); checkGameOver(); }
+        } else {
+            renderTray();
+        }
+    }
+
+    function getBoardCellFromPixel(clientX, clientY) {
+        const sampleCell = boardElement.children[0];
+        const cellSize = sampleCell ? sampleCell.getBoundingClientRect().width : 44;
+        const targetX = clientX - dragOffsetX + (cellSize / 2);
+        const targetY = clientY - dragOffsetY + (cellSize / 2);
+        const element = document.elementFromPoint(targetX, targetY);
+        if (element && element.classList.contains('cell')) return element;
+        return null;
+    }
+
+    function canPlace(matrix, startR, startC) {
+        for (let r = 0; r < matrix.length; r++) {
+            for (let c = 0; c < matrix[r].length; c++) {
+                if (matrix[r][c]) {
+                    const br = startR + r;
+                    const bc = startC + c;
+                    if (br < 0 || br >= BOARD_SIZE || bc < 0 || bc >= BOARD_SIZE || board[br][bc] > 0) return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    function clearPreview() {
+        const cells = boardElement.children;
+        for (let i = 0; i < cells.length; i++) {
+            cells[i].classList.remove('preview', 'preview-error', 'hover-active');
+        }
+    }
+
+    function placeShapeAt(r, c, shapeData) {
+        let blocksPlaced = 0;
+        const cells = boardElement.children;
+        const matrix = shapeData.matrix;
+        const colorMeta = PALETTE[shapeData.id] || { c2: '#00ffcc' };
+
+        for (let sr = 0; sr < matrix.length; sr++) {
+            for (let sc = 0; sc < matrix[0].length; sc++) {
+                if (matrix[sr][sc]) {
+                    const br = r + sr;
+                    const bc = c + sc;
+                    board[br][bc] = shapeData.id + 1; 
+                    blocksPlaced++;
+
+                    const cellIndex = br * BOARD_SIZE + bc;
+                    if(cells[cellIndex]) {
+                        cells[cellIndex].classList.add('just-placed');
+                        const rect = cells[cellIndex].getBoundingClientRect();
+                        
+                        // 【改善】配置時のスキャンウェーブエフェクト
+                        createScanWave(rect.left + rect.width / 2, rect.top + rect.height / 2, colorMeta.c2);
+                    }
+                }
+            }
+        }
+
+        updateScoreDisplay(score + blocksPlaced * 10);
+        tray[draggingIndex] = null;
+        
+        clearLines();
+        updateBoardUI();
+    }
+
+    // 【改善】配置時のスクエア型スキャンウェーブを極めて視認しやすく強化
+    function createScanWave(x, y, color) {
+        scanWaves.push({
+            x: x,
+            y: y,
+            size: 8,        // 開始サイズ
+            maxSize: 76,    // 少し大きく広げて見えやすく
+            color: color,
+            alpha: 1.0,
+            speed: 3.8      // 「パシッ」と素早く広がる快感速度
+        });
+    }
+
+    function clearLines() {
+        let rowsToClear = [];
+        let colsToClear = [];
+
+        for (let r = 0; r < BOARD_SIZE; r++) {
+            let isFull = true;
+            for(let c=0; c<BOARD_SIZE; c++) { if(board[r][c] === 0) { isFull = false; break; } }
+            if (isFull) rowsToClear.push(r);
+        }
+
+        for (let c = 0; c < BOARD_SIZE; c++) {
+            let isFull = true;
+            for (let r = 0; r < BOARD_SIZE; r++) { if (board[r][c] === 0) { isFull = false; break; } }
+            if (isFull) colsToClear.push(c);
+        }
+
+        const totalLines = rowsToClear.length + colsToClear.length;
+
+        if (totalLines === 0) {
+            comboCount = 0;
+            return;
+        }
+
+        comboCount++;
+        const cells = boardElement.children;
+
+        rowsToClear.forEach(r => {
+            for(let c=0; c<BOARD_SIZE; c++) cells[r * BOARD_SIZE + c].classList.add('spark');
+        });
+        colsToClear.forEach(c => {
+            for(let r=0; r<BOARD_SIZE; r++) cells[r * BOARD_SIZE + c].classList.add('spark');
+        });
+
+        const boardRect = boardElement.getBoundingClientRect();
+        const sampleCell = cells[0].getBoundingClientRect();
+        const cellSizeWithGap = sampleCell.width; 
+        
+        const laserWidth = 24 + comboCount * 4;
+
+        rowsToClear.forEach(r => {
+            const y = boardRect.top + 12 + (r * cellSizeWithGap) + sampleCell.height / 2;
+            let sampleShapeId = board[r][0] > 0 ? board[r][0] - 1 : 0;
+            let laserColor = (PALETTE[sampleShapeId] || PALETTE[0]).c2;
+            createLaser(0, y, window.innerWidth, y, laserColor, laserWidth);
+        });
+
+        colsToClear.forEach(c => {
+            const x = boardRect.left + 12 + (c * cellSizeWithGap) + sampleCell.width / 2;
+            let sampleShapeId = board[0][c] > 0 ? board[0][c] - 1 : 3;
+            let laserColor = (PALETTE[sampleShapeId] || PALETTE[0]).c2;
+            createLaser(x, 0, x, window.innerHeight, laserColor, laserWidth);
+        });
+
+        setTimeout(() => {
+            rowsToClear.forEach(r => { 
+                createLineBreakParticles(r, true);
+                for (let c = 0; c < BOARD_SIZE; c++) board[r][c] = 0; 
+            });
+            colsToClear.forEach(c => { 
+                createLineBreakParticles(c, false);
+                for (let r = 0; r < BOARD_SIZE; r++) board[r][c] = 0; 
+            });
+
+            for (let i = 0; i < cells.length; i++) cells[i].classList.remove('spark');
+            updateBoardUI();
+
+            let baseScore = totalLines * 100;
+            if (totalLines > 1) baseScore += (totalLines - 1) * 100;
+            
+            const finalAdded = baseScore * comboCount;
+            updateScoreDisplay(score + finalAdded);
+
+            let isPerfect = true;
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) { if (board[r][c] !== 0) { isPerfect = false; break; } }
+            }
+
+            if (isPerfect) {
+                updateScoreDisplay(score + 3000);
+                effectQueue.push({ type: 'perfect', data: { boardRect } });
+            }
+            
+            effectQueue.push({ 
+                type: 'combo', 
+                data: { totalLines, comboCount: comboCount, x: boardRect.left + boardRect.width/2, y: boardRect.top + boardRect.height/2 } 
+            });
+
+            processNextEffect();
+
+        }, 160);
+    }
+
+    function processNextEffect() {
+        if (effectQueue.length === 0) {
+            isProcessingQueue = false;
+            return;
+        }
+        isProcessingQueue = true;
+        const currentEffect = effectQueue.shift();
+
+        if (currentEffect.type === 'perfect') {
+            triggerPerfectClearEffect(currentEffect.data.boardRect);
+            setTimeout(processNextEffect, 1200);
+        } 
+        else if (currentEffect.type === 'combo') {
+            const d = currentEffect.data;
+            let comboText = `${d.totalLines} LINES`;
+            if (d.comboCount > 1) comboText = `🔥 COMBO x${d.comboCount}`;
+            
+            createComboText(comboText, d.x, d.y, d.comboCount);
+            setTimeout(processNextEffect, 400);
+        }
+    }
+
+    function createLaser(x1, y1, x2, y2, color, startWidth) {
+        lasers.push({ 
+            x1: x1, y1: y1, x2: x2, y2: y2, 
+            width: startWidth, 
+            maxWidth: startWidth,
+            color: color,
+            alpha: 1.0 
+        });
+    }
+
+    // 【修正】ライン消去時の飛び散るドットを、ダラダラ残らず「少し早くシュッと消える」ように調整
+    function createLineBreakParticles(index, isRow) {
+        const cells = boardElement.children;
+        const pCount = 10; // 少しスマートに絞って速度感を向上
+
+        for (let i = 0; i < BOARD_SIZE; i++) {
+            const cellIndex = isRow ? (index * BOARD_SIZE + i) : (i * BOARD_SIZE + index);
+            const cellEl = cells[cellIndex];
+            if(!cellEl) continue;
+            
+            let cellShapeId = isRow ? (board[index][i] > 0 ? board[index][i]-1 : 0) : (board[i][index] > 0 ? board[i][index]-1 : 0);
+            let particleColor = (PALETTE[cellShapeId] || PALETTE[0]).c2;
+
+            const rect = cellEl.getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+
+            for (let p = 0; p < pCount; p++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 1.5 + 0.6; // 初速を少し上げて飛び散りキレを強化
+                particles.push({
+                    x: cx, y: cy,
+                    vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                    radius: Math.random() * 2.2 + 1.0,
+                    color: particleColor,
+                    alpha: 1.0, 
+                    decay: 0.022, // 消滅スピード（前の0.009から大幅に速め、早くシュッと消えるように）
+                    isSquare: Math.random() > 0.3
+                });
+            }
+        }
+    }
+
+    function createComboText(text, x, y, currentCombo) {
+        const targetScale = Math.min(1.0 + (currentCombo * 0.2), 2.2);
+        let textColor = '#00ffcc';
+        let shadowColor = 'rgba(0, 85, 255, 0.5)';
+        
+        if (currentCombo >= 3) {
+            textColor = '#ffdf3b';
+            shadowColor = 'rgba(256, 50, 0, 0.6)';
+        } else if (currentCombo === 2) {
+            textColor = '#ff007f';
+            shadowColor = 'rgba(140, 0, 203, 0.5)';
+        }
+
+        textEffects.push({
+            text: text, x: x, y: y - 30, scale: 0.1, targetScale: targetScale,
+            alpha: 1, phase: 'pop', color: textColor, shadow: shadowColor
+        });
+    }
+
+    function triggerPerfectClearEffect(boardRect) {
+        flashOverlay.style.opacity = '0.25';
+        let flashInterval = setInterval(() => {
+            let op = parseFloat(flashOverlay.style.opacity);
+            if (op <= 0) clearInterval(flashInterval);
+            else flashOverlay.style.opacity = (op - 0.04).toString();
+        }, 25);
+
+        const bx = boardRect.left + boardRect.width / 2;
+        const by = boardRect.top + boardRect.height / 2;
+
+        for (let i = 0; i < 100; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 2.0 + 0.5;
+            let randomColor = PALETTE[Math.floor(Math.random() * PALETTE.length)].c2;
+            particles.push({
+                x: bx, y: by, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                radius: Math.random() * 3.0 + 1.2, color: randomColor,
+                alpha: 1.0, decay: 0.018, isSquare: Math.random() > 0.3
+            });
+        }
+
+        textEffects.push({
+            text: 'PERFECT !!', x: window.innerWidth / 2, y: by, scale: 0.1, targetScale: 1.4, alpha: 1, phase: 'pop', color: '#ffffff', shadow: '#ff007f'
+        });
+    }
+
+    function drawLoop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+        
+        // 1. 背景の小さな星々
+        for (let i = 0; i < spaceStars.length; i++) {
+            let s = spaceStars[i];
+            s.y += s.speedY;
+            if (s.y < 0) { s.y = bgCanvas.height; s.x = Math.random() * bgCanvas.width; }
+            bgCtx.fillStyle = '#ffffff';
+            bgCtx.globalAlpha = s.alpha * (0.6 + Math.sin(Date.now() * 0.0015 + i) * 0.4); 
+            bgCtx.fillRect(s.x, s.y, s.size, s.size);
+        }
+
+        // 2. 【改善】背景のサイバーグリッドライン（不透明度・輝度を強化し、はっきり見えるように変更）
+        bgGridOffset += 0.5; 
+        
+        bgCtx.strokeStyle = 'rgba(0, 140, 255, 0.45)'; // 以前の0.18から大幅に濃く
+        bgCtx.lineWidth = 1.8;
+        const centerX = bgCanvas.width / 2;
+        for (let i = -12; i <= 12; i++) {
+            bgCtx.beginPath();
+            bgCtx.moveTo(centerX + i * 45, 0);
+            bgCtx.lineTo(centerX + i * 150, bgCanvas.height);
+            bgCtx.stroke();
+        }
+
+        let hSpacing = 55;
+        for (let y = (bgGridOffset % hSpacing); y < bgCanvas.height; y += hSpacing) {
+            let ratio = y / bgCanvas.height;
+            bgCtx.strokeStyle = `rgba(0, 255, 204, ${0.18 + ratio * 0.35})`; // 以前の0.06からクッキリ見える濃度へ
+            bgCtx.lineWidth = 1.2 + ratio * 1.8;
+            bgCtx.beginPath();
+            bgCtx.moveTo(0, y);
+            bgCtx.lineTo(bgCanvas.width, y);
+            bgCtx.stroke();
+        }
+        bgCtx.globalAlpha = 1.0;
+
+        // 3. レーザー描画
+        for (let i = lasers.length - 1; i >= 0; i--) {
+            let l = lasers[i];
+            l.alpha -= 0.028; 
+            l.width *= 0.88;  
+
+            if (l.alpha <= 0 || l.width < 1.0) { lasers.splice(i, 1); continue; }
+
+            ctx.save();
+            ctx.globalAlpha = l.alpha;
+            ctx.strokeStyle = l.color;
+            ctx.lineWidth = l.width;
+            ctx.shadowBlur = 30;
+            ctx.shadowColor = l.color;
+            ctx.beginPath();
+            ctx.moveTo(l.x1, l.y1);
+            ctx.lineTo(l.x2, l.y2);
+            ctx.stroke();
+
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = l.width * 0.35;
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.moveTo(l.x1, l.y1);
+            ctx.lineTo(l.x2, l.y2);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // 4. 【改善】サイバー・スキャンウェーブ（配置時エフェクトの線を太く、グローを激しくして超視認性強化）
+        for (let i = scanWaves.length - 1; i >= 0; i--) {
+            let w = scanWaves[i];
+            w.size += w.speed;
+            w.alpha = 1.0 - (w.size / w.maxSize);
+
+            if (w.size >= w.maxSize || w.alpha <= 0) {
+                scanWaves.splice(i, 1);
+                continue;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = w.alpha;
+            ctx.strokeStyle = w.color;
+            ctx.lineWidth = 4; // 線を以前の2から「4」に太くして力強く
+            ctx.shadowBlur = 24; // ネオンの光を激しく発光
+            ctx.shadowColor = w.color;
+            
+            ctx.strokeRect(w.x - w.size / 2, w.y - w.size / 2, w.size, w.size);
+            ctx.restore();
+        }
+
+        // 5. ライン消去用パーティクル描画
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx; 
+            p.y += p.vy;
+            p.alpha -= p.decay;
+
+            if (p.alpha <= 0) { particles.splice(i, 1); continue; }
+
+            ctx.save();
+            ctx.globalAlpha = p.alpha;
+            ctx.fillStyle = p.color || '#ff00cc';
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = p.color || '#ff00cc';
+            ctx.beginPath();
+            if (p.isSquare) {
+                ctx.fillRect(p.x - p.radius, p.y - p.radius, p.radius * 2, p.radius * 2);
+            } else {
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        // 6. テキストエフェクト描画
+        for (let i = textEffects.length - 1; i >= 0; i--) {
+            let t = textEffects[i];
+            if (t.phase === 'pop') {
+                t.scale += (t.targetScale - t.scale) * 0.3 + 0.04;
+                if (t.scale >= t.targetScale) { t.scale = t.targetScale; t.phase = 'stay'; t.timer = 25; }
+            } else if (t.phase === 'stay') {
+                t.timer--; if (t.timer <= 0) t.phase = 'fade';
+            } else if (t.phase === 'fade') {
+                t.alpha -= 0.07; t.y -= 1.0;
+                if (t.alpha <= 0) { textEffects.splice(i, 1); continue; }
+            }
+
+            ctx.save();
+            ctx.globalAlpha = t.alpha;
+            ctx.translate(t.x, t.y);
+            ctx.scale(t.scale, t.scale);
+            ctx.font = 'italic 900 26px \'Orbitron\', system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = t.shadow;
+            ctx.fillStyle = t.color;
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = '#010308';
+            ctx.strokeText(t.text, 0, 0);
+            ctx.fillText(t.text, 0, 0);
+            ctx.restore();
+        }
+
+        requestAnimationFrame(drawLoop);
+    }
+    requestAnimationFrame(drawLoop);
+
+    function checkGameOver() {
+        let canPlaceAny = false;
+        for (let i = 0; i < 3; i++) {
+            const shapeData = tray[i];
+            if (shapeData !== null) {
+                for (let r = 0; r < BOARD_SIZE; r++) {
+                    for (let c = 0; c < BOARD_SIZE; c++) {
+                        if (canPlace(shapeData.matrix, r, c)) { canPlaceAny = true; break; }
+                    }
+                    if (canPlaceAny) break;
+                }
+            }
+            if (canPlaceAny) break;
+        }
+
+        if (!canPlaceAny && tray.some(s => s !== null)) {
+            saveScore();
+            finalScoreVal.innerText = score;
+            modalOverlay.style.display = 'flex';
+        }
+    }
+
+    initGame();
+</script>
+</body>
+</html>
