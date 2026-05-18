@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>究極スイカゲーム・デラックス</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #0f172a;
+            font-family: 'Hiragino Kaku Gothic Pro', 'Meiryo', sans-serif;
+            touch-action: none;
+            color: white;
+        }
+        canvas {
+            display: block;
+            touch-action: none;
+        }
+        .evolution-guide {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(8px);
+        }
+        .ui-overlay {
+            pointer-events: none;
+        }
+        .ui-overlay button, .ui-overlay .pointer-auto {
+            pointer-events: auto;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 0.8; }
+        }
+        .next-preview {
+            animation: pulse 2s infinite ease-in-out;
+        }
+        .mode-card {
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .mode-card:hover {
+            transform: scale(1.05);
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #eab308;
+        }
+        .mode-active {
+            border-color: #eab308 !important;
+            background: rgba(234, 179, 8, 0.1) !important;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container" class="relative w-screen h-screen flex flex-col items-center justify-center overflow-hidden">
+    
+    <!-- 初期設定メニュー -->
+    <div id="setup-menu" class="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[100] p-6 overflow-y-auto">
+        <h1 class="text-5xl font-black text-yellow-500 mb-2 italic tracking-tighter">SUIKA ULTIMATE</h1>
+        <p class="text-slate-400 mb-10 tracking-widest text-sm">究極のフルーツパズル</p>
+
+        <div class="w-full max-w-2xl space-y-8">
+            <!-- モード選択 -->
+            <div>
+                <label class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 block">1. ステージ形状を選択</label>
+                <div class="grid grid-cols-2 gap-4">
+                    <div id="btn-square" onclick="selectShape('square')" class="mode-card bg-white/5 border-2 border-slate-700 p-6 rounded-2xl text-center mode-active">
+                        <div class="text-4xl mb-2">🟦</div>
+                        <div class="font-bold">SQUARE</div>
+                    </div>
+                    <div id="btn-circle" onclick="selectShape('circle')" class="mode-card bg-white/5 border-2 border-slate-700 p-6 rounded-2xl text-center">
+                        <div class="text-4xl mb-2">🟡</div>
+                        <div class="font-bold">CIRCLE</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- サイズ選択 -->
+            <div>
+                <label class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 block">2. ステージサイズを選択</label>
+                <div class="grid grid-cols-3 gap-3">
+                    <div id="btn-small" onclick="selectSize('small')" class="mode-card bg-white/5 border-2 border-slate-700 py-4 rounded-2xl text-center">
+                        <div class="text-sm font-bold">SMALL</div>
+                    </div>
+                    <div id="btn-medium" onclick="selectSize('medium')" class="mode-card bg-white/5 border-2 border-slate-700 py-4 rounded-2xl text-center mode-active">
+                        <div class="text-sm font-bold">MEDIUM</div>
+                    </div>
+                    <div id="btn-large" onclick="selectSize('large')" class="mode-card bg-white/5 border-2 border-slate-700 py-4 rounded-2xl text-center">
+                        <div class="text-sm font-bold">LARGE</div>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="startGame()" class="w-full bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-black py-5 rounded-2xl text-2xl transition-all active:scale-95 shadow-lg shadow-yellow-500/20">
+                PLAY START
+            </button>
+        </div>
+    </div>
+
+    <!-- UI Header -->
+    <div class="ui-overlay absolute top-0 left-0 w-full p-4 flex justify-between items-start z-10">
+        <div class="bg-slate-900/60 p-3 rounded-2xl border border-white/10 backdrop-blur-md">
+            <div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Score</div>
+            <div id="score" class="text-3xl font-black text-yellow-400 leading-none">0</div>
+        </div>
+        
+        <div class="flex flex-col items-end gap-2">
+            <div class="bg-slate-900/60 p-3 rounded-2xl border border-white/10 backdrop-blur-md flex items-center gap-3">
+                <div class="text-right">
+                    <div class="text-[10px] text-slate-400 uppercase font-bold">Next</div>
+                    <div id="next-name" class="text-xs font-bold truncate max-w-[60px]">イチゴ</div>
+                </div>
+                <div id="next-fruit" class="text-3xl next-preview">🍓</div>
+            </div>
+            <div class="flex gap-2">
+                <button id="mute-btn" class="pointer-auto bg-slate-900/60 p-2 rounded-full border border-white/10 hover:bg-white/10 backdrop-blur-md">
+                    <span id="mute-icon">🔊</span>
+                </button>
+                <button onclick="location.reload()" class="pointer-auto bg-slate-900/60 p-2 rounded-full border border-white/10 hover:bg-white/10 backdrop-blur-md">
+                    <span>🔄</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Evolution Guide -->
+    <div class="ui-overlay absolute bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-lg evolution-guide p-3 rounded-2xl flex justify-between items-center border border-white/10 z-10">
+        <div class="flex justify-between w-full px-1 overflow-x-auto gap-1 text-xs sm:text-sm">
+            <span>🍒</span><span>→</span><span>🍓</span><span>→</span><span>🍇</span><span>→</span><span>🍊</span><span>→</span><span>🍅</span><span>→</span><span>🍎</span><span>→</span><span>🍐</span><span>→</span><span>🍑</span><span>→</span><span>🍍</span><span>→</span><span>🍈</span><span>→</span><span>🍉</span>
+        </div>
+    </div>
+
+    <!-- Main Canvas -->
+    <div id="canvas-wrapper" class="w-full h-full flex items-center justify-center"></div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over" class="fixed inset-0 bg-slate-950/90 hidden flex items-center justify-center z-50 p-6 backdrop-blur-xl">
+        <div class="bg-slate-900 border-2 border-yellow-500 p-10 rounded-[3rem] text-center max-w-sm w-full shadow-2xl">
+            <h2 class="text-6xl font-black text-yellow-500 mb-2 italic">FINISH!</h2>
+            <p class="text-slate-400 mb-8 uppercase tracking-widest text-xs">Game Over</p>
+            <div class="bg-white/5 rounded-3xl p-6 mb-8 border border-white/5">
+                <div class="text-xs text-slate-500 mb-1 uppercase font-bold">Final Score</div>
+                <div id="final-score" class="text-5xl font-black text-white">0</div>
+            </div>
+            <button onclick="location.reload()" class="w-full bg-white text-slate-950 font-black py-4 rounded-2xl text-lg transition-transform active:scale-95">
+                RETRY
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Audio ---
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    let isMuted = false;
+
+    function initAudio() { if (!audioCtx) audioCtx = new AudioContext(); }
+    function playSound(freq, type, duration, vol = 0.1) {
+        if (isMuted || !audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + duration);
+    }
+    const playDropSound = () => playSound(200, 'sine', 0.3, 0.15);
+    const playMergeSound = (l) => playSound(300 + (l * 40), 'triangle', 0.4, 0.2);
+    const playGameOverSound = () => playSound(80, 'sawtooth', 1.5, 0.2);
+
+    // --- Config ---
+    const FRUITS = [
+        { name: "さくらんぼ", radius: 15, score: 2, emoji: "🍒" },
+        { name: "いちご", radius: 22, score: 4, emoji: "🍓" },
+        { name: "ぶどう", radius: 30, score: 8, emoji: "🍇" },
+        { name: "デコポン", radius: 38, score: 16, emoji: "🍊" },
+        { name: "かき", radius: 48, score: 32, emoji: "🍅" },
+        { name: "りんご", radius: 60, score: 64, emoji: "🍎" },
+        { name: "なし", radius: 72, score: 128, emoji: "🍐" },
+        { name: "もも", radius: 85, score: 256, emoji: "🍑" },
+        { name: "パイン", radius: 100, score: 512, emoji: "🍍" },
+        { name: "メロン", radius: 120, score: 1024, emoji: "🍈" },
+        { name: "スイカ", radius: 145, score: 2048, emoji: "🍉" }
+    ];
+
+    const { Engine, Render, Runner, Bodies, Composite, Events, Body, Vector } = Matter;
+    let engine, render, runner;
+    let currentFruit = null;
+    let nextFruitIndex = 0;
+    let score = 0;
+    let isGameOver = false;
+    let canDrop = true;
+    
+    // 選べる設定
+    let config = {
+        shape: 'square',
+        sizeScale: 1.0
+    };
+
+    let worldWidth, worldHeight, centerX, centerY, containerRadius;
+    const DEADLINE_Y = 100; // アウト判定の高さ（上部）
+
+    function selectShape(s) {
+        config.shape = s;
+        document.getElementById('btn-square').classList.toggle('mode-active', s === 'square');
+        document.getElementById('btn-circle').classList.toggle('mode-active', s === 'circle');
+    }
+
+    function selectSize(sz) {
+        const scales = { small: 0.8, medium: 1.0, large: 1.2 };
+        config.sizeScale = scales[sz];
+        ['small', 'medium', 'large'].forEach(id => {
+            document.getElementById('btn-' + id).classList.toggle('mode-active', id === sz);
+        });
+    }
+
+    function startGame() {
+        document.getElementById('setup-menu').style.display = 'none';
+        init();
+    }
+
+    function init() {
+        const wrapper = document.getElementById('canvas-wrapper');
+        
+        // サイズ計算
+        const baseSize = Math.min(window.innerWidth, window.innerHeight * 0.85);
+        worldWidth = baseSize * config.sizeScale;
+        worldHeight = baseSize * config.sizeScale;
+        centerX = worldWidth / 2;
+        centerY = worldHeight / 2;
+        containerRadius = (worldWidth / 2) - 10;
+
+        engine = Engine.create({ constraintIterations: 2, positionIterations: 6, velocityIterations: 6 });
+        engine.gravity.scale = (config.shape === 'square') ? 0.001 : 0;
+
+        render = Render.create({
+            element: wrapper,
+            engine: engine,
+            options: {
+                width: worldWidth,
+                height: worldHeight,
+                wireframes: false,
+                background: 'transparent'
+            }
+        });
+
+        const wallOptions = { isStatic: true, render: { fillStyle: '#1e293b' } };
+
+        if (config.shape === 'square') {
+            const ground = Bodies.rectangle(centerX, worldHeight - 10, worldWidth, 20, wallOptions);
+            const left = Bodies.rectangle(10, centerY, 20, worldHeight, wallOptions);
+            const right = Bodies.rectangle(worldWidth - 10, centerY, 20, worldHeight, wallOptions);
+            Composite.add(engine.world, [ground, left, right]);
+        } else {
+            const segments = 72;
+            const thickness = 50;
+            for (let i = 0; i < segments; i++) {
+                const angle = (i / segments) * Math.PI * 2;
+                const x = centerX + Math.cos(angle) * (containerRadius + thickness/2);
+                const y = centerY + Math.sin(angle) * (containerRadius + thickness/2);
+                const wall = Bodies.rectangle(x, y, thickness, (containerRadius * 2 * Math.PI) / segments + 5, {
+                    ...wallOptions, angle: angle
+                });
+                Composite.add(engine.world, wall);
+            }
+        }
+
+        Render.run(render);
+        runner = Runner.create();
+        Runner.run(runner, engine);
+
+        setupGameEvents();
+        spawnNext();
+        
+        Events.on(engine, 'beforeUpdate', () => {
+            if (isGameOver) return;
+            const bodies = Composite.allBodies(engine.world);
+            bodies.forEach(body => {
+                if (!body.isStatic && body.label.startsWith('fruit_')) {
+                    if (config.shape === 'circle') {
+                        // 円形引力（強力に）
+                        const forceMagnitude = 0.0003 * body.mass;
+                        const delta = Vector.sub({x: centerX, y: centerY}, body.position);
+                        const distance = Vector.magnitude(delta);
+                        if (distance > 1) {
+                            const force = Vector.mult(Vector.normalise(delta), forceMagnitude);
+                            Body.applyForce(body, body.position, force);
+                        }
+                        // アウト判定：判定線を「半径の1/4」越えたら
+                        // 円形モードはフチからの距離で判定
+                        const limit = containerRadius;
+                        if (body.hasLanded && distance + (body.radius * 0.75) > limit) {
+                            body.outTime = (body.outTime || 0) + 1;
+                            if (body.outTime > 60) endGame();
+                        } else { body.outTime = 0; }
+                    } else {
+                        // 四角モード：DEADLINE_Yを「半径の1/4」越えたら
+                        if (body.hasLanded && (body.position.y - body.radius * 0.75) < DEADLINE_Y && Math.abs(body.velocity.y) < 0.5) {
+                            body.outTime = (body.outTime || 0) + 1;
+                            if (body.outTime > 150) endGame();
+                        } else { body.outTime = 0; }
+                    }
+                }
+            });
+        });
+
+        Events.on(render, 'afterRender', () => {
+            const ctx = render.context;
+            const bodies = Composite.allBodies(engine.world);
+            
+            // 判定線の描画
+            ctx.beginPath();
+            if (config.shape === 'circle') {
+                ctx.arc(centerX, centerY, containerRadius, 0, Math.PI * 2);
+            } else {
+                ctx.moveTo(0, DEADLINE_Y); ctx.lineTo(worldWidth, DEADLINE_Y);
+            }
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.3)';
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            bodies.forEach(body => {
+                if (body.emoji) {
+                    ctx.font = `${body.radius * 1.7}px serif`;
+                    ctx.save();
+                    ctx.translate(body.position.x, body.position.y);
+                    ctx.rotate(body.angle);
+                    ctx.fillText(body.emoji, 0, 0);
+                    if (body.outTime > 40) {
+                        ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3; ctx.strokeText(body.emoji, 0, 0);
+                    }
+                    ctx.restore();
+                }
+            });
+        });
+    }
+
+    function spawnNext() {
+        if (isGameOver) return;
+        const index = nextFruitIndex;
+        const data = FRUITS[index];
+        nextFruitIndex = Math.floor(Math.random() * 5);
+        document.getElementById('next-fruit').innerText = FRUITS[nextFruitIndex].emoji;
+        document.getElementById('next-name').innerText = FRUITS[nextFruitIndex].name;
+
+        // 初期スポーン位置（プレビュー）
+        currentFruit = Bodies.circle(centerX, (config.shape === 'circle' ? centerY - containerRadius + 50 : DEADLINE_Y - 40), data.radius, {
+            isStatic: true, isSensor: true, label: 'preview', render: { visible: false }
+        });
+        currentFruit.emoji = data.emoji;
+        currentFruit.radius = data.radius;
+        currentFruit.fruitIndex = index;
+        Composite.add(engine.world, currentFruit);
+        canDrop = true;
+    }
+
+    function setupGameEvents() {
+        const updatePos = (clientX, clientY) => {
+            if (!currentFruit || !canDrop) return;
+            const rect = render.canvas.getBoundingClientRect();
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            let targetX, targetY;
+            if (config.shape === 'circle') {
+                const dx = x - centerX;
+                const dy = y - centerY;
+                const angle = Math.atan2(dy, dx);
+                // サークルの内側に沿って移動
+                const dist = containerRadius - currentFruit.radius - 10;
+                targetX = centerX + Math.cos(angle) * dist;
+                targetY = centerY + Math.sin(angle) * dist;
+            } else {
+                targetX = Math.max(currentFruit.radius + 20, Math.min(worldWidth - currentFruit.radius - 20, x));
+                targetY = DEADLINE_Y - 40;
+            }
+            Body.setPosition(currentFruit, { x: targetX, y: targetY });
+        };
+
+        const handleInputMove = (e) => {
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            updatePos(clientX, clientY);
+        };
+
+        const handleInputDown = (e) => {
+            if (!canDrop || !currentFruit) return;
+            initAudio();
+            
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            // 触った瞬間にその位置へ移動してから落とす
+            updatePos(clientX, clientY);
+            
+            canDrop = false;
+            const data = FRUITS[currentFruit.fruitIndex];
+            const fruit = Bodies.circle(currentFruit.position.x, currentFruit.position.y, data.radius, {
+                label: 'fruit_' + currentFruit.fruitIndex,
+                friction: 0.1, restitution: 0.3, render: { visible: false }
+            });
+            fruit.emoji = data.emoji; fruit.radius = data.radius; fruit.fruitIndex = currentFruit.fruitIndex; fruit.hasLanded = false;
+
+            Composite.remove(engine.world, currentFruit);
+            Composite.add(engine.world, fruit);
+            currentFruit = null;
+            playDropSound();
+            setTimeout(spawnNext, 450);
+        };
+
+        const canvas = render.canvas;
+        canvas.addEventListener('mousemove', handleInputMove);
+        canvas.addEventListener('mousedown', handleInputDown);
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); handleInputMove(e); }, { passive: false });
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleInputDown(e); }, { passive: false });
+
+        Events.on(engine, 'collisionStart', (event) => {
+            event.pairs.forEach(pair => {
+                const { bodyA, bodyB } = pair;
+                if (bodyA.label.startsWith('fruit_')) bodyA.hasLanded = true;
+                if (bodyB.label.startsWith('fruit_')) bodyB.hasLanded = true;
+
+                if (bodyA.label === bodyB.label && bodyA.label.startsWith('fruit_')) {
+                    const idx = bodyA.fruitIndex;
+                    if (idx < FRUITS.length - 1) {
+                        const newIdx = idx + 1;
+                        const pos = { x: (bodyA.position.x + bodyB.position.x) / 2, y: (bodyA.position.y + bodyB.position.y) / 2 };
+                        Composite.remove(engine.world, [bodyA, bodyB]);
+                        playMergeSound(newIdx);
+                        const data = FRUITS[newIdx];
+                        const newFruit = Bodies.circle(pos.x, pos.y, data.radius, {
+                            label: 'fruit_' + newIdx, render: { visible: false }
+                        });
+                        newFruit.emoji = data.emoji; newFruit.radius = data.radius; newFruit.fruitIndex = newIdx; newFruit.hasLanded = true;
+                        Composite.add(engine.world, newFruit);
+                        score += data.score;
+                        document.getElementById('score').innerText = score;
+                    }
+                }
+            });
+        });
+
+        document.getElementById('mute-btn').onclick = () => {
+            isMuted = !isMuted;
+            document.getElementById('mute-icon').innerText = isMuted ? '🔇' : '🔊';
+        };
+    }
+
+    function endGame() {
+        if (isGameOver) return;
+        isGameOver = true;
+        playGameOverSound();
+        document.getElementById('final-score').innerText = score;
+        document.getElementById('game-over').classList.remove('hidden');
+    }
+
+</script>
+
+</body>
+</html>
