@@ -338,14 +338,18 @@ class BilliardBall {
             // これにより、的球に当たって前進速度を失った瞬間に、バックスピンによって強烈に手前へ戻る推進力がかかります
             let spinDriveX = 0;
             let spinDriveZ = 0;
+
+            // ★バックスピン（this.spinY が負）の時だけ係数を弱める（例: 0.022 → 0.006）
+            let spinCoef = this.spinY < 0 ? 0.0001 : 0.022;
+
             if (speed > 0.01) {
-                spinDriveX = dirX * this.spinY * 0.022 * dtFactor;
-                spinDriveZ = dirZ * this.spinY * 0.022 * dtFactor;
+                spinDriveX = dirX * this.spinY * spinCoef * dtFactor;
+                spinDriveZ = dirZ * this.spinY * spinCoef * dtFactor;
             } else {
                 // ほぼ停止状態のときは、純粋に狙っているアングル（あるいは回転軸）の方向へ引き戻す
                 let backAngle = aimAngle;
-                spinDriveX = -Math.sin(backAngle) * this.spinY * 0.022 * dtFactor;
-                spinDriveZ = -Math.cos(backAngle) * this.spinY * 0.022 * dtFactor;
+                spinDriveX = -Math.sin(backAngle) * this.spinY * spinCoef * dtFactor;
+                spinDriveZ = -Math.cos(backAngle) * this.spinY * spinCoef * dtFactor;
             }
             this.vx += spinDriveX;
             this.vz += spinDriveZ;
@@ -474,12 +478,18 @@ function init() {
     hitMarker = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), new THREE.MeshBasicMaterial({color: 0xff0000, depthTest: false}));
     hitMarker.renderOrder = 999; hitMarker.visible = false; scene.add(hitMarker);
 
-    window.addEventListener('keydown', e => {
+    window.addEventListener('keydown', (e) => {
         keys[e.key] = true;
-        if (e.key === 'a' || e.key === 'A') keys['A_KEY'] = true;
-        if (e.key === 'd' || e.key === 'D') keys['D_KEY'] = true;
-        if (e.key === 'w' || e.key === 'W') keys['W_KEY'] = true;
-        if (e.key === 's' || e.key === 'S') keys['S_KEY'] = true;
+        if (e.code === 'KeyA' || e.key === 'a' || e.key === 'A') keys['A_KEY'] = true;
+        if (e.code === 'KeyD' || e.key === 'd' || e.key === 'D') keys['D_KEY'] = true;
+        if (e.code === 'KeyW' || e.key === 'w' || e.key === 'W') keys['W_KEY'] = true;
+        if (e.code === 'KeyS' || e.key === 's' || e.key === 'S') keys['S_KEY'] = true;
+
+        if (e.code === 'Space') {
+            if (!areBallsStopped()) {
+                fastForwardPhysics();
+            }
+        }
 
         if (gameState !== 'PLAYING') return;
 
@@ -523,13 +533,15 @@ function init() {
             triggerUiTimer();
         }
     });
-    window.addEventListener('keyup', e => { 
-        keys[e.key] = false; 
-        if (e.key === 'a' || e.key === 'A') keys['A_KEY'] = false;
-        if (e.key === 'd' || e.key === 'D') keys['D_KEY'] = false;
-        if (e.key === 'w' || e.key === 'W') keys['W_KEY'] = false;
-        if (e.key === 's' || e.key === 'S') keys['S_KEY'] = false;
+
+    window.addEventListener('keyup', (e) => {
+        keys[e.key] = false;
+        if (e.code === 'KeyA' || e.key === 'a' || e.key === 'A') keys['A_KEY'] = false;
+        if (e.code === 'KeyD' || e.key === 'd' || e.key === 'D') keys['D_KEY'] = false;
+        if (e.code === 'KeyW' || e.key === 'w' || e.key === 'W') keys['W_KEY'] = false;
+        if (e.code === 'KeyS' || e.key === 's' || e.key === 'S') keys['S_KEY'] = false;
     });
+
     window.addEventListener('mousedown', onMouseDown);
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
@@ -933,7 +945,7 @@ function onMouseUp() {
         cueBall.vz = -Math.cos(aimAngle + deflect) * shotPower * 0.038;
         
         cueBall.spinX = -spinOffset.x * shotPower * 0.6; 
-        cueBall.spinY = spinOffset.y * shotPower * 0.5; 
+        cueBall.spinY = spinOffset.y * shotPower * 0.6; 
         
         viewMode = 'OVERVIEW'; document.getElementById('status').innerText = "視点: 俯瞰 (OVERVIEW)";
         
@@ -1229,8 +1241,6 @@ function animate() {
         return;
     }
 
-    if (keys[' '] && !areBallsStopped()) { fastForwardPhysics(); keys[' '] = false; }
-    
     if (keys['A_KEY']) aimAngle += 0.03;      
     if (keys['D_KEY']) aimAngle -= 0.03;      
     if (keys['ArrowLeft']) aimAngle += 0.0035;  
