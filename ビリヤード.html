@@ -1218,8 +1218,10 @@ function updatePhysics() {
 }
 
 function fastForwardPhysics() {
-    let limit = 200; 
-    while(!areBallsStopped() && limit > 0) { updatePhysics(); limit--; }
+    // 完全にすべての球が止まるまで、制限なしで物理演算をループさせます
+    while (!areBallsStopped()) { 
+        updatePhysics(); 
+    }
 }
 
 function onWindowResize() {
