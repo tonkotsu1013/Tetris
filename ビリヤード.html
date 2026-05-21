@@ -182,7 +182,7 @@
     }
     
     // ==========================================
-    // フレンドリスト読み込み
+    // フレンドリスト読み込み・表示処理
     // ==========================================
     function loadFriendsList() {
         if (!socket) return;
@@ -198,8 +198,6 @@
             }
             
             friends.forEach(friend => {
-                if (friend.status !== 'accepted') return;
-                
                 const div = document.createElement('div');
                 div.className = 'friendItem';
                 div.style.display = 'flex';
@@ -208,20 +206,57 @@
                 div.style.padding = '10px';
                 div.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
                 
-                const statusDot = friend.isOnline ? 
-                    (friend.currentActivity === 'playing' ? '🔴' : '🟢') : '⚫';
-                
-                div.innerHTML = `
-                    <span>${statusDot} ${friend.name}</span>
-                    ${friend.isOnline && friend.currentActivity === 'idle' ? 
-                        `<button class="miniBtn" onclick="challengeFriend('${friend.code}')">対戦申込</button>` : 
-                        '<span style="color:#888; font-size:12px;">オフライン/対戦中</span>'
-                    }
-                `;
+                if (friend.status === 'pending') {
+                    // ▼ 追加: 承認待ち（相手からの申請）のUI ▼
+                    div.innerHTML = `
+                        <span>📬 ${friend.name} からの申請</span>
+                        <div>
+                            <button style="background: #4CAF50; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin-right: 5px; font-weight: bold;" onclick="respondFriendRequest('${friend.code}', true)">承認</button>
+                            <button style="background: #FF5252; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;" onclick="respondFriendRequest('${friend.code}', false)">拒否</button>
+                        </div>
+                    `;
+                } else if (friend.status === 'accepted') {
+                    // 既存: フレンド一覧のUI
+                    const statusDot = friend.isOnline ? 
+                        (friend.currentActivity === 'playing' ? '🔴' : '🟢') : '⚫';
+                    
+                    div.innerHTML = `
+                        <span>${statusDot} ${friend.name}</span>
+                        ${friend.isOnline && friend.currentActivity === 'idle' ? 
+                            `<button style="background: #2196F3; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;" onclick="challengeFriend('${friend.code}')">対戦申込</button>` : 
+                            '<span style="color:#888; font-size:12px;">オフライン/対戦中</span>'
+                        }
+                    `;
+                }
                 
                 listEl.appendChild(div);
             });
         });
+    }
+
+    // ==========================================
+    // フレンド申請アクション
+    // ==========================================
+    // 相手にフレンド申請を送る
+    function sendFriendRequest() {
+        const targetCode = document.getElementById('friendCodeInput').value.trim();
+        if (!targetCode) {
+            alert('ユーザーコードを入力してください');
+            return;
+        }
+        
+        socket.emit('send_friend_request', targetCode, (response) => {
+            alert(response.message);
+            if (response.success) {
+                // 成功したら入力欄を空にする
+                document.getElementById('friendCodeInput').value = '';
+            }
+        });
+    }
+
+    // 相手からのフレンド申請を承認・拒否する
+    function respondFriendRequest(targetCode, accept) {
+        socket.emit('respond_friend_request', { targetCode, accept });
     }
     
     function challengeFriend(friendCode) {
