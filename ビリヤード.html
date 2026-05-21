@@ -66,15 +66,289 @@
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    // ==========================================
+    // オンライン対戦用の変数
+    // ==========================================
+    let socket = null;
+    let myPlayerCode = null;
+    let myPlayerName = null;
+    let isOnlineMode = false;
+    let currentMatchId = null;
+    let myPlayerNumber = null; // 1 or 2
+    let opponentCode = null;
+    let opponentName = null;
+    
+    // ==========================================
+    // ログイン処理
+    // ==========================================
+    function doLogin() {
+        const code = document.getElementById('loginCode').value.trim();
+        const name = document.getElementById('loginName').value.trim();
+        const msgEl = document.getElementById('loginMessage');
+        
+        if (!code || !name) {
+            msgEl.textContent = 'コードと名前を入力してください';
+            return;
+        }
+        
+        socket = io();
+        
+        socket.on('connect', () => {
+            socket.emit('login', { code, name }, (response) => {
+                if (response.success) {
+                    myPlayerCode = code;
+                    myPlayerName = name;
+                    document.getElementById('login-overlay').style.display = 'none';
+                    document.getElementById('main-menu-overlay').style.display = 'flex';
+                } else {
+                    msgEl.textContent = response.message;
+                }
+            });
+        });
+        
+        // オンライン対戦イベントリスナー
+        socket.on('billiards_challenge_received', (data) => {
+            if (confirm(`${data.name}さんから対戦の申し込みがあります。受けますか？`)) {
+                socket.emit('billiards_challenge_response', { 
+                    targetCode: data.code, 
+                    accept: true 
+                });
+            } else {
+                socket.emit('billiards_challenge_response', { 
+                    targetCode: data.code, 
+                    accept: false 
+                });
+            }
+        });
+        
+        socket.on('billiards_challenge_declined', () => {
+            document.getElementById('waiting-overlay').style.display = 'none';
+            alert('対戦が拒否されました');
+        });
+        
+        socket.on('billiards_match_start', (data) => {
+            document.getElementById('waiting-overlay').style.display = 'none';
+            document.getElementById('online-menu-overlay').style.display = 'none';
+            
+            isOnlineMode = true;
+            currentMatchId = data.matchId;
+            myPlayerNumber = data.playerNumber;
+            opponentCode = data.opponentCode;
+            opponentName = data.opponentName;
+            
+            // ゲーム開始（9-Ballでスタート）
+            startGame('9BALL', true);
+        });
+        
+        socket.on('billiards_game_state_update', (state) => {
+            applyReceivedGameState(state);
+        });
+        
+        socket.on('billiards_match_ended', (data) => {
+            const isWinner = (data.winner === myPlayerCode);
+            setTimeout(() => {
+                alert(isWinner ? 'あなたの勝ちです！' : 'あなたの負けです');
+                location.reload();
+            }, 1000);
+        });
+        
+        socket.on('friends_data_update', () => {
+            if (document.getElementById('online-menu-overlay').style.display === 'flex') {
+                loadFriendsList();
+            }
+        });
+    }
+    
+    // ==========================================
+    // メニュー表示関数
+    // ==========================================
+    function showOnlineMenu() {
+        document.getElementById('main-menu-overlay').style.display = 'none';
+        document.getElementById('online-menu-overlay').style.display = 'flex';
+        loadFriendsList();
+    }
+    
+    function showLocalMenu() {
+        document.getElementById('main-menu-overlay').style.display = 'none';
+        document.getElementById('start-overlay').style.display = 'flex';
+    }
+    
+    function backToMainMenu() {
+        document.getElementById('start-overlay').style.display = 'none';
+        document.getElementById('online-menu-overlay').style.display = 'none';
+        document.getElementById('main-menu-overlay').style.display = 'flex';
+    }
+    
+    // ==========================================
+    // フレンドリスト読み込み
+    // ==========================================
+    function loadFriendsList() {
+        if (!socket) return;
+        
+        socket.emit('get_friends');
+        socket.once('friends_data', (friends) => {
+            const listEl = document.getElementById('friendsList');
+            listEl.innerHTML = '';
+            
+            if (friends.length === 0) {
+                listEl.innerHTML = '<p style="text-align:center; color:#aaa;">フレンドがいません</p>';
+                return;
+            }
+            
+            friends.forEach(friend => {
+                if (friend.status !== 'accepted') return;
+                
+                const div = document.createElement('div');
+                div.className = 'friendItem';
+                div.style.display = 'flex';
+                div.style.justifyContent = 'space-between';
+                div.style.alignItems = 'center';
+                div.style.padding = '10px';
+                div.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
+                
+                const statusDot = friend.isOnline ? 
+                    (friend.currentActivity === 'playing' ? '🔴' : '🟢') : '⚫';
+                
+                div.innerHTML = `
+                    <span>${statusDot} ${friend.name}</span>
+                    ${friend.isOnline && friend.currentActivity === 'idle' ? 
+                        `<button class="miniBtn" onclick="challengeFriend('${friend.code}')">対戦申込</button>` : 
+                        '<span style="color:#888; font-size:12px;">オフライン/対戦中</span>'
+                    }
+                `;
+                
+                listEl.appendChild(div);
+            });
+        });
+    }
+    
+    function challengeFriend(friendCode) {
+        if (!socket) return;
+        document.getElementById('waiting-overlay').style.display = 'flex';
+        socket.emit('billiards_challenge', friendCode);
+    }
+    
+    // ==========================================
+    // ゲーム状態の同期
+    // ==========================================
+    function syncGameState() {
+        if (!isOnlineMode || !socket || !currentMatchId) return;
+        
+        const state = {
+            balls: balls.map(b => ({
+                id: b.id,
+                x: b.mesh.position.x,
+                y: b.mesh.position.y,
+                z: b.mesh.position.z,
+                vx: b.vx,
+                vz: b.vz,
+                spinX: b.spinX,
+                spinY: b.spinY,
+                active: b.active
+            })),
+            currentPlayer: currentPlayer,
+            gameState: gameState,
+            gameMode: gameMode
+        };
+        
+        socket.emit('billiards_game_state', { matchId: currentMatchId, state });
+    }
+    
+    function applyReceivedGameState(state) {
+        // 受信した状態を適用
+        state.balls.forEach(ballData => {
+            const ball = balls.find(b => b.id === ballData.id);
+            if (ball) {
+                ball.mesh.position.set(ballData.x, ballData.y, ballData.z);
+                ball.vx = ballData.vx;
+                ball.vz = ballData.vz;
+                ball.spinX = ballData.spinX;
+                ball.spinY = ballData.spinY;
+                ball.active = ballData.active;
+            }
+        });
+        
+        currentPlayer = state.currentPlayer;
+        gameState = state.gameState;
+        gameMode = state.gameMode;
+        
+        updateUI();
+    }
+    
+    function notifyGameOver(winnerCode) {
+        if (!isOnlineMode || !socket || !currentMatchId) return;
+        socket.emit('billiards_game_over', { 
+            matchId: currentMatchId, 
+            winnerCode: winnerCode 
+        });
+    }
+</script>
 </head>
 <body>
 
-<div id="start-overlay">
+<!-- ログイン画面 -->
+<div id="login-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,15,15,0.95); display: flex; align-items: center; justify-content: center; z-index: 2000;">
+    <div style="background: rgba(0,0,0,0.9); border: 2px solid #555; border-radius: 12px; padding: 30px; width: 400px; max-width: 90%; color: white;">
+        <h2 style="text-align: center; color: #4CAF50; margin-bottom: 20px;">3D BILLIARDS ONLINE</h2>
+        <div style="margin-bottom: 15px;">
+            <label style="display: block; margin-bottom: 5px;">ユーザーコード:</label>
+            <input type="text" id="loginCode" style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #555; background: #222; color: white; box-sizing: border-box;">
+        </div>
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 5px;">ユーザー名:</label>
+            <input type="text" id="loginName" style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #555; background: #222; color: white; box-sizing: border-box;">
+        </div>
+        <button class="menu-btn" style="width: 100%;" onclick="doLogin()">ログイン</button>
+        <div id="loginMessage" style="text-align: center; margin-top: 10px; color: #FF5252; font-size: 14px;"></div>
+    </div>
+</div>
+
+<!-- メインメニュー -->
+<div id="main-menu-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,15,15,0.95); display: none; align-items: center; justify-content: center; z-index: 2000; color: white;">
+    <div style="text-align: center;">
+        <h1 style="font-size: 36px; margin-bottom: 5px; color: #4CAF50;">3D BILLIARDS</h1>
+        <p style="color: #aaa; margin-bottom: 30px;">オンライン対戦 or ローカル対戦</p>
+        <button class="menu-btn" onclick="showOnlineMenu()">オンライン対戦</button>
+        <button class="menu-btn" onclick="showLocalMenu()">ローカル対戦</button>
+    </div>
+</div>
+
+<!-- オンライン対戦メニュー -->
+<div id="online-menu-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,15,15,0.95); display: none; align-items: center; justify-content: center; z-index: 2000; overflow-y: auto;">
+    <div style="background: rgba(0,0,0,0.9); border: 2px solid #555; border-radius: 12px; padding: 30px; width: 600px; max-width: 90%; color: white; max-height: 90vh; overflow-y: auto;">
+        <h2 style="text-align: center; color: #4CAF50; margin-bottom: 20px;">フレンド選択</h2>
+        <div id="friendsList" style="max-height: 400px; overflow-y: auto; margin-bottom: 20px;">
+            <!-- フレンドリストがここに表示される -->
+        </div>
+        <button class="menu-btn" style="width: 100%; margin-top: 10px;" onclick="backToMainMenu()">メインメニューへ戻る</button>
+    </div>
+</div>
+
+<!-- ローカル対戦メニュー -->
+<div id="start-overlay" style="display: none;">
     <h1 style="font-size: 36px; margin-bottom: 5px; color: #4CAF50;">3D BILLIARDS</h1>
     <p style="color: #aaa; margin-bottom: 30px;">ゲームモードを選択してください</p>
     <button class="menu-btn" onclick="startGame('9BALL')">9-Ball</button>
     <button class="menu-btn" onclick="startGame('8BALL')">8-Ball</button>
+    <button class="menu-btn" onclick="backToMainMenu()">メインメニューへ戻る</button>
 </div>
+
+<!-- 対戦待機画面 -->
+<div id="waiting-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,15,15,0.95); display: none; align-items: center; justify-content: center; z-index: 2000;">
+    <div style="text-align: center; color: white;">
+        <h2 style="color: #4CAF50; margin-bottom: 20px;">対戦相手を待っています...</h2>
+        <div style="font-size: 48px; animation: spin 1s linear infinite;">⏳</div>
+    </div>
+</div>
+
+<style>
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+</style>
 
 <div id="ui-layer">
     <div id="status">視点: 俯瞰 (OVERVIEW)</div>
@@ -446,10 +720,18 @@ function updateLabelsDepthOrder() {
     });
 }
 
-function startGame(mode) {
+function startGame(mode, isOnline = false) {
     gameMode = mode;
     document.getElementById('start-overlay').style.display = 'none';
     document.getElementById('game-mode-title').innerText = mode === '9BALL' ? '9-BALL MODE' : '8-BALL MODE';
+    
+    if (isOnline) {
+        // オンラインモードの場合、プレイヤー名を表示
+        const p1Name = myPlayerNumber === 1 ? myPlayerName : opponentName;
+        const p2Name = myPlayerNumber === 2 ? myPlayerName : opponentName;
+        document.getElementById('player-turn').innerText = `${p1Name} vs ${p2Name}`;
+    }
+    
     init();
 }
 
@@ -928,6 +1210,17 @@ function updateSpinFromHit(hitPoint) {
 
 function onMouseUp() {
     if (!isCharging) return;
+    
+    // オンラインモードの場合、自分のターンでなければショットできない
+    if (isOnlineMode && currentPlayer !== myPlayerNumber) {
+        isCharging = false;
+        hitMarker.visible = false;
+        document.getElementById('power-container').style.display = 'none';
+        document.getElementById('spin-indicator').style.display = 'none';
+        alert('相手のターンです');
+        return;
+    }
+    
     isCharging = false; hitMarker.visible = false;
     document.getElementById('power-container').style.display = 'none';
     document.getElementById('spin-indicator').style.display = 'none';
@@ -951,6 +1244,11 @@ function onMouseUp() {
         
         document.getElementById('minimal-turn-indicator').style.right = '20px';
         document.getElementById('minimal-turn-indicator').style.left = 'auto';
+        
+        // オンラインモードの場合、ショット直後の状態を同期
+        if (isOnlineMode) {
+            setTimeout(() => syncGameState(), 100);
+        }
     }
     shotPower = 0; document.getElementById('power-bar').style.width = '0%';
 }
@@ -978,6 +1276,16 @@ function evaluateShot() {
     }
     balls.forEach(b => { if(b.active) b.setLabelText(); });
     applyUiVisibility();
+    
+    // オンラインモードの場合、ゲーム状態を同期
+    if (isOnlineMode) {
+        syncGameState();
+        
+        // ゲームオーバーの場合、勝者を通知
+        if (gameState === 'GAMEOVER') {
+            notifyGameOver(myPlayerCode);
+        }
+    }
 }
 
 function evaluate9Ball(isTurnSwitchOn) {
