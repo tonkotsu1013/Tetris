@@ -556,6 +556,107 @@ io.on('connection', (socket) => {
     // --------------------------------------------------
     // ----- ここまで追加 -----
 
+    // ==========================================
+    // BILLIARDS GAME HANDLERS
+    // ==========================================
+    socket.on('billiards_challenge', (targetCode) => {
+        const user = onlineUsers[socket.id];
+        const targetSocketId = socketMap[targetCode];
+        if (user && targetSocketId && onlineUsers[targetSocketId].status === 'idle') {
+            io.to(targetSocketId).emit('billiards_challenge_received', { 
+                code: user.code, 
+                name: user.name 
+            });
+        }
+    });
+
+    socket.on('billiards_challenge_response', (data) => {
+        const user = onlineUsers[socket.id];
+        const { targetCode, accept } = data;
+        const targetSocketId = socketMap[targetCode];
+        
+        if (!accept) {
+            if (targetSocketId) {
+                io.to(targetSocketId).emit('billiards_challenge_declined');
+            }
+            return;
+        }
+        
+        if (targetSocketId) {
+            const matchId = `billiards_${Date.now()}`;
+            activeMatches[matchId] = { 
+                p1: targetCode, 
+                p2: user.code, 
+                type: 'billiards',
+                gameMode: '9BALL',
+                currentTurn: 1
+            };
+            
+            onlineUsers[socket.id].status = 'playing';
+            onlineUsers[targetSocketId].status = 'playing';
+            
+            io.to(targetSocketId).emit('billiards_match_start', { 
+                matchId, 
+                playerNumber: 1, 
+                opponentCode: user.code,
+                opponentName: user.name
+            });
+            io.to(socket.id).emit('billiards_match_start', { 
+                matchId, 
+                playerNumber: 2, 
+                opponentCode: targetCode,
+                opponentName: onlineUsers[targetSocketId].name
+            });
+            
+            io.emit('friends_data_update');
+        }
+    });
+
+    socket.on('billiards_game_state', (data) => {
+        const user = onlineUsers[socket.id];
+        if (!user) return;
+        
+        const { matchId, state } = data;
+        const match = activeMatches[matchId];
+        if (!match || match.type !== 'billiards') return;
+        
+        const opponentCode = (match.p1 === user.code) ? match.p2 : match.p1;
+        const opponentSocketId = socketMap[opponentCode];
+        
+        if (opponentSocketId) {
+            io.to(opponentSocketId).emit('billiards_game_state_update', state);
+        }
+    });
+
+    socket.on('billiards_game_over', (data) => {
+        const user = onlineUsers[socket.id];
+        if (!user) return;
+        
+        const { matchId, winnerCode } = data;
+        const match = activeMatches[matchId];
+        if (!match || match.type !== 'billiards') return;
+        
+        const p1SocketId = socketMap[match.p1];
+        const p2SocketId = socketMap[match.p2];
+        
+        db.run(
+            `INSERT INTO match_history (p1_code, p2_code, p1_type, p2_type, winner_code) VALUES (?, ?, 'billiards', 'billiards', ?)`,
+            [match.p1, match.p2, winnerCode]
+        );
+        
+        if (p1SocketId) {
+            io.to(p1SocketId).emit('billiards_match_ended', { winner: winnerCode });
+            if (onlineUsers[p1SocketId]) onlineUsers[p1SocketId].status = 'idle';
+        }
+        if (p2SocketId) {
+            io.to(p2SocketId).emit('billiards_match_ended', { winner: winnerCode });
+            if (onlineUsers[p2SocketId]) onlineUsers[p2SocketId].status = 'idle';
+        }
+        
+        delete activeMatches[matchId];
+        io.emit('friends_data_update');
+    });
+
     socket.on('disconnect', () => {
         const user = onlineUsers[socket.id];
         if (user) {
