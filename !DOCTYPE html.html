@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>にゃんこ大戦争 - 日本編 完全再現版</title>
+    <style>
+        body {
+            margin: 0; background-color: #111; display: flex;
+            justify-content: center; align-items: center; height: 100vh;
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif;
+            overflow: hidden; user-select: none; -webkit-user-select: none;
+        }
+        #gameContainer {
+            position: relative; box-shadow: 0 0 50px rgba(0,0,0,1);
+            border-radius: 8px; overflow: hidden; border: 6px solid #222;
+        }
+        canvas { display: block; background-color: #AFDCFF; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <canvas id="gameCanvas" width="1024" height="576"></canvas>
+</div>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const SCREEN_WIDTH = 1024, SCREEN_HEIGHT = 576, GROUND_Y = SCREEN_HEIGHT - 130;
+let gameState = "TITLE"; // TITLE, MAP, POWERUP, FORMATION, BATTLE
+let money = 0, xp = 5000; 
+let maxClearedStageId = 1; // ステージ進行度（キャラ解放に利用）
+
+// 働きネコシステム
+let walletLevel = 1;
+const MAX_WALLET_LEVEL = 8; // ★修正: エラー原因だった定数を復活
+const walletCaps = [500, 1000, 1800, 2800, 4000, 5500, 7200, 9999];
+const walletSpeeds = [0.8, 1.3, 2.0, 2.8, 3.8, 5.0, 6.5, 8.5]; 
+const upgradeCosts = [100, 200, 400, 800, 1600, 3000, 6000, 0];
+
+// --- キャラクター基本データベース（解放条件 reqStage を追加） ---
+const ALL_CHARACTER_DATABASE = {
+    "normal":   { name: "ネコ", cost: 75, hp: 400, power: 32, speed: 2.2, cdMax: 60, width: 50, height: 50, kbCount: 3, attackRange: 15, preAttackFrames: 8, attackCooldown: 37, reqStage: 1 },
+    "tank":     { name: "タンクネコ", cost: 150, hp: 1600, power: 8, speed: 1.2, cdMax: 60, width: 46, height: 75, kbCount: 1, attackRange: 10, preAttackFrames: 15, attackCooldown: 60, reqStage: 2 },
+    "axe":      { name: "バトルネコ", cost: 300, hp: 800, power: 120, speed: 2.6, cdMax: 60, width: 52, height: 52, kbCount: 3, attackRange: 18, preAttackFrames: 12, attackCooldown: 28, reqStage: 4 },
+    "gross":    { name: "キモネコ", cost: 400, hp: 800, power: 250, speed: 1.5, cdMax: 100, width: 44, height: 110, kbCount: 3, attackRange: 130, preAttackFrames: 18, attackCooldown: 80, reqStage: 6 },
+    "cow":      { name: "ウシネコ", cost: 750, hp: 1200, power: 85, speed: 4.8, cdMax: 110, width: 65, height: 45, kbCount: 5, attackRange: 15, preAttackFrames: 6, attackCooldown: 12, reqStage: 8 },
+    "bird":     { name: "ネコノトリ", cost: 650, hp: 600, power: 350, speed: 1.8, cdMax: 110, width: 55, height: 60, kbCount: 4, attackRange: 85, preAttackFrames: 14, attackCooldown: 40, reqStage: 10 },
+    "fish":     { name: "ネコフィッシュ", cost: 800, hp: 1800, power: 450, speed: 2.0, cdMax: 120, width: 60, height: 50, kbCount: 3, attackRange: 20, preAttackFrames: 16, attackCooldown: 50, reqStage: 12 },
+    "lizard":   { name: "ネコトカゲ", cost: 1000, hp: 1400, power: 650, speed: 1.6, cdMax: 160, width: 70, height: 50, kbCount: 3, attackRange: 180, preAttackFrames: 24, attackCooldown: 90, reqStage: 14 },
+    "titan":    { name: "巨神ネコ", cost: 1300, hp: 3200, power: 850, speed: 1.4, cdMax: 240, width: 85, height: 100, kbCount: 1, attackRange: 25, preAttackFrames: 22, attackCooldown: 70, reqStage: 16 }
+};
+
+let unitLevels = { normal: 1, tank: 1, axe: 1, gross: 1, cow: 1, bird: 1, fish: 1, lizard: 1, titan: 1 };
+function getUpgradeXp(level) { return 1000 + (level * 500); } 
+
+let currentFormation = ["normal", "tank", "axe", "gross", "cow"];
+let charTypes = {};
+function syncCharTypes() {
+    charTypes = {};
+    currentFormation.forEach(key => { 
+        let base = ALL_CHARACTER_DATABASE[key];
+        let lv = unitLevels[key];
+        charTypes[key] = { ...base, hp: base.hp * (1 + (lv-1)*0.2), power: base.power * (1 + (lv-1)*0.2), cd: 0, popScale: 0 }; 
+    });
+}
+
+// 敵基本データベース
+const ENEMY_DATABASE = {
+    "wanko":     { name: "わんこ", isRed: false, hp: 300, power: 40, speed: 1.1, width: 45, height: 40, kbCount: 3, attackRange: 15, preAttackFrames: 12, attackCooldown: 40 },
+    "nyoro":     { name: "にょろ", isRed: false, hp: 200, power: 60, speed: 1.4, width: 55, height: 25, kbCount: 3, attackRange: 10, preAttackFrames: 8, attackCooldown: 30 },
+    "raynyan":   { name: "例のヤツ", isRed: false, hp: 450, power: 80, speed: 1.0, width: 40, height: 45, kbCount: 3, attackRange: 15, preAttackFrames: 14, attackCooldown: 45 },
+    "kabachan":  { name: "カバちゃん", isRed: false, hp: 3000, power: 250, speed: 0.8, width: 80, height: 70, kbCount: 1, attackRange: 30, preAttackFrames: 20, attackCooldown: 60 }
+};
+
+// ステージデータ生成
+const ALL_STAGES = [
+    { id: 1, name: "長崎県", x: 150, y: 350, unlocked: true, baseHp: 1500, bg: "normal", spawns: [{ type: "wanko", delay: 100, interval: 150, max: 10, mag: 1.0 }, { type: "wanko", triggerHp: 0.8, interval: 0, max: 1, mag: 1.5, isBoss: true }] },
+    { id: 2, name: "佐賀県", x: 280, y: 320, unlocked: false, baseHp: 2000, bg: "evening", spawns: [{ type: "wanko", delay: 50, interval: 120, max: -1, mag: 1.2 }, { type: "nyoro", delay: 300, interval: 200, max: -1, mag: 1.0 }, { type: "raynyan", triggerHp: 0.9, interval: 0, max: 1, mag: 1.5, isBoss: true }] }
+];
+for(let i=3; i<=48; i++) {
+    let bgType = i%3===0 ? "night" : i%2===0 ? "evening" : "normal";
+    ALL_STAGES.push({
+        id: i, name: `ステージ${i}`, x: 300 + i*40, y: 300 + Math.sin(i)*100, unlocked: false, baseHp: 2000 + i*500, bg: bgType,
+        spawns: [{ type: "wanko", delay: 60, interval: 150 - i, max: -1, mag: 1.0 + (i*0.1) }, { type: "kabachan", triggerHp: 0.8, interval: 0, max: 1, mag: 1.0 + (i*0.05), isBoss: true }]
+    });
+}
+
+// 戦闘・システム変数
+let playerBaseHp = 1000, maxPlayerBaseHp = 1000, enemyBaseHp = 1000, maxEnemyBaseHp = 1000;
+let catCannonCharge = 0; const CAT_CANNON_MAX = 900; let cannonLaserTimer = 0;
+let friends = [], enemies = [], particles = [], texts = [];
+let battleFrame = 0, gameOver = false, gameResult = "";
+let playerBaseHitFlash = 0, enemyBaseHitFlash = 0, baseShakeTimer = 0;
+
+let mapScrollX = 0; const MAP_MAX_WIDTH = 2500;
+let isDragging = false, dragStartX = 0, initialScrollX = 0;
+let selectedStage = null, activeSpawns = [];
+let selectedFormationSlot = null; // 編成画面用
+
+// UI配置
+const slotPositions = {};
+function rebuildSlotPositions() {
+    currentFormation.forEach((key, index) => { slotPositions[key] = { x: 30 + (index * 135), y: SCREEN_HEIGHT - 105, w: 125, h: 85 }; });
+}
+rebuildSlotPositions();
+const walletBtnPos = { x: SCREEN_WIDTH - 330, y: SCREEN_HEIGHT - 105, w: 140, h: 85 };
+const cannonBtnPos = { x: SCREEN_WIDTH - 175, y: SCREEN_HEIGHT - 105, w: 140, h: 85 };
+const backBtnPos = { x: 25, y: 25, w: 110, h: 45 };
+
+function initBattle() {
+    money = 0; walletLevel = 1; catCannonCharge = 0; cannonLaserTimer = 0;
+    friends = []; enemies = []; particles = []; texts = [];
+    battleFrame = 0; gameOver = false; gameResult = "";
+    playerBaseHitFlash = 0; enemyBaseHitFlash = 0; baseShakeTimer = 0;
+    syncCharTypes();
+    
+    let stage = selectedStage || ALL_STAGES[0];
+    maxEnemyBaseHp = stage.baseHp; enemyBaseHp = maxEnemyBaseHp;
+    maxPlayerBaseHp = 2000; playerBaseHp = maxPlayerBaseHp;
+    activeSpawns = stage.spawns.map(s => ({ ...s, spawnedCount: 0, nextSpawnFrame: s.delay || 0, bossTriggered: false }));
+}
+
+function createHitParticle(x, y, color) { for(let i=0; i<5; i++) particles.push({ x: x+(Math.random()-0.5)*30, y: y+(Math.random()-0.5)*30, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10 - 2, life: 15, maxLife: 15, color: color }); }
+function createDamageText(x, y, text, color) { texts.push({ x: x, y: y, text: text, color: color, life: 30, maxLife: 30, vy: -2 }); }
+
+function spawnEntity(key, isEnemy, spawnData = null) {
+    let db = isEnemy ? ENEMY_DATABASE[key] : charTypes[key];
+    let mag = isEnemy && spawnData ? spawnData.mag : 1;
+    let actualHp = db.hp * mag, actualPower = db.power * mag;
+    
+    let entity = {
+        id: Date.now() + Math.random(), type: key, isEnemy: isEnemy,
+        x: isEnemy ? SCREEN_WIDTH - 140 : 140, y: GROUND_Y - db.height / 2,
+        hp: actualHp, maxHp: actualHp, power: actualPower, speed: db.speed, width: db.width, height: db.height,
+        attackRange: db.attackRange, attackCooldown: db.attackCooldown, cooldownTimer: 0,
+        preAttackFrames: db.preAttackFrames, attackTimer: 0, kbCount: db.kbCount, kbDamageThreshold: actualHp / db.kbCount, damageAccumulated: 0,
+        state: "walk", animFrame: Math.floor(Math.random() * 20), kbTimer: 0, kbMaxTimer: 25, isRed: db.isRed, xpValue: (db.hp/10)*mag
+    };
+    if (isEnemy) {
+        enemies.push(entity);
+        if(spawnData && spawnData.isBoss) { baseShakeTimer = 20; createDamageText(entity.x, entity.y - 50, "BOSS WARNING", "#FF0000"); }
+    } else friends.push(entity);
+}
+
+function fireCatCannon() {
+    if (catCannonCharge >= CAT_CANNON_MAX && !gameOver) {
+        catCannonCharge = 0; cannonLaserTimer = 35; baseShakeTimer = 15;
+        enemies.forEach(e => {
+            let dmg = 500 + (walletLevel * 100); e.hp -= dmg;
+            createHitParticle(e.x, e.y, "#FFFF00"); createDamageText(e.x, e.y - 40, dmg, "#FFD700");
+            e.state = "kb"; e.kbTimer = e.kbMaxTimer; e.attackTimer = 0; e.damageAccumulated = 0;
+        });
+    }
+}
+
+// 共通描画関数 (右向き基準)
+function drawSpriteFacingForward(type, x, y, animFrame, state, atkTimer, isEnemy, kbTimer, kbMax, isRed) {
+    ctx.save();
+    if (state === "kb") {
+        let p = 1 - (kbTimer / kbMax); 
+        ctx.translate(x, y - (Math.sin(p * Math.PI) * 60));
+        ctx.rotate(p * Math.PI * (isEnemy ? 1 : -1)); ctx.globalAlpha = isEnemy ? 0.6 : 0.7;
+    } else {
+        let atkOffset = 0, atkRotation = 0;
+        let db = isEnemy ? ENEMY_DATABASE[type] : ALL_CHARACTER_DATABASE[type];
+        if (state === "attack") {
+            let wr = atkTimer / db.preAttackFrames;
+            if (wr <= 1.0) { atkOffset = Math.sin(wr * Math.PI/2) * -10; atkRotation = Math.sin(wr * Math.PI/2) * -0.2; }
+            else { atkOffset = 15; atkRotation = 0.3; }
+        }
+        let bounce = (state === "walk") ? Math.abs(Math.sin(animFrame * 0.2)) * 5 : 0;
+        let faceDir = isEnemy ? -1 : 1;
+        ctx.translate(x + (atkOffset * faceDir), y - bounce); ctx.scale(faceDir, 1); ctx.rotate(atkRotation);
+    }
+
+    ctx.strokeStyle = "#000000"; ctx.lineWidth = 3.5;
+    let bodyColor = isRed ? "#FF4444" : "#FFFFFF";
+
+    if(type === "normal") {
+        ctx.fillStyle="#000"; ctx.beginPath(); ctx.moveTo(-6,-20); ctx.lineTo(-12,-38); ctx.lineTo(6,-26); ctx.fill(); 
+        ctx.beginPath(); ctx.moveTo(18,-20); ctx.lineTo(24,-38); ctx.lineTo(6,-26); ctx.fill(); 
+        ctx.fillRect(-14,18,7,12); ctx.fillRect(7,18,7,12); 
+        ctx.fillStyle="#FFF"; ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fill(); ctx.stroke(); 
+        ctx.fillStyle="#000"; ctx.beginPath(); ctx.arc(7,-4,2.5,0,Math.PI*2); ctx.arc(17,-4,2.5,0,Math.PI*2); ctx.fill(); 
+        ctx.beginPath(); ctx.arc(12,3,3,0,Math.PI); ctx.stroke(); 
+    } else if(type === "tank") {
+        ctx.fillStyle="#FFF"; ctx.beginPath(); ctx.roundRect(-20,-48,40,72,10); ctx.fill(); ctx.stroke();
+        ctx.fillStyle="#000"; ctx.fillRect(-12,24,6,8); ctx.fillRect(6,24,6,8);
+        ctx.beginPath(); ctx.arc(4,-24,2,0,Math.PI*2); ctx.arc(14,-24,2,0,Math.PI*2); ctx.fill(); 
+    } else if(type === "axe") {
+        ctx.fillStyle="#D32F2F"; ctx.beginPath(); ctx.moveTo(-15,0); ctx.lineTo(-30,25); ctx.lineTo(10,20); ctx.fill();
+        ctx.fillStyle="#FFF"; ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle="#000"; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(15,8); ctx.lineTo(34,-15); ctx.stroke(); 
+        ctx.fillStyle="#757575"; ctx.beginPath(); ctx.moveTo(25,-22); ctx.lineTo(44,-30); ctx.lineTo(38,-2); ctx.fill(); ctx.stroke(); 
+        ctx.fillStyle="#000"; ctx.beginPath(); ctx.arc(8,-4,2.5,0,Math.PI*2); ctx.arc(18,-4,2.5,0,Math.PI*2); ctx.fill();
+    } else if(type === "gross") {
+        ctx.strokeStyle="#000"; ctx.lineWidth=4.5; let legY = Math.sin(animFrame*0.15)*6;
+        ctx.beginPath(); ctx.moveTo(-5,0); ctx.lineTo(-14,40); ctx.lineTo(-8,85); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(5,0); ctx.lineTo(14,40-legY); ctx.lineTo(12,85); ctx.stroke();
+        ctx.fillStyle="#FFF"; ctx.beginPath(); ctx.arc(0,-10,22,0,Math.PI*2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle="#000"; ctx.beginPath(); ctx.arc(8,-12,2,0,Math.PI*2); ctx.arc(16,-12,2,0,Math.PI*2); ctx.fill();
+    } else if(type === "cow") {
+        ctx.fillStyle="#000"; let walk1=Math.sin(animFrame*0.4)*8;
+        ctx.fillRect(-25,15,8,20+walk1); ctx.fillRect(-10,15,8,20-walk1); ctx.fillRect(5,15,8,20+walk1); ctx.fillRect(20,15,8,20-walk1);
+        ctx.fillStyle="#FFF"; ctx.beginPath(); ctx.ellipse(0,0,36,22,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(28,-8,14,0,Math.PI*2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle="#000"; ctx.beginPath(); ctx.arc(32,-10,2,0,Math.PI*2); ctx.arc(38,-10,2,0,Math.PI*2); ctx.fill();
+    } else if(type === "wanko" || type === "nyoro" || type === "raynyan" || type === "kabachan") {
+        ctx.fillStyle="#000"; ctx.fillRect(-10,15,6,12); ctx.fillRect(10,15,6,12);
+        ctx.fillStyle=bodyColor; ctx.beginPath(); ctx.ellipse(0,2,20,12,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle="#000"; ctx.beginPath(); ctx.arc(16,-10,12,0,Math.PI*2); ctx.fill(); 
+        ctx.fillStyle=bodyColor; ctx.beginPath(); ctx.arc(16,-10,10,0,Math.PI*2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle="#000"; ctx.beginPath(); ctx.arc(20,-12,2,0,Math.PI*2); ctx.fill(); 
+    } else {
+        ctx.fillStyle=bodyColor; ctx.beginPath(); ctx.arc(0,0,25,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+}
+
+// --- メインアップデート ---
+function update() {
+    if (gameState !== "BATTLE" || gameOver) return;
+    battleFrame++;
+
+    let cap = walletCaps[walletLevel - 1], spd = walletSpeeds[walletLevel - 1];
+    if (money < cap) money = Math.min(cap, money + spd);
+    if (catCannonCharge < CAT_CANNON_MAX) catCannonCharge++;
+    
+    if (cannonLaserTimer > 0) cannonLaserTimer--;
+    if (playerBaseHitFlash > 0) playerBaseHitFlash--;
+    if (enemyBaseHitFlash > 0) enemyBaseHitFlash--;
+    if (baseShakeTimer > 0) baseShakeTimer--;
+    for (let k in charTypes) { if (charTypes[k].cd > 0) charTypes[k].cd--; if (charTypes[k].popScale > 0) charTypes[k].popScale -= 0.1; }
+
+    activeSpawns.forEach(sp => {
+        if (sp.triggerHp) {
+            if (!sp.bossTriggered && (enemyBaseHp / maxEnemyBaseHp) <= sp.triggerHp) { spawnEntity(sp.type, true, sp); sp.bossTriggered = true; sp.spawnedCount++; }
+        } else {
+            if (battleFrame >= sp.nextSpawnFrame && (sp.max === -1 || sp.spawnedCount < sp.max)) { spawnEntity(sp.type, true, sp); sp.spawnedCount++; sp.nextSpawnFrame = battleFrame + sp.interval; }
+        }
+    });
+
+    function processEntityLogic(entities, targets, isEnemy) {
+        let baseLimitX = isEnemy ? 140 : SCREEN_WIDTH - 140;
+        entities.forEach(entity => {
+            entity.animFrame++;
+            if (entity.state === "kb") {
+                entity.kbTimer--; entity.x += isEnemy ? 3 : -3;
+                if (entity.kbTimer <= 0) { entity.state = "walk"; entity.attackTimer = 0; entity.cooldownTimer = 0; }
+                return; 
+            }
+            if (entity.cooldownTimer > 0) entity.cooldownTimer--;
+
+            let inRangeTarget = null;
+            for (let i = 0; i < targets.length; i++) {
+                let t = targets[i]; if (t.state === "kb") continue;
+                let dist = isEnemy ? (entity.x - t.x) : (t.x - entity.x);
+                if (dist > 0 && dist - entity.width/2 - t.width/2 <= entity.attackRange) { inRangeTarget = t; break; }
+            }
+
+            if (inRangeTarget || (isEnemy ? (entity.x - baseLimitX) : (baseLimitX - entity.x)) <= entity.attackRange) {
+                entity.state = "attack";
+                if (entity.cooldownTimer === 0) {
+                    entity.attackTimer++;
+                    if (entity.attackTimer === entity.preAttackFrames) { 
+                        let hitX = isEnemy ? entity.x - entity.attackRange : entity.x + entity.attackRange;
+                        createHitParticle(hitX, entity.y, isEnemy ? "#FF0000" : "#FFFFFF");
+                        if (inRangeTarget) {
+                            inRangeTarget.hp -= entity.power; inRangeTarget.damageAccumulated += entity.power;
+                            createDamageText(inRangeTarget.x, inRangeTarget.y - 20, Math.floor(entity.power), isEnemy ? "#FF0000" : "#FFF");
+                            if (inRangeTarget.damageAccumulated >= inRangeTarget.kbDamageThreshold) {
+                                inRangeTarget.state = "kb"; inRangeTarget.kbTimer = inRangeTarget.kbMaxTimer; inRangeTarget.damageAccumulated -= inRangeTarget.kbDamageThreshold;
+                            }
+                        } else {
+                            if(isEnemy) { playerBaseHp = Math.max(0, playerBaseHp - entity.power); playerBaseHitFlash = 5; }
+                            else { enemyBaseHp = Math.max(0, enemyBaseHp - entity.power); enemyBaseHitFlash = 5; }
+                            createDamageText(baseLimitX, GROUND_Y - 50, Math.floor(entity.power), "#FFA500");
+                        }
+                    } else if (entity.attackTimer >= entity.preAttackFrames + 10) {
+                        entity.attackTimer = 0; entity.cooldownTimer = entity.attackCooldown;
+                    }
+                } else { entity.state = "walk"; }
+            } else { entity.state = "walk"; entity.attackTimer = 0; entity.x += isEnemy ? -entity.speed : entity.speed; }
+        });
+    }
+
+    processEntityLogic(friends, enemies, false);
+    processEntityLogic(enemies, friends, true);
+
+    enemies.forEach(e => { if(e.hp <= 0) xp += Math.floor(e.xpValue); });
+    friends = friends.filter(f => f.hp > 0); enemies = enemies.filter(e => e.hp > 0);
+    particles = particles.filter(p => { p.x+=p.vx; p.y+=p.vy; p.life--; return p.life > 0; });
+    texts = texts.filter(t => { t.y+=t.vy; t.life--; return t.life > 0; });
+
+    if (playerBaseHp <= 0) { gameOver = true; gameResult = "LOSE"; }
+    else if (enemyBaseHp <= 0) { 
+        gameOver = true; gameResult = "WIN"; 
+        if (selectedStage) {
+            xp += selectedStage.baseHp / 10; 
+            let nextId = selectedStage.id + 1;
+            if (nextId > maxClearedStageId) maxClearedStageId = nextId; // ★クリア進行度を保存
+            let nextStg = ALL_STAGES.find(s=>s.id === nextId);
+            if(nextStg) nextStg.unlocked = true;
+        }
+    }
+}
+
+// --- 描画レイヤー ---
+function draw() {
+    ctx.clearRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    let t = Date.now();
+
+    if (gameState === "TITLE") {
+        let grad = ctx.createLinearGradient(0,0,0,SCREEN_HEIGHT);
+        grad.addColorStop(0, "#F5B041"); grad.addColorStop(1, "#DC7633");
+        ctx.fillStyle = grad; ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+        
+        ctx.textAlign = "center"; ctx.fillStyle = "#FFF"; ctx.font = "bold 64px sans-serif";
+        ctx.strokeStyle = "#4A235A"; ctx.lineWidth = 10;
+        ctx.strokeText("にゃんこ大戦争", SCREEN_WIDTH/2, 140); ctx.fillText("にゃんこ大戦争", SCREEN_WIDTH/2, 140);
+        ctx.textAlign = "left"; 
+        
+        drawSpriteFacingForward("normal", SCREEN_WIDTH/2, 260 - Math.abs(Math.sin(t*0.005))*40, 0, "walk", 0, false, 0, 0, false);
+
+        const btns = [{id:"map", text:"戦闘開始", y:320}, {id:"powerup", text:"パワーアップ", y:400}, {id:"formation", text:"キャラクター編成", y:480}];
+        btns.forEach(b => {
+            ctx.fillStyle="#CA6F1E"; ctx.fillRect(SCREEN_WIDTH/2 - 170, b.y, 340, 60);
+            ctx.strokeStyle="#FFF"; ctx.lineWidth=4; ctx.strokeRect(SCREEN_WIDTH/2 - 170, b.y, 340, 60);
+            ctx.fillStyle="#FFF"; ctx.font="bold 24px sans-serif"; ctx.textAlign="center";
+            ctx.fillText(b.text, SCREEN_WIDTH/2, b.y+38); ctx.textAlign="left";
+        });
+    }
+    else if (gameState === "FORMATION") {
+        // ★新規: キャラクター編成画面
+        ctx.fillStyle = "#2E4053"; ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+        ctx.fillStyle = "#5D6D7E"; ctx.fillRect(backBtnPos.x, backBtnPos.y, backBtnPos.w, backBtnPos.h);
+        ctx.fillStyle = "#FFF"; ctx.font = "bold 16px sans-serif"; ctx.fillText("戻る", backBtnPos.x+35, backBtnPos.y+28);
+        
+        ctx.textAlign="center"; ctx.font="bold 30px sans-serif"; ctx.fillText("キャラクター編成", SCREEN_WIDTH/2, 50);
+        ctx.font="18px sans-serif"; ctx.fillStyle="#F4D03F"; ctx.fillText("1. 上の枠を選ぶ → 2. 下の手持ちから入れ替えたいキャラを選ぶ", SCREEN_WIDTH/2, 90); ctx.textAlign="left";
+
+        // 出撃スロット（上部）
+        currentFormation.forEach((key, i) => {
+            let bx = 110 + i * 165, by = 120;
+            ctx.fillStyle = (selectedFormationSlot === i) ? "#E74C3C" : "#34495E"; 
+            ctx.fillRect(bx, by, 140, 110); ctx.strokeStyle = "#FFF"; ctx.lineWidth = 3; ctx.strokeRect(bx, by, 140, 110);
+            
+            if (key) {
+                ctx.save(); ctx.scale(0.7, 0.7); drawSpriteFacingForward(key, (bx+70)/0.7, (by+70)/0.7, 0, "walk", 0, false, 0, 0, false); ctx.restore();
+                ctx.fillStyle="#FFF"; ctx.font="16px sans-serif"; ctx.textAlign="center"; ctx.fillText(ALL_CHARACTER_DATABASE[key].name, bx+70, by+100); ctx.textAlign="left";
+            }
+        });
+
+        // アンロック済みキャラ一覧（下部グリッド）
+        let allKeys = Object.keys(ALL_CHARACTER_DATABASE);
+        allKeys.forEach((key, i) => {
+            let row = Math.floor(i / 5), col = i % 5;
+            let bx = 110 + col * 165, by = 280 + row * 130;
+            let db = ALL_CHARACTER_DATABASE[key];
+            
+            ctx.fillStyle = "#1B2631"; ctx.fillRect(bx, by, 140, 110);
+            ctx.strokeStyle = "#7F8C8D"; ctx.lineWidth = 2; ctx.strokeRect(bx, by, 140, 110);
+
+            if (maxClearedStageId >= db.reqStage) {
+                // アンロック済み
+                ctx.save(); ctx.scale(0.6, 0.6); drawSpriteFacingForward(key, (bx+70)/0.6, (by+65)/0.6, 0, "walk", 0, false, 0, 0, false); ctx.restore();
+                ctx.fillStyle="#FFF"; ctx.font="14px sans-serif"; ctx.textAlign="center"; ctx.fillText(db.name, bx+70, by+100); ctx.textAlign="left";
+            } else {
+                // 未解放（シルエットと解放条件）
+                ctx.fillStyle="#7F8C8D"; ctx.font="bold 40px sans-serif"; ctx.textAlign="center"; ctx.fillText("?", bx+70, by+60);
+                ctx.font="12px sans-serif"; ctx.fillStyle="#E74C3C"; ctx.fillText(`ステージ${db.reqStage}で解放`, bx+70, by+95); ctx.textAlign="left";
+            }
+        });
+    }
+    else if (gameState === "MAP") {
+        ctx.fillStyle = "#A3E4D7"; ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+        ctx.save(); ctx.translate(-mapScrollX, 0); 
+        
+        ctx.strokeStyle = "#7DCEA0"; ctx.lineWidth = 15; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.beginPath();
+        ALL_STAGES.forEach((stg, i) => { if(i===0) ctx.moveTo(stg.x, stg.y); else ctx.lineTo(stg.x, stg.y); }); ctx.stroke();
+
+        ALL_STAGES.forEach(stg => {
+            let isSel = selectedStage && selectedStage.id === stg.id;
+            ctx.fillStyle = !stg.unlocked ? "#7F8C8D" : isSel ? "#E74C3C" : "#2980B9";
+            ctx.beginPath(); ctx.arc(stg.x, stg.y, isSel?20:12, 0, Math.PI*2); ctx.fill();
+            if(stg.unlocked) { ctx.strokeStyle="#FFF"; ctx.lineWidth=3; ctx.stroke(); }
+            ctx.fillStyle = stg.unlocked ? "#111" : "#7F8C8D"; ctx.font="bold 14px sans-serif"; ctx.fillText(stg.name, stg.x-25, stg.y-25);
+        });
+        ctx.restore();
+
+        ctx.fillStyle = "#5D6D7E"; ctx.fillRect(backBtnPos.x, backBtnPos.y, backBtnPos.w, backBtnPos.h);
+        ctx.fillStyle = "#FFF"; ctx.font = "bold 16px sans-serif"; ctx.fillText("戻る", backBtnPos.x+35, backBtnPos.y+28);
+        ctx.fillStyle="#000"; ctx.font="bold 24px Courier New"; ctx.fillText(`XP: ${xp}`, 160, 55);
+
+        if (selectedStage) {
+            ctx.fillStyle="rgba(0,0,0,0.85)"; ctx.fillRect(SCREEN_WIDTH-320, 80, 290, 320);
+            ctx.fillStyle="#FFF"; ctx.font="bold 30px sans-serif"; ctx.textAlign="center"; ctx.fillText(selectedStage.name, SCREEN_WIDTH-175, 140); ctx.textAlign="left";
+            ctx.font="14px sans-serif"; ctx.fillStyle="#AAA"; ctx.fillText("出現する敵情報:", SCREEN_WIDTH-290, 180);
+            selectedStage.spawns.forEach((sp, i) => {
+                let eName = ENEMY_DATABASE[sp.type].name;
+                ctx.fillStyle = sp.isBoss ? "#FF6666" : "#FFF";
+                ctx.fillText(`・${eName} (倍率: x${sp.mag.toFixed(1)}) ${sp.isBoss?"[BOSS]":""}`, SCREEN_WIDTH-280, 210 + i*25);
+            });
+            ctx.fillStyle="#E74C3C"; ctx.fillRect(SCREEN_WIDTH-270, 320, 200, 60);
+            ctx.fillStyle="#FFF"; ctx.font="bold 24px sans-serif"; ctx.textAlign="center"; ctx.fillText("出陣!", SCREEN_WIDTH-170, 358); ctx.textAlign="left";
+        }
+    }
+    else if (gameState === "POWERUP") {
+        ctx.fillStyle = "#2C3E50"; ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+        ctx.fillStyle = "#5D6D7E"; ctx.fillRect(backBtnPos.x, backBtnPos.y, backBtnPos.w, backBtnPos.h);
+        ctx.fillStyle = "#FFF"; ctx.font = "bold 16px sans-serif"; ctx.fillText("戻る", backBtnPos.x+35, backBtnPos.y+28);
+        ctx.fillStyle="#F1C40F"; ctx.font="bold 30px Courier New"; ctx.fillText(`XP: ${xp}`, 160, 55);
+        ctx.fillStyle="#FFF"; ctx.font="bold 36px sans-serif"; ctx.textAlign="center"; ctx.fillText("パワーアップ", SCREEN_WIDTH/2, 60); ctx.textAlign="left";
+
+        let allKeys = Object.keys(ALL_CHARACTER_DATABASE).filter(k => maxClearedStageId >= ALL_CHARACTER_DATABASE[k].reqStage);
+        allKeys.forEach((k, i) => {
+            let row = Math.floor(i / 2), col = i % 2; let bx = 100 + col * 420, by = 120 + row * 110;
+            ctx.fillStyle = "#34495E"; ctx.fillRect(bx, by, 400, 90); ctx.strokeStyle = "#7F8C8D"; ctx.lineWidth = 2; ctx.strokeRect(bx, by, 400, 90);
+            ctx.save(); ctx.scale(0.6,0.6); drawSpriteFacingForward(k, (bx+50)/0.6, (by+60)/0.6, 0, "walk", 0, false, 0, 0, false); ctx.restore();
+
+            let lv = unitLevels[k], cost = getUpgradeXp(lv);
+            ctx.fillStyle="#FFF"; ctx.font="bold 18px sans-serif"; ctx.fillText(`${ALL_CHARACTER_DATABASE[k].name} (Lv.${lv})`, bx+100, by+30);
+            ctx.font="13px sans-serif"; ctx.fillStyle="#BDC3C7"; ctx.fillText(`体力: ${Math.floor(ALL_CHARACTER_DATABASE[k].hp*(1+(lv-1)*0.2))} / 攻撃: ${Math.floor(ALL_CHARACTER_DATABASE[k].power*(1+(lv-1)*0.2))}`, bx+100, by+55);
+
+            let canBuy = xp >= cost;
+            ctx.fillStyle = canBuy ? "#27AE60" : "#7F8C8D"; ctx.fillRect(bx+260, by+40, 120, 40);
+            ctx.fillStyle="#FFF"; ctx.font="14px sans-serif"; ctx.textAlign="center"; ctx.fillText(`UP (${cost})`, bx+320, by+65); ctx.textAlign="left";
+        });
+    }
+    else if (gameState === "BATTLE") {
+        let shakeX = 0, shakeY = 0; if (baseShakeTimer > 0) { shakeX = (Math.random() - 0.5) * 10; shakeY = (Math.random() - 0.5) * 10; }
+        ctx.save(); ctx.translate(shakeX, shakeY);
+
+        let bgType = selectedStage ? selectedStage.bg : "normal";
+        if(bgType === "evening") { ctx.fillStyle = "#E67E22"; ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT); ctx.fillStyle = "#873600"; ctx.fillRect(0, GROUND_Y, SCREEN_WIDTH, SCREEN_HEIGHT - GROUND_Y); } 
+        else if(bgType === "night") { ctx.fillStyle = "#1B2631"; ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT); ctx.fillStyle = "#17202A"; ctx.fillRect(0, GROUND_Y, SCREEN_WIDTH, SCREEN_HEIGHT - GROUND_Y); } 
+        else { ctx.fillStyle = "#AFDCFF"; ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT); ctx.fillStyle = "#64C864"; ctx.fillRect(0, GROUND_Y, SCREEN_WIDTH, SCREEN_HEIGHT - GROUND_Y); }
+
+        ctx.fillStyle = playerBaseHitFlash > 0 ? "#FFF" : "#A0A0A0"; ctx.fillRect(30, GROUND_Y - 150, 110, 150); ctx.strokeRect(30, GROUND_Y - 150, 110, 150);
+        ctx.fillStyle="#E0E0E0"; ctx.fillRect(30, GROUND_Y-170, 110, 10); ctx.fillStyle="#64C864"; ctx.fillRect(30, GROUND_Y-170, 110*(playerBaseHp/maxPlayerBaseHp), 10);
+
+        ctx.fillStyle = enemyBaseHitFlash > 0 ? "#FFF" : "#D24646"; ctx.fillRect(SCREEN_WIDTH-140, GROUND_Y-150, 110, 150); ctx.strokeRect(SCREEN_WIDTH-140, GROUND_Y-150, 110, 150);
+        ctx.fillStyle="#E0E0E0"; ctx.fillRect(SCREEN_WIDTH-140, GROUND_Y-170, 110, 10); ctx.fillStyle="#FF3333"; ctx.fillRect(SCREEN_WIDTH-140, GROUND_Y-170, 110*(enemyBaseHp/maxEnemyBaseHp), 10);
+
+        if (cannonLaserTimer > 0) { ctx.fillStyle="rgba(255,255,130,0.8)"; ctx.fillRect(140, GROUND_Y-90, SCREEN_WIDTH-280, 70); }
+
+        friends.forEach(f => drawSpriteFacingForward(f.type, f.x, f.y, f.animFrame, f.state, f.attackTimer, false, f.kbTimer, f.kbMaxTimer, f.isRed));
+        enemies.forEach(e => drawSpriteFacingForward(e.type, e.x, e.y, e.animFrame, e.state, e.attackTimer, true, e.kbTimer, e.kbMaxTimer, e.isRed));
+
+        particles.forEach(p => { ctx.fillStyle = p.color; ctx.globalAlpha = p.life/p.maxLife; ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha=1; });
+        texts.forEach(t => { ctx.fillStyle = t.color; ctx.font="bold 20px sans-serif"; ctx.globalAlpha = t.life/t.maxLife; ctx.fillText(t.text, t.x, t.y); ctx.globalAlpha=1; });
+
+        ctx.fillStyle="#000"; ctx.font="bold 22px Courier New"; ctx.fillText(`所持金: ${Math.floor(money)} / ${walletCaps[walletLevel-1]}円`, 20, 40);
+        ctx.fillStyle="#212F3D"; ctx.fillRect(0, SCREEN_HEIGHT-120, SCREEN_WIDTH, 120);
+        
+        currentFormation.forEach(k => {
+            let pos = slotPositions[k]; if(!pos) return;
+            let cfg = charTypes[k]; let ready = (money >= cfg.cost && cfg.cd === 0);
+            ctx.save(); ctx.translate(pos.x + pos.w/2, pos.y + pos.h/2); let s = 1 + cfg.popScale; ctx.scale(s, s); ctx.translate(-(pos.x + pos.w/2), -(pos.y + pos.h/2));
+            ctx.fillStyle="#34495E"; ctx.fillRect(pos.x, pos.y, pos.w, pos.h); ctx.strokeStyle=ready?"#F1C40F":"#7F8C8D"; ctx.lineWidth=3; ctx.strokeRect(pos.x, pos.y, pos.w, pos.h);
+            ctx.save(); ctx.scale(0.5,0.5); drawSpriteFacingForward(k, (pos.x+pos.w/2)/0.5, (pos.y+45)/0.5, 0, "walk", 0, false, 0, 0, false); ctx.restore();
+            ctx.fillStyle=ready?"#F1C40F":"#E74C3C"; ctx.font="14px sans-serif"; ctx.fillText(`${cfg.cost}円`, pos.x+10, pos.y+pos.h-10);
+            if(cfg.cd > 0) { let r = cfg.cd/cfg.cdMax; ctx.fillStyle="rgba(0,0,0,0.6)"; ctx.fillRect(pos.x, pos.y, pos.w, pos.h*r); }
+            ctx.restore();
+        });
+
+        ctx.fillStyle="#1F618D"; ctx.fillRect(walletBtnPos.x, walletBtnPos.y, walletBtnPos.w, walletBtnPos.h);
+        ctx.fillStyle="#FFF"; ctx.font="14px sans-serif"; ctx.fillText("働きネコUP", walletBtnPos.x+30, walletBtnPos.y+30);
+        if(walletLevel < MAX_WALLET_LEVEL) ctx.fillText(`(${upgradeCosts[walletLevel-1]}円)`, walletBtnPos.x+30, walletBtnPos.y+60);
+
+        let isC = catCannonCharge >= CAT_CANNON_MAX;
+        ctx.fillStyle=isC?"#922B21":"#421511"; ctx.fillRect(cannonBtnPos.x, cannonBtnPos.y, cannonBtnPos.w, cannonBtnPos.h);
+        ctx.fillStyle="#FFF"; ctx.fillText(isC?"砲撃(Space)":`${Math.floor((catCannonCharge/CAT_CANNON_MAX)*100)}%`, cannonBtnPos.x+30, cannonBtnPos.y+45);
+
+        if (gameOver) {
+            ctx.fillStyle="rgba(0,0,0,0.8)"; ctx.fillRect(0,0,SCREEN_WIDTH,SCREEN_HEIGHT);
+            ctx.fillStyle=gameResult==="WIN"?"#F1C40F":"#C0392B"; ctx.font="bold 50px sans-serif"; ctx.textAlign="center";
+            ctx.fillText(gameResult==="WIN"?"STAGE CLEAR!":"BATTLE LOSE...", SCREEN_WIDTH/2, 250);
+            ctx.font="24px sans-serif"; ctx.fillStyle="#FFF"; ctx.fillText("クリックしてマップへ戻る", SCREEN_WIDTH/2, 300); ctx.textAlign="left";
+        }
+        ctx.restore();
+    }
+}
+
+// --- 入力制御 ---
+canvas.addEventListener("mousedown", (e) => {
+    const rect = canvas.getBoundingClientRect(); const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+
+    if (gameState === "TITLE") {
+        if(mx>=SCREEN_WIDTH/2-170 && mx<=SCREEN_WIDTH/2+170) {
+            if(my>=320 && my<=380) { gameState = "MAP"; selectedStage = ALL_STAGES.find(s=>s.unlocked); }
+            if(my>=400 && my<=460) gameState = "POWERUP";
+            if(my>=480 && my<=540) { gameState = "FORMATION"; selectedFormationSlot = null; }
+        }
+    }
+    else if (gameState === "FORMATION") {
+        if(mx>=backBtnPos.x&&mx<=backBtnPos.x+backBtnPos.w && my>=backBtnPos.y&&my<=backBtnPos.y+backBtnPos.h) { gameState = "TITLE"; return; }
+        
+        // 出撃スロットの選択
+        for(let i=0; i<5; i++) {
+            let bx = 110 + i * 165, by = 120;
+            if(mx >= bx && mx <= bx+140 && my >= by && my <= by+110) selectedFormationSlot = i;
+        }
+
+        // キャラ入れ替え判定
+        if (selectedFormationSlot !== null) {
+            let allKeys = Object.keys(ALL_CHARACTER_DATABASE);
+            for(let i=0; i<allKeys.length; i++) {
+                let row = Math.floor(i / 5), col = i % 5;
+                let bx = 110 + col * 165, by = 280 + row * 130;
+                let key = allKeys[i];
+                if(mx >= bx && mx <= bx+140 && my >= by && my <= by+110) {
+                    if (maxClearedStageId >= ALL_CHARACTER_DATABASE[key].reqStage && !currentFormation.includes(key)) {
+                        currentFormation[selectedFormationSlot] = key;
+                        selectedFormationSlot = null; syncCharTypes(); rebuildSlotPositions(); break;
+                    }
+                }
+            }
+        }
+    }
+    else if (gameState === "MAP") {
+        if(mx>=backBtnPos.x&&mx<=backBtnPos.x+backBtnPos.w && my>=backBtnPos.y&&my<=backBtnPos.y+backBtnPos.h) { gameState = "TITLE"; return; }
+        if(selectedStage && mx>=SCREEN_WIDTH-270&&mx<=SCREEN_WIDTH-70 && my>=320&&my<=380) { initBattle(); gameState = "BATTLE"; return; }
+        isDragging = true; dragStartX = mx; initialScrollX = mapScrollX;
+    }
+    else if (gameState === "POWERUP") {
+        if(mx>=backBtnPos.x&&mx<=backBtnPos.x+backBtnPos.w && my>=backBtnPos.y&&my<=backBtnPos.y+backBtnPos.h) { gameState = "TITLE"; return; }
+        let allKeys = Object.keys(ALL_CHARACTER_DATABASE).filter(k => maxClearedStageId >= ALL_CHARACTER_DATABASE[k].reqStage);
+        allKeys.forEach((k, i) => {
+            let row = Math.floor(i / 2), col = i % 2; let btnX = 100 + col * 420 + 260, btnY = 120 + row * 110 + 40;
+            if (mx >= btnX && mx <= btnX + 120 && my >= btnY && my <= btnY + 40) {
+                let cost = getUpgradeXp(unitLevels[k]); if(xp >= cost) { xp -= cost; unitLevels[k]++; syncCharTypes(); }
+            }
+        });
+    }
+    else if (gameState === "BATTLE") {
+        if(gameOver) { gameState = "MAP"; return; }
+        currentFormation.forEach(k => {
+            let pos = slotPositions[k];
+            if (pos && mx>=pos.x&&mx<=pos.x+pos.w && my>=pos.y&&my<=pos.y+pos.h) {
+                let db = charTypes[k];
+                if (money >= db.cost && db.cd === 0) { money -= db.cost; db.cd = db.cdMax; db.popScale = 0.3; spawnEntity(k, false); }
+            }
+        });
+        if(mx>=walletBtnPos.x&&mx<=walletBtnPos.x+walletBtnPos.w && my>=walletBtnPos.y&&my<=walletBtnPos.y+walletBtnPos.h) {
+            if (walletLevel < MAX_WALLET_LEVEL && money >= upgradeCosts[walletLevel-1]) { money -= upgradeCosts[walletLevel-1]; walletLevel++; }
+        }
+        if(mx>=cannonBtnPos.x&&mx<=cannonBtnPos.x+cannonBtnPos.w && my>=cannonBtnPos.y&&my<=cannonBtnPos.y+cannonBtnPos.h) fireCatCannon();
+    }
+});
+
+canvas.addEventListener("mousemove", (e) => {
+    if(gameState === "MAP" && isDragging) {
+        const mx = e.clientX - canvas.getBoundingClientRect().left;
+        mapScrollX = Math.max(0, Math.min(MAP_MAX_WIDTH - SCREEN_WIDTH, initialScrollX + (dragStartX - mx)));
+    }
+});
+
+canvas.addEventListener("mouseup", (e) => {
+    if(gameState === "MAP") {
+        const mx = e.clientX - canvas.getBoundingClientRect().left, my = e.clientY - canvas.getBoundingClientRect().top;
+        if(isDragging && Math.abs(mx - dragStartX) < 5) { 
+            ALL_STAGES.forEach(s => { if(Math.hypot((mx + mapScrollX)-s.x, my-s.y)<=25 && s.unlocked) selectedStage = s; });
+        }
+        isDragging = false;
+    }
+});
+canvas.addEventListener("mouseleave", () => { isDragging = false; });
+window.addEventListener("keydown", (e) => { if (e.code === "Space" && gameState === "BATTLE") { e.preventDefault(); fireCatCannon(); } });
+
+function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
+gameLoop();
+</script>
+</body>
+</html>
