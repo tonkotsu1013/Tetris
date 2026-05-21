@@ -318,7 +318,12 @@
 <!-- オンライン対戦メニュー -->
 <div id="online-menu-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,15,15,0.95); display: none; align-items: center; justify-content: center; z-index: 2000; overflow-y: auto;">
     <div style="background: rgba(0,0,0,0.9); border: 2px solid #555; border-radius: 12px; padding: 30px; width: 600px; max-width: 90%; color: white; max-height: 90vh; overflow-y: auto;">
-        <h2 style="text-align: center; color: #4CAF50; margin-bottom: 20px;">フレンド選択</h2>
+       <h2 style="text-align: center; color: #4CAF50; margin-bottom: 20px;">フレンド選択</h2>
+        
+        <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+            <input type="text" id="friendCodeInput" placeholder="相手のユーザーコードを入力" style="flex-grow: 1; padding: 10px; border-radius: 5px; border: 1px solid #555; background: #222; color: white; box-sizing: border-box;">
+            <button class="menu-btn" style="width: auto; padding: 10px 20px; font-size: 14px; margin: 0;" onclick="sendFriendRequest()">追加</button>
+        </div>
         <div id="friendsList" style="max-height: 400px; overflow-y: auto; margin-bottom: 20px;">
             <!-- フレンドリストがここに表示される -->
         </div>
