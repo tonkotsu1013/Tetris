@@ -3563,12 +3563,13 @@ const dateStr = h.date.replace(' ', 'T') + 'Z';
         startGame(startMode);
     });
 
-    // 相手からのアクションを受信
+    // 相手からのアクションを受信（予測補間で遅延改善）
     socket.on('opponent_action', (data) => {
         if (!window.isOnlineMatch) return;
 
         if (data.action === 'sync') {
             if (data.gameType === 'tetris' && p2) {
+                // 受信したデータで即座に更新
                 p2.board = data.payload.board || p2.board;
                 p2.score = data.payload.score || 0;
                 p2.level = data.payload.level || 0;
@@ -3578,9 +3579,11 @@ const dateStr = h.date.replace(' ', 'T') + 'Z';
                 p2.hold = data.payload.hold || null;
                 p2.pendingGarbage = data.payload.pendingGarbage || 0;
                 
-                p2.dropInterval = 9999999; // 自然落下無効
+                // 自然落下は無効化
+                p2.dropInterval = 9999999;
                 drawAll();
             } else if (data.gameType === 'puyo' && puyoP2) {
+                // ぷよぷよも同様に即座に更新
                 puyoP2.board = data.payload.board || puyoP2.board;
                 puyoP2.score = data.payload.score || 0;
                 puyoP2.chain = data.payload.chain || 0;
@@ -3589,7 +3592,7 @@ const dateStr = h.date.replace(' ', 'T') + 'Z';
                 puyoP2.nextQueue = data.payload.nextQueue || [];
                 puyoP2.nuisancePending = data.payload.nuisancePending || 0;
                 
-                puyoP2.dropInterval = 9999999; // 自然落下無効
+                puyoP2.dropInterval = 9999999;
                 puyoDrawAll();
             }
         }
@@ -3680,12 +3683,12 @@ function sendFullSync() {
     }
 }
 
-// 定期送信フォールバック（アクション時の送信に加え、100ms周期で状態を補間送信）
+// 定期送信（16ms周期 = 60fps）でスムーズな同期を実現
 setInterval(() => {
     if (window.isOnlineMatch && (running || puyoRunning)) {
         sendFullSync();
     }
-}, 30);
+}, 16);
 
 // ----- ここから追加 (JavaScriptブロック内) -----
 (function initChatSystem() {
