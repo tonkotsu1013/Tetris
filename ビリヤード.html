@@ -1,1343 +1,1745 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>3D Billiards - Advanced Backspin Backtrack</title>
-    <style>
-        body { margin: 0; overflow: hidden; background: #111; font-family: sans-serif; user-select: none; }
-        #canvas-container { width: 100vw; height: 100vh; display: block; }
-        
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
-        
-        /* 視点ステータス */
-        #status { position: absolute; top: 20px; left: 20px; color: #fff; font-size: 14px; background: rgba(0,0,0,0.7); padding: 8px 12px; border-radius: 5px; }
-        
-        /* コントロールパネル */
-        #control-panel { position: absolute; top: 75px; left: 20px; background: rgba(0,0,0,0.8); border: 1px solid #444; border-radius: 5px; padding: 12px; color: white; pointer-events: auto; font-size: 13px; display: flex; flex-direction: column; gap: 8px; }
-        .toggle-container { display: flex; align-items: center; gap: 8px; }
-        .toggle-container label { cursor: pointer; }
-        
-        /* スコアボードUI */
-        #scoreboard { position: absolute; bottom: 30px; right: 20px; background: rgba(0,0,0,0.9); border: 2px solid #555; border-radius: 10px; padding: 15px; text-align: left; color: white; width: 230px; box-shadow: 0 4px 15px rgba(0,0,0,0.6); transition: opacity 0.3s ease, visibility 0.3s ease; opacity: 1; visibility: visible; }
-        #game-mode-title { font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
-        #player-turn { font-size: 20px; font-weight: bold; margin-bottom: 5px; color: #4CAF50; }
-        #target-ball-info { font-size: 14px; color: #FFC107; margin-bottom: 6px; font-weight: bold; }
-        #game-message { font-size: 13px; min-height: 20px; color: #FF5252; font-weight: bold; line-height: 1.3; }
+<meta charset="UTF-8">
+<title>3D Billiards Online</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+:root {
+    --bg: #0d0d0f;
+    --surface: #16161a;
+    --surface2: #1e1e24;
+    --border: #2a2a35;
+    --green: #2ecc71;
+    --yellow: #f1c40f;
+    --red: #e74c3c;
+    --blue: #3498db;
+    --text: #e8e8f0;
+    --muted: #888;
+    --accent: #7c5cbf;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; }
 
-        /* 右上の小さなプレイヤー名表示 */
-        #minimal-turn-indicator { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.75); border: 1px solid #555; border-radius: 4px; padding: 6px 12px; color: #4CAF50; font-size: 14px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s ease; opacity: 0; pointer-events: none; }
+/* ─── SCREENS ─── */
+.screen { position: fixed; inset: 0; display: none; z-index: 100; }
+.screen.active { display: flex; }
 
-        /* パワーメーター */
-        #power-container { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 300px; height: 20px; background: rgba(255,255,255,0.2); border: 2px solid #fff; border-radius: 10px; overflow: hidden; display: none; }
-        #power-bar { width: 0%; height: 100%; background: linear-gradient(to right, #5cb85c, #f0ad4e, #d9534f); }
+/* ─── LOGIN SCREEN ─── */
+#login-screen {
+    background: radial-gradient(ellipse at 40% 60%, #1a2a1a 0%, #0d0d0f 70%);
+    align-items: center; justify-content: center; flex-direction: column; gap: 20px;
+}
+.login-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 40px; width: 360px;
+    box-shadow: 0 0 60px rgba(46,204,113,0.08);
+}
+.login-box h1 { font-size: 28px; text-align: center; color: var(--green); margin-bottom: 6px; letter-spacing: 2px; }
+.login-box p { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 28px; }
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; }
+.field input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); padding: 10px 14px; border-radius: 8px; font-size: 15px;
+    outline: none; transition: border 0.2s;
+}
+.field input:focus { border-color: var(--green); }
+.btn {
+    display: block; width: 100%; padding: 12px; border: none;
+    border-radius: 8px; font-size: 16px; font-weight: bold;
+    cursor: pointer; transition: all 0.2s;
+}
+.btn-green { background: var(--green); color: #fff; }
+.btn-green:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.btn-red { background: var(--red); color: #fff; }
+.btn-blue { background: var(--blue); color: #fff; }
+.btn-purple { background: var(--accent); color: #fff; }
+.btn-ghost {
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--border);
+}
+.btn-ghost:hover { background: var(--surface2); color: var(--text); }
+.login-msg { text-align: center; font-size: 13px; min-height: 20px; margin-top: 8px; }
 
-        /* スピン確認用インジケーター */
-        #spin-indicator { position: absolute; top: 165px; left: 20px; width: 80px; height: 80px; background: #fff; border-radius: 50%; border: 3px solid #555; display: none; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
-        #spin-cross-h { position: absolute; top: 39px; left: 0; width: 80px; height: 2px; background: #ddd; }
-        #spin-cross-v { position: absolute; top: 0; left: 39px; width: 2px; height: 80px; background: #ddd; }
-        #spin-dot { position: absolute; top: 35px; left: 35px; width: 10px; height: 10px; background: red; border-radius: 50%; }
+/* ─── LOBBY SCREEN ─── */
+#lobby-screen {
+    background: var(--bg);
+    flex-direction: row;
+}
 
-        /* ポケット指定用UI */
-        #pocket-call-panel { position: absolute; bottom: 30px; left: 20px; background: rgba(0,0,0,0.9); border: 2px solid #FFC107; border-radius: 8px; padding: 12px; color: white; display: none; flex-direction: column; gap: 8px; pointer-events: auto; width: 240px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
-        #pocket-call-panel h3 { display: block; font-size: 13px; font-weight: bold; color: #FFC107; text-align: center; margin: 0 0 4px 0; }
-        .pocket-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-        .pocket-btn { background: #222; border: 1px solid #555; color: white; padding: 7px; font-size: 11px; border-radius: 4px; cursor: pointer; text-align: center; transition: all 0.1s; }
-        .pocket-btn:hover { background: #333; border-color: #888; }
-        .pocket-btn.selected { background: #FFC107; border-color: #fff; color: #000; font-weight: bold; }
+/* Left panel: friends */
+.friends-panel {
+    width: 320px; min-width: 280px; background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; height: 100vh;
+}
+.panel-header {
+    padding: 18px 16px 12px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+}
+.panel-header h2 { font-size: 16px; flex: 1; }
+.user-info { padding: 16px; background: var(--surface2); border-bottom: 1px solid var(--border); }
+.user-info .name { font-size: 16px; font-weight: bold; }
+.user-info .code { font-size: 12px; color: var(--muted); font-family: monospace; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 6px; }
 
-        /* 球頭上のラベル */
-        .ball-label { position: absolute; color: white; font-weight: bold; font-size: 12px; background: rgba(0,0,0,0.75); padding: 3px 6px; border-radius: 6px; border: 1px solid #777; transform: translate(-50%, -100%); pointer-events: none; text-shadow: 1px 1px 2px #000; white-space: nowrap; z-index: 5; }
-        .ball-label.cue { background: rgba(255,255,255,0.9); color: black; border-color: #333; }
-        .ball-label.freeball { background: #FF5252; color: white; animation: pulse 1s infinite; }
-        
-        .ball-label.low-group { border: 2px solid #ff3b30; box-shadow: 0 0 6px rgba(255,59,48,0.6); }   
-        .ball-label.high-group { border: 2px solid #007aff; box-shadow: 0 0 6px rgba(0,122,255,0.6); } 
-        .ball-label.my-target { border: 2px solid #FFD700; box-shadow: 0 0 10px #FFD700; } 
+.tab-bar { display: flex; border-bottom: 1px solid var(--border); }
+.tab {
+    flex: 1; padding: 10px; text-align: center; font-size: 13px;
+    cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+.tab.active { color: var(--green); border-bottom-color: var(--green); }
 
-        /* モード選択オーバーレイ */
-        #start-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,15,15,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; color: white; pointer-events: auto; }
-        .menu-btn { background: #333; border: 2px solid #666; color: white; font-size: 20px; padding: 15px 40px; margin: 10px; border-radius: 8px; cursor: pointer; transition: 0.2s; width: 200px; font-weight: bold; }
-        .menu-btn:hover { background: #555; border-color: #fff; transform: scale(1.05); }
+.friend-list { flex: 1; overflow-y: auto; padding: 8px; }
+.friend-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 8px; margin-bottom: 4px;
+    cursor: default; transition: background 0.15s;
+}
+.friend-item:hover { background: var(--surface2); }
+.friend-avatar {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--accent); display: flex; align-items: center; justify-content: center;
+    font-weight: bold; font-size: 16px; flex-shrink: 0;
+}
+.friend-avatar.online { background: #1a4a2a; border: 2px solid var(--green); }
+.friend-info { flex: 1; min-width: 0; }
+.friend-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.friend-status { font-size: 11px; color: var(--muted); }
+.friend-status.online { color: var(--green); }
+.friend-status.playing { color: var(--yellow); }
+.friend-actions { display: flex; gap: 4px; }
+.icon-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 5px 8px; border-radius: 6px;
+    cursor: pointer; font-size: 12px; transition: all 0.15s;
+}
+.icon-btn:hover { background: var(--border); }
+.icon-btn.danger:hover { background: var(--red); border-color: var(--red); }
 
-        @keyframes pulse {
-            0% { transform: translate(-50%, -100%) scale(1); }
-            50% { transform: translate(-50%, -100%) scale(1.08); }
-            100% { transform: translate(-50%, -100%) scale(1); }
-        }
-    </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+.add-friend-form { padding: 12px; border-top: 1px solid var(--border); }
+.add-friend-form input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); padding: 8px 12px; border-radius: 8px; font-size: 13px;
+    outline: none; margin-bottom: 8px;
+}
+.add-friend-form input:focus { border-color: var(--green); }
+
+/* Right area: lobby main */
+.lobby-main {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 20px; padding: 40px;
+}
+.lobby-title { font-size: 40px; color: var(--green); letter-spacing: 4px; font-weight: 900; }
+.lobby-subtitle { color: var(--muted); margin-top: -10px; }
+.lobby-actions { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+.lobby-actions .btn { width: 200px; }
+
+/* ─── OVERLAYS ─── */
+.overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    display: none; align-items: center; justify-content: center; z-index: 500;
+}
+.overlay.active { display: flex; }
+.modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 32px; width: 420px; max-width: 95vw;
+}
+.modal h2 { font-size: 20px; margin-bottom: 8px; }
+.modal p { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+.modal-actions .btn { flex: 1; }
+
+/* Setup modal */
+.setup-section { margin-bottom: 20px; }
+.setup-section label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+.btn-group { display: flex; gap: 8px; }
+.btn-toggle {
+    flex: 1; padding: 10px; background: var(--surface2);
+    border: 2px solid var(--border); color: var(--text);
+    border-radius: 8px; cursor: pointer; font-size: 14px;
+    transition: all 0.15s; text-align: center;
+}
+.btn-toggle.selected { border-color: var(--green); color: var(--green); background: rgba(46,204,113,0.1); }
+.btn-toggle:hover:not(.selected) { border-color: var(--muted); }
+
+/* Notification */
+.notification {
+    position: fixed; top: 20px; right: 20px; z-index: 9999;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 20px; max-width: 360px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5); transform: translateX(110%);
+    transition: transform 0.3s ease;
+}
+.notification.show { transform: translateX(0); }
+.notification h3 { font-size: 14px; margin-bottom: 6px; }
+.notification p { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+.notification-btns { display: flex; gap: 8px; }
+.notification-btns .btn { flex: 1; padding: 8px; font-size: 13px; }
+
+/* ─── GAME SCREEN ─── */
+#game-screen {
+    position: fixed; inset: 0; display: none; flex-direction: column;
+}
+#game-screen.active { display: flex; }
+#canvas-container { position: absolute; inset: 0; }
+
+/* Game HUD */
+#game-hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; padding: 12px 16px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%);
+    z-index: 20; pointer-events: none;
+}
+.hud-player {
+    display: flex; align-items: center; gap: 10px; min-width: 160px;
+}
+.hud-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--accent); display: flex; align-items: center;
+    justify-content: center; font-weight: bold; font-size: 15px;
+    border: 2px solid transparent; transition: border-color 0.3s;
+}
+.hud-avatar.active-turn { border-color: var(--green); box-shadow: 0 0 10px rgba(46,204,113,0.5); }
+.hud-name { font-size: 14px; font-weight: bold; }
+.hud-group { font-size: 12px; color: var(--muted); }
+.hud-center { flex: 1; text-align: center; }
+.hud-mode { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; }
+.hud-turn { font-size: 15px; font-weight: bold; color: var(--green); }
+.hud-right { min-width: 160px; display: flex; justify-content: flex-end; align-items: center; gap: 8px; pointer-events: auto; }
+.btn-small {
+    padding: 6px 12px; font-size: 12px; border: 1px solid var(--border);
+    border-radius: 6px; background: rgba(0,0,0,0.5); color: var(--text);
+    cursor: pointer; transition: all 0.15s;
+}
+.btn-small:hover { background: rgba(255,255,255,0.1); }
+
+/* Game UI elements */
+#ui-layer {
+    position: absolute; inset: 0; pointer-events: none; z-index: 10;
+}
+#status { position: absolute; top: 70px; left: 16px; color: #fff; font-size: 12px; background: rgba(0,0,0,0.6); padding: 5px 10px; border-radius: 5px; }
+
+#scoreboard {
+    position: absolute; bottom: 24px; right: 16px;
+    background: rgba(0,0,0,0.85); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; width: 220px; color: white;
+    transition: opacity 0.3s;
+}
+#game-mode-title { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+#player-turn { font-size: 18px; font-weight: bold; margin-bottom: 4px; color: var(--green); }
+#target-ball-info { font-size: 13px; color: var(--yellow); margin-bottom: 4px; }
+#game-message { font-size: 12px; color: var(--red); min-height: 18px; }
+
+#power-container {
+    position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+    width: 280px; height: 18px; background: rgba(255,255,255,0.15);
+    border: 2px solid rgba(255,255,255,0.5); border-radius: 9px; overflow: hidden; display: none;
+}
+#power-bar { width: 0%; height: 100%; background: linear-gradient(to right, #2ecc71, #f39c12, #e74c3c); }
+
+#spin-indicator {
+    position: absolute; top: 130px; left: 16px;
+    width: 76px; height: 76px; background: #fff; border-radius: 50%;
+    border: 2px solid #555; display: none; box-shadow: 0 0 10px rgba(0,0,0,0.5);
+}
+#spin-cross-h { position: absolute; top: 37px; left: 0; width: 76px; height: 2px; background: #ddd; }
+#spin-cross-v { position: absolute; top: 0; left: 37px; width: 2px; height: 76px; background: #ddd; }
+#spin-dot { position: absolute; top: 33px; left: 33px; width: 10px; height: 10px; background: red; border-radius: 50%; }
+
+#pocket-call-panel {
+    position: absolute; bottom: 24px; left: 16px;
+    background: rgba(0,0,0,0.9); border: 2px solid var(--yellow);
+    border-radius: 8px; padding: 12px; color: white;
+    display: none; flex-direction: column; gap: 8px; pointer-events: auto; width: 230px;
+}
+#pocket-call-panel h3 { font-size: 12px; color: var(--yellow); text-align: center; }
+.pocket-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.pocket-btn {
+    background: #222; border: 1px solid #555; color: white;
+    padding: 6px; font-size: 11px; border-radius: 4px; cursor: pointer;
+    text-align: center; transition: all 0.1s; pointer-events: auto;
+}
+.pocket-btn:hover { background: #333; }
+.pocket-btn.selected { background: var(--yellow); border-color: #fff; color: #000; font-weight: bold; }
+
+/* Ball labels */
+.ball-label {
+    position: absolute; color: white; font-weight: bold; font-size: 11px;
+    background: rgba(0,0,0,0.75); padding: 2px 5px; border-radius: 5px;
+    border: 1px solid #777; transform: translate(-50%, -100%);
+    pointer-events: none; white-space: nowrap; z-index: 5;
+}
+.ball-label.cue { background: rgba(255,255,255,0.9); color: black; border-color: #333; }
+.ball-label.freeball { background: #e74c3c; animation: pulse 1s infinite; }
+.ball-label.my-target { border: 2px solid gold; box-shadow: 0 0 8px gold; }
+@keyframes pulse {
+    0%,100% { transform: translate(-50%, -100%) scale(1); }
+    50% { transform: translate(-50%, -100%) scale(1.1); }
+}
+
+#labels-container { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+
+/* Spectator banner */
+#spectator-banner {
+    position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
+    background: rgba(124,92,191,0.9); border: 1px solid var(--accent);
+    border-radius: 8px; padding: 8px 20px; font-size: 13px;
+    pointer-events: auto; display: none; z-index: 30; gap: 12px; align-items: center;
+}
+#spectator-banner span { font-weight: bold; }
+#spectator-view-toggle { display: flex; gap: 8px; }
+.view-btn {
+    padding: 5px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.3);
+    background: transparent; color: white; cursor: pointer; font-size: 12px;
+}
+.view-btn.active { background: rgba(255,255,255,0.2); border-color: white; }
+
+/* Waiting overlay */
+#waiting-overlay {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.7);
+    display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px; z-index: 50;
+}
+#waiting-overlay h2 { color: var(--yellow); font-size: 24px; }
+#waiting-overlay p { color: var(--muted); }
+.spinner {
+    width: 40px; height: 40px; border: 3px solid var(--border);
+    border-top-color: var(--green); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Result overlay */
+#result-overlay {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.88);
+    display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px; z-index: 60;
+}
+#result-overlay h1 { font-size: 60px; font-weight: 900; }
+#result-overlay h1.win { color: var(--green); text-shadow: 0 0 40px rgba(46,204,113,0.5); }
+#result-overlay h1.lose { color: var(--red); }
+#result-overlay p { color: var(--muted); font-size: 16px; }
+
+/* Setup overlay (custom) */
+#setup-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+    display: none; align-items: center; justify-content: center; z-index: 600;
+}
+#setup-overlay.active { display: flex; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Pending badge */
+.pending-badge {
+    background: var(--red); color: white; border-radius: 50%;
+    width: 18px; height: 18px; font-size: 11px; font-weight: bold;
+    display: flex; align-items: center; justify-content: center;
+}
+</style>
 </head>
 <body>
 
-<div id="start-overlay">
-    <h1 style="font-size: 36px; margin-bottom: 5px; color: #4CAF50;">3D BILLIARDS</h1>
-    <p style="color: #aaa; margin-bottom: 30px;">ゲームモードを選択してください</p>
-    <button class="menu-btn" onclick="startGame('9BALL')">9-Ball</button>
-    <button class="menu-btn" onclick="startGame('8BALL')">8-Ball</button>
+<!-- ═══════════════════════════════════════ LOGIN ═══════════════════════════════════════ -->
+<div id="login-screen" class="screen active">
+    <div class="login-box">
+        <h1>🎱 BILLIARDS</h1>
+        <p>コードと名前でログイン・新規登録</p>
+        <div class="field">
+            <label>プレイヤーコード（英数字）</label>
+            <input id="login-code" type="text" placeholder="例: abc123" maxlength="20">
+        </div>
+        <div class="field">
+            <label>プレイヤー名</label>
+            <input id="login-name" type="text" placeholder="例: あなたの名前" maxlength="20">
+        </div>
+        <button class="btn btn-green" onclick="doLogin()">ログイン / 登録</button>
+        <div class="login-msg" id="login-msg"></div>
+    </div>
 </div>
 
-<div id="ui-layer">
-    <div id="status">視点: 俯瞰 (OVERVIEW)</div>
-    
-    <div id="control-panel">
-        <div class="toggle-container">
-            <input type="checkbox" id="turn-switch" checked style="cursor:pointer;">
-            <label for="turn-switch">ユーザー交代: <span id="turn-switch-status" style="font-weight:bold; color:#4CAF50;">ON</span></label>
-        </div>
-        <div class="toggle-container">
-            <input type="checkbox" id="ui-display-switch" checked style="cursor:pointer;">
-            <label for="ui-display-switch">情報UIを表示する</label>
-        </div>
-    </div>
-    
-    <div id="scoreboard">
-        <div id="game-mode-title">9-BALL</div>
-        <div id="player-turn">Player 1 のターン</div>
-        <div id="target-ball-info">ターゲット: 1番</div>
-        <div id="game-message">ゲーム開始！ ブレイクショットを打ってください。</div>
-    </div>
+<!-- ═══════════════════════════════════════ LOBBY ═══════════════════════════════════════ -->
+<div id="lobby-screen" class="screen">
 
-    <div id="minimal-turn-indicator">Player 1</div>
+    <!-- Friends Panel -->
+    <div class="friends-panel">
+        <div class="user-info">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <span class="status-dot"></span>
+                <div>
+                    <div class="name" id="my-name-display">---</div>
+                    <div class="code" id="my-code-display">コード: ---</div>
+                </div>
+            </div>
+        </div>
 
-    <div id="pocket-call-panel">
-        <h3>8番指定ポケット (必須)</h3>
-        <div class="pocket-grid">
-            <button class="pocket-btn" id="p-btn-0" onclick="selectCalledPocket(0)">左上 (コーナー)</button>
-            <button class="pocket-btn" id="p-btn-1" onclick="selectCalledPocket(1)">右上 (コーナー)</button>
-            <button class="pocket-btn" id="p-btn-2" onclick="selectCalledPocket(2)">左中 (サイド)</button>
-            <button class="pocket-btn" id="p-btn-3" onclick="selectCalledPocket(3)">右中 (サイド)</button>
-            <button class="pocket-btn" id="p-btn-4" onclick="selectCalledPocket(4)">左下 (コーナー)</button>
-            <button class="pocket-btn" id="p-btn-5" onclick="selectCalledPocket(5)">右下 (コーナー)</button>
+        <div class="tab-bar">
+            <div class="tab active" id="tab-friends" onclick="switchTab('friends')">フレンド</div>
+            <div class="tab" id="tab-requests" onclick="switchTab('requests')">
+                申請 <span id="requests-badge" style="display:none" class="pending-badge">0</span>
+            </div>
+            <div class="tab" id="tab-history" onclick="switchTab('history')">履歴</div>
+        </div>
+
+        <div class="friend-list" id="friend-list-container"></div>
+
+        <div class="add-friend-form">
+            <input id="add-friend-code" placeholder="フレンドのコードを入力..." maxlength="20">
+            <button class="btn btn-green" style="padding:8px;font-size:13px;" onclick="sendFriendRequest()">フレンド申請を送る</button>
         </div>
     </div>
 
-    <div id="spin-indicator">
-        <div id="spin-cross-h"></div>
-        <div id="spin-cross-v"></div>
-        <div id="spin-dot"></div>
+    <!-- Lobby Main -->
+    <div class="lobby-main">
+        <div class="lobby-title">3D BILLIARDS</div>
+        <div class="lobby-subtitle">オンライン対戦</div>
+        <div class="lobby-actions">
+            <button class="btn btn-ghost" onclick="doLogout()">ログアウト</button>
+        </div>
+        <div style="color:var(--muted);font-size:13px;margin-top:20px;text-align:center;">
+            フレンドのリストから「対戦申し込み」ボタンを押してください
+        </div>
     </div>
-
-    <div id="power-container"><div id="power-bar"></div></div>
 </div>
-<div id="labels-container" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; overflow:hidden;"></div>
-<div id="canvas-container"></div>
+
+<!-- ═══════════════════════════════════════ MATCH SETUP ═══════════════════════════════════════ -->
+<div id="setup-overlay">
+    <div class="modal" style="width:480px;">
+        <h2>⚙️ 対戦設定</h2>
+        <p id="setup-desc">設定を確定してください。</p>
+
+        <div id="setup-host-controls">
+            <div class="setup-section">
+                <label>ゲームモード</label>
+                <div class="btn-group">
+                    <div class="btn-toggle selected" id="mode-9ball" onclick="selectMode('9BALL')">9-Ball</div>
+                    <div class="btn-toggle" id="mode-8ball" onclick="selectMode('8BALL')">8-Ball</div>
+                </div>
+            </div>
+            <div class="setup-section">
+                <label>先攻プレイヤー</label>
+                <div class="btn-group">
+                    <div class="btn-toggle selected" id="first-random" onclick="selectFirst('random')">🎲 ランダム</div>
+                    <div class="btn-toggle" id="first-p1" onclick="selectFirst('p1')" style="flex:1.2"></div>
+                    <div class="btn-toggle" id="first-p2" onclick="selectFirst('p2')" style="flex:1.2"></div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-red btn-ghost" onclick="cancelMatch()">キャンセル</button>
+                <button class="btn btn-green" onclick="confirmMatchStart()">対戦スタート！</button>
+            </div>
+        </div>
+
+        <div id="setup-guest-waiting" style="display:none;text-align:center;padding:20px 0;">
+            <div class="spinner" style="margin:0 auto 16px;"></div>
+            <p>ホストが設定中です...</p>
+            <button class="btn btn-ghost" style="width:100%;margin-top:16px;" onclick="cancelMatch()">キャンセル</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════ CHALLENGE NOTIFICATION ═══════════════════════════════════════ -->
+<div class="notification" id="challenge-notif">
+    <h3>⚔️ 対戦申し込み</h3>
+    <p id="challenge-from-name">--- から対戦申し込みが来ています！</p>
+    <div class="notification-btns">
+        <button class="btn btn-ghost" onclick="respondChallenge(false)">断る</button>
+        <button class="btn btn-green" onclick="respondChallenge(true)">受ける！</button>
+    </div>
+</div>
+
+<!-- Generic notification -->
+<div class="notification" id="generic-notif">
+    <h3 id="generic-notif-title">通知</h3>
+    <p id="generic-notif-body"></p>
+</div>
+
+<!-- ═══════════════════════════════════════ GAME ═══════════════════════════════════════ -->
+<div id="game-screen">
+    <div id="canvas-container"></div>
+    <div id="labels-container"></div>
+
+    <!-- HUD -->
+    <div id="game-hud">
+        <div class="hud-player" id="hud-p1">
+            <div class="hud-avatar" id="hud-p1-avatar">P1</div>
+            <div>
+                <div class="hud-name" id="hud-p1-name">Player 1</div>
+                <div class="hud-group" id="hud-p1-group">---</div>
+            </div>
+        </div>
+        <div class="hud-center">
+            <div class="hud-mode" id="hud-mode">9-BALL</div>
+            <div class="hud-turn" id="hud-turn-text">---</div>
+        </div>
+        <div class="hud-right">
+            <div class="hud-player" id="hud-p2" style="flex-direction:row-reverse;">
+                <div class="hud-avatar" id="hud-p2-avatar">P2</div>
+                <div style="text-align:right;">
+                    <div class="hud-name" id="hud-p2-name">Player 2</div>
+                    <div class="hud-group" id="hud-p2-group">---</div>
+                </div>
+            </div>
+            <button class="btn-small" onclick="returnToLobby()">🏠 ロビー</button>
+        </div>
+    </div>
+
+    <!-- Spectator banner -->
+    <div id="spectator-banner">
+        <span>👁 観戦中</span>
+        <div id="spectator-view-toggle">
+            <button class="view-btn active" id="view-btn-overview" onclick="setSpectatorView('overview')">俯瞰</button>
+            <button class="view-btn" id="view-btn-p1" onclick="setSpectatorView('p1')">P1視点</button>
+            <button class="view-btn" id="view-btn-p2" onclick="setSpectatorView('p2')">P2視点</button>
+        </div>
+    </div>
+
+    <!-- Game UI -->
+    <div id="ui-layer">
+        <div id="status">視点: 俯瞰 (OVERVIEW)</div>
+        <div id="scoreboard">
+            <div id="game-mode-title">9-BALL</div>
+            <div id="player-turn">Player 1 のターン</div>
+            <div id="target-ball-info">ターゲット: 1番</div>
+            <div id="game-message">ゲーム開始！</div>
+        </div>
+        <div id="spin-indicator">
+            <div id="spin-cross-h"></div>
+            <div id="spin-cross-v"></div>
+            <div id="spin-dot"></div>
+        </div>
+        <div id="pocket-call-panel">
+            <h3>8番 指定ポケット（必須）</h3>
+            <div class="pocket-grid">
+                <button class="pocket-btn" id="p-btn-0" onclick="selectCalledPocket(0)">左上</button>
+                <button class="pocket-btn" id="p-btn-1" onclick="selectCalledPocket(1)">右上</button>
+                <button class="pocket-btn" id="p-btn-2" onclick="selectCalledPocket(2)">左中</button>
+                <button class="pocket-btn" id="p-btn-3" onclick="selectCalledPocket(3)">右中</button>
+                <button class="pocket-btn" id="p-btn-4" onclick="selectCalledPocket(4)">左下</button>
+                <button class="pocket-btn" id="p-btn-5" onclick="selectCalledPocket(5)">右下</button>
+            </div>
+        </div>
+        <div id="power-container"><div id="power-bar"></div></div>
+    </div>
+
+    <!-- Waiting (opponent's turn) -->
+    <div id="waiting-overlay">
+        <div class="spinner"></div>
+        <h2>相手のターン</h2>
+        <p id="waiting-desc">相手がショットを打つのを待っています...</p>
+    </div>
+
+    <!-- Result -->
+    <div id="result-overlay">
+        <h1 id="result-title">WIN</h1>
+        <p id="result-desc">おめでとうございます！</p>
+        <button class="btn btn-green" style="width:200px;margin-top:16px;" onclick="returnToLobby()">ロビーへ戻る</button>
+    </div>
+</div>
 
 <script>
-const TABLE_W = 30;
-const TABLE_L = 60;
-const BALL_R = 0.7;
+// ╔══════════════════════════════════════════════════════════════╗
+// ║               SOCKET & ONLINE STATE                         ║
+// ╚══════════════════════════════════════════════════════════════╝
+const socket = io();
+let myCode = '', myName = '';
+let currentMatchId = null;
+let myRole = null; // 'p1', 'p2', 'spectator'
+let isMyTurn = false;
+let isSpectator = false;
+let challengerCode = null, challengerName = null;
+let pendingMatchId = null;
+let setupMode = '9BALL', setupFirst = 'random';
+let matchP1 = {}, matchP2 = {};
+let spectatorView = 'overview'; // 'overview', 'p1', 'p2'
+// Spectator shared camera angles from active player (if they broadcast)
+let spectatorSharedAimAngle = 0;
 
-// 物理挙動の調整
-const SPIN_FRICTION_X = 0.95;  
-const SPIN_FRICTION_Y = 0.996; 
-const RESTITUTION = 0.975;     
-const POCKET_RADIUS = 1.95;   
-const STOP_THRESHOLD = 0.005; 
-
-// === 追加：空気抵抗係数 ===
-const AIR_DRAG_COEF = 0.015; // 速度の2乗に比例して減速させる係数（ゲームプレイに合わせて微調整してください）
-
-let scene, camera, overviewCamera, renderer, cueBall, hitMarker, tableCloth;
-let balls = [];
-let viewMode = 'OVERVIEW';
-let aimAngle = 0;
-let aimElevation = 0.05; 
-let isCharging = false;
-let shotPower = 0;
-
-let maxPower = 48;            
-let powerDirection = 1;
-let chargeSpeed = 0.45; 
-
-let spinOffset = new THREE.Vector2();
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-const keys = {};
-
-// ゲームルール状態
-let gameMode = '9BALL'; 
-let currentPlayer = 1;
-let gameState = 'PLAYING'; 
-let shotInProgress = false;
-let firstHitBall = null;
-let pocketedBallsThisTurn = [];
-let cueBallPocketed = false;
-let isFreeBallMode = false;
-let uiTimeoutId = null;
-let targetBallAtShotStart = null;
-
-// 8ボールルール状態
-let playerGroup = { 1: null, 2: null }; 
-let calledPocket = 0; 
-
-const pockets = [
-    { x: -TABLE_W/2, z: -TABLE_L/2, name: "左上 (コーナー)" }, 
-    { x:  TABLE_W/2, z: -TABLE_L/2, name: "右上 (コーナー)" },
-    { x: -TABLE_W/2, z: 0,           name: "左中 (サイド)" },   
-    { x:  TABLE_W/2, z: 0,           name: "右中 (サイド)" },
-    { x: -TABLE_W/2, z:  TABLE_L/2, name: "左下 (コーナー)" }, 
-    { x:  TABLE_W/2, z:  TABLE_L/2, name: "右下 (コーナー)" }
-];
-
-const BOUNDS_X = TABLE_W / 2 - BALL_R;
-const BOUNDS_Z = TABLE_L / 2 - BALL_R;
-
-let tableWalls = [];
-let visualFramerails = [];
-
-document.getElementById('turn-switch').addEventListener('change', (e) => {
-    const statusText = document.getElementById('turn-switch-status');
-    if(e.target.checked) {
-        statusText.innerText = "ON";
-        statusText.style.color = "#4CAF50";
-    } else {
-        statusText.innerText = "OFF (固定)";
-        statusText.style.color = "#FF5252";
-    }
-});
-
-document.getElementById('ui-display-switch').addEventListener('change', (e) => {
-    applyUiVisibility();
-});
-
-function applyUiVisibility() {
-    if (gameState === 'GAMEOVER') {
-        const scoreboard = document.getElementById('scoreboard');
-        scoreboard.style.opacity = '1';
-        scoreboard.style.visibility = 'visible';
-        document.getElementById('minimal-turn-indicator').style.opacity = '0';
-        return;
-    }
-
-    const isVisibleSetting = document.getElementById('ui-display-switch').checked;
-    const scoreboard = document.getElementById('scoreboard');
-    const minimalIndicator = document.getElementById('minimal-turn-indicator');
-    
-    if (isVisibleSetting) {
-        if (shotInProgress) {
-            scoreboard.style.opacity = '0';
-            scoreboard.style.visibility = 'hidden';
-            minimalIndicator.style.opacity = '1'; 
+// ── Login ──
+function doLogin() {
+    const code = document.getElementById('login-code').value.trim();
+    const name = document.getElementById('login-name').value.trim();
+    if (!code || !name) return showLoginMsg('コードと名前を入力してください。', 'red');
+    socket.emit('login', { code, name }, (res) => {
+        if (res.success) {
+            myCode = code; myName = name;
+            document.getElementById('my-name-display').textContent = name;
+            document.getElementById('my-code-display').textContent = 'コード: ' + code;
+            showScreen('lobby-screen');
+            socket.emit('get_friends');
         } else {
-            if (scoreboard.style.opacity === '1') {
-                minimalIndicator.style.opacity = '0'; 
-            } else {
-                minimalIndicator.style.opacity = '1'; 
-            }
+            showLoginMsg(res.message, 'red');
         }
+    });
+}
+function showLoginMsg(msg, color) {
+    const el = document.getElementById('login-msg');
+    el.textContent = msg;
+    el.style.color = color === 'red' ? 'var(--red)' : 'var(--green)';
+}
+function doLogout() {
+    socket.emit('return_to_lobby');
+    myCode = ''; myName = '';
+    showScreen('login-screen');
+}
+
+// ── Screens ──
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id)?.classList.add('active');
+}
+
+// ── Tab switch ──
+let currentTab = 'friends';
+function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    socket.emit('get_friends');
+}
+
+// ── Friends list rendering ──
+socket.on('friends_data_update', () => { if (myCode) socket.emit('get_friends'); });
+socket.on('friends_data', (list) => {
+    const container = document.getElementById('friend-list-container');
+    container.innerHTML = '';
+
+    let pendingIn = list.filter(f => f.status === 'pending' && !f.isSender);
+    let pendingOut = list.filter(f => f.status === 'pending' && f.isSender);
+    let accepted = list.filter(f => f.status === 'accepted');
+
+    // Update badge
+    const badge = document.getElementById('requests-badge');
+    if (pendingIn.length > 0) {
+        badge.textContent = pendingIn.length;
+        badge.style.display = 'flex';
     } else {
-        scoreboard.style.opacity = '0';
-        scoreboard.style.visibility = 'hidden';
-        minimalIndicator.style.opacity = '1';
+        badge.style.display = 'none';
+    }
+
+    if (currentTab === 'friends') {
+        if (accepted.length === 0) {
+            container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:30px 16px;font-size:13px;">フレンドがいません。<br>下のフォームからコードで追加しよう！</div>';
+            return;
+        }
+        // Sort: favorites first, then online
+        accepted.sort((a,b) => {
+            if (b.is_favorite !== a.is_favorite) return b.is_favorite - a.is_favorite;
+            if (b.isOnline !== a.isOnline) return (b.isOnline?1:0) - (a.isOnline?1:0);
+            return a.name.localeCompare(b.name);
+        });
+        accepted.forEach(f => {
+            const item = document.createElement('div');
+            item.className = 'friend-item';
+            const actLabel = f.activity === 'offline' ? 'オフライン' :
+                             f.activity === 'idle' ? 'ロビー' :
+                             f.activity === 'playing' ? '対戦中' :
+                             f.activity === 'setup' ? '設定中' : f.activity;
+            const actClass = f.isOnline ? (f.activity === 'playing' ? 'playing' : 'online') : '';
+            item.innerHTML = `
+                <div class="friend-avatar ${f.isOnline ? 'online' : ''}">${f.name[0].toUpperCase()}</div>
+                <div class="friend-info">
+                    <div class="friend-name">${escHtml(f.name)} ${f.is_favorite ? '⭐' : ''}</div>
+                    <div class="friend-status ${actClass}">${actLabel}</div>
+                </div>
+                <div class="friend-actions">
+                    ${f.isOnline && f.activity === 'idle' ? `<button class="icon-btn" onclick="challengeFriend('${f.code}')" title="対戦申し込み">⚔️</button>` : ''}
+                    <button class="icon-btn" onclick="toggleFav('${f.code}')" title="お気に入り">${f.is_favorite ? '★' : '☆'}</button>
+                    <button class="icon-btn danger" onclick="deleteFriend('${f.code}')">✕</button>
+                </div>`;
+            container.appendChild(item);
+        });
+
+    } else if (currentTab === 'requests') {
+        if (pendingIn.length === 0 && pendingOut.length === 0) {
+            container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:30px 16px;font-size:13px;">申請はありません</div>';
+            return;
+        }
+        if (pendingIn.length > 0) {
+            container.innerHTML += '<div style="padding:8px 12px;font-size:11px;color:var(--muted);text-transform:uppercase;">受信した申請</div>';
+            pendingIn.forEach(f => {
+                const item = document.createElement('div');
+                item.className = 'friend-item';
+                item.innerHTML = `
+                    <div class="friend-avatar">${f.name[0].toUpperCase()}</div>
+                    <div class="friend-info"><div class="friend-name">${escHtml(f.name)}</div><div class="friend-status">${f.code}</div></div>
+                    <div class="friend-actions">
+                        <button class="icon-btn btn-green" onclick="respondRequest('${f.code}',true)" style="background:var(--green);color:#fff;">✓</button>
+                        <button class="icon-btn danger" onclick="respondRequest('${f.code}',false)">✕</button>
+                    </div>`;
+                container.appendChild(item);
+            });
+        }
+        if (pendingOut.length > 0) {
+            container.innerHTML += '<div style="padding:8px 12px;font-size:11px;color:var(--muted);text-transform:uppercase;">送信した申請</div>';
+            pendingOut.forEach(f => {
+                const item = document.createElement('div');
+                item.className = 'friend-item';
+                item.innerHTML = `
+                    <div class="friend-avatar">${f.name[0].toUpperCase()}</div>
+                    <div class="friend-info"><div class="friend-name">${escHtml(f.name)}</div><div class="friend-status">承認待ち...</div></div>`;
+                container.appendChild(item);
+            });
+        }
+
+    } else if (currentTab === 'history') {
+        // Show all accepted friends for history selection
+        container.innerHTML = '<div style="padding:8px 12px;font-size:11px;color:var(--muted);">フレンドを選ぶと対戦履歴が表示されます</div>';
+        accepted.forEach(f => {
+            const item = document.createElement('div');
+            item.className = 'friend-item';
+            item.style.cursor = 'pointer';
+            item.innerHTML = `
+                <div class="friend-avatar ${f.isOnline?'online':''}">${f.name[0].toUpperCase()}</div>
+                <div class="friend-info"><div class="friend-name">${escHtml(f.name)}</div></div>
+                <div class="friend-actions"><button class="icon-btn" onclick="showHistory('${f.code}','${escHtml(f.name)}')">📋</button></div>`;
+            container.appendChild(item);
+        });
+    }
+});
+
+function sendFriendRequest() {
+    const code = document.getElementById('add-friend-code').value.trim();
+    if (!code) return;
+    socket.emit('send_friend_request', code, (res) => {
+        showGenericNotif(res.success ? '✅ 完了' : '⚠️ エラー', res.message);
+        if (res.success) document.getElementById('add-friend-code').value = '';
+    });
+}
+function respondRequest(code, accept) {
+    socket.emit('respond_friend_request', { targetCode: code, accept });
+}
+function toggleFav(code) { socket.emit('toggle_favorite', code); }
+function deleteFriend(code) {
+    if (confirm('フレンドを削除しますか？')) socket.emit('delete_friend', code);
+}
+function showHistory(code, name) {
+    socket.emit('get_history', code);
+}
+socket.on('history_data', ({ targetCode, history }) => {
+    const container = document.getElementById('friend-list-container');
+    let html = `<div style="padding:8px 12px;"><strong>vs ${escHtml(targetCode)} の履歴</strong></div>`;
+    if (history.length === 0) {
+        html += '<div style="padding:8px 16px;color:var(--muted);font-size:13px;">対戦記録なし</div>';
+    }
+    history.forEach(h => {
+        const won = h.winner_code === myCode;
+        const resultColor = won ? 'var(--green)' : h.winner_code ? 'var(--red)' : 'var(--muted)';
+        const resultLabel = won ? '勝利' : h.winner_code ? '敗北' : '記録なし';
+        const date = new Date(h.date).toLocaleDateString('ja-JP');
+        html += `<div class="friend-item">
+            <div style="flex:1;font-size:12px;color:var(--muted);">${date} ${h.game_mode||'9BALL'}</div>
+            <div style="font-weight:bold;color:${resultColor};">${resultLabel}</div>
+        </div>`;
+    });
+    container.innerHTML = html;
+});
+
+// ── Challenge (sending) ──
+function challengeFriend(code) {
+    socket.emit('challenge_friend', code);
+    showGenericNotif('⚔️ 申し込み送信', '対戦申し込みを送りました。応答を待っています...');
+}
+
+// ── Challenge (receiving) ──
+socket.on('incoming_challenge', ({ code, name }) => {
+    challengerCode = code; challengerName = name;
+    document.getElementById('challenge-from-name').textContent = `${name} から対戦申し込みが来ています！`;
+    document.getElementById('challenge-notif').classList.add('show');
+    setTimeout(() => document.getElementById('challenge-notif').classList.remove('show'), 15000);
+});
+function respondChallenge(accept) {
+    document.getElementById('challenge-notif').classList.remove('show');
+    socket.emit('respond_challenge', { targetCode: challengerCode, accept });
+    challengerCode = null;
+}
+socket.on('challenge_rejected', ({ name }) => {
+    showGenericNotif('❌ 断られました', `${name} が対戦を断りました。`);
+});
+socket.on('challenge_error', ({ message }) => {
+    showGenericNotif('⚠️ エラー', message);
+});
+
+// ── Match Setup ──
+socket.on('match_setup', ({ matchId, isHost, opponentName, opponentCode }) => {
+    pendingMatchId = matchId;
+    const p1Name = isHost ? myName : opponentName;
+    const p2Name = isHost ? opponentName : myName;
+    document.getElementById('setup-desc').textContent = `対 ${opponentName} との設定`;
+    document.getElementById('first-p1').textContent = isHost ? 'あなた (先攻)' : opponentName + ' (先攻)';
+    document.getElementById('first-p2').textContent = isHost ? opponentName + ' (先攻)' : 'あなた (先攻)';
+
+    if (isHost) {
+        document.getElementById('setup-host-controls').style.display = '';
+        document.getElementById('setup-guest-waiting').style.display = 'none';
+        selectMode('9BALL');
+        selectFirst('random');
+    } else {
+        document.getElementById('setup-host-controls').style.display = 'none';
+        document.getElementById('setup-guest-waiting').style.display = '';
+    }
+    document.getElementById('setup-overlay').classList.add('active');
+});
+
+function selectMode(m) {
+    setupMode = m;
+    document.getElementById('mode-9ball').classList.toggle('selected', m === '9BALL');
+    document.getElementById('mode-8ball').classList.toggle('selected', m === '8BALL');
+}
+function selectFirst(f) {
+    setupFirst = f;
+    ['random','p1','p2'].forEach(x => document.getElementById('first-'+x).classList.toggle('selected', x === f));
+}
+function confirmMatchStart() {
+    socket.emit('match_start_config', { matchId: pendingMatchId, gameMode: setupMode, firstPlayer: setupFirst });
+    document.getElementById('setup-overlay').classList.remove('active');
+}
+function cancelMatch() {
+    document.getElementById('setup-overlay').classList.remove('active');
+    socket.emit('return_to_lobby');
+    pendingMatchId = null;
+}
+
+// ── Match Start ──
+socket.on('match_start', (data) => {
+    document.getElementById('setup-overlay').classList.remove('active');
+    currentMatchId = data.matchId;
+    matchP1 = data.p1; matchP2 = data.p2;
+
+    // Determine role
+    if (data.p1.code === myCode) { myRole = 'p1'; }
+    else if (data.p2.code === myCode) { myRole = 'p2'; }
+    else { myRole = 'spectator'; isSpectator = true; }
+
+    isMyTurn = data.firstPlayer === myCode;
+    isSpectator = myRole === 'spectator';
+
+    // Setup HUD
+    document.getElementById('hud-p1-name').textContent = data.p1.name;
+    document.getElementById('hud-p1-avatar').textContent = data.p1.name[0].toUpperCase();
+    document.getElementById('hud-p2-name').textContent = data.p2.name;
+    document.getElementById('hud-p2-avatar').textContent = data.p2.name[0].toUpperCase();
+    document.getElementById('hud-mode').textContent = data.gameMode;
+
+    startBilliards(data);
+    showScreen('game-screen');
+    document.getElementById('game-screen').classList.add('active');
+
+    if (isSpectator) {
+        document.getElementById('spectator-banner').style.display = 'flex';
+        document.getElementById('waiting-overlay').style.display = 'none';
+    } else {
+        document.getElementById('spectator-banner').style.display = 'none';
+        updateTurnUI();
+    }
+});
+
+function updateTurnUI() {
+    const name = isMyTurn ? 'あなたのターン' : '相手のターン';
+    document.getElementById('hud-turn-text').textContent = name;
+
+    const p1Active = (isMyTurn && myRole === 'p1') || (!isMyTurn && myRole === 'p2');
+    document.getElementById('hud-p1-avatar').classList.toggle('active-turn', p1Active);
+    document.getElementById('hud-p2-avatar').classList.toggle('active-turn', !p1Active);
+
+    const waiting = document.getElementById('waiting-overlay');
+    if (isSpectator) {
+        waiting.style.display = 'none';
+    } else if (!isMyTurn) {
+        waiting.style.display = 'flex';
+    } else {
+        waiting.style.display = 'none';
     }
 }
 
-function createBallTexture(colorStr, num) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 256; canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-    
-    if (num === 0) {
-        ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,256,256);
-    } else if (num >= 9) {
-        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 256, 256);
-        ctx.fillStyle = colorStr; ctx.fillRect(0, 64, 256, 128);
+// ── Spectator view ──
+function setSpectatorView(v) {
+    spectatorView = v;
+    ['overview','p1','p2'].forEach(x => {
+        document.getElementById('view-btn-'+x).classList.toggle('active', x === v);
+    });
+}
+
+// ── Opponent shot received ──
+socket.on('opponent_shot', (data) => {
+    // Apply the shot on our local physics
+    applyOpponentShot(data);
+});
+
+// ── Ball state sync ──
+socket.on('sync_ball_state', (data) => {
+    syncBallsFromState(data.ballStates);
+    if (data.nextTurn !== undefined) {
+        isMyTurn = (data.nextTurn === myCode);
+        if (!isSpectator) updateTurnUI();
+    }
+});
+
+socket.on('opponent_freeball', (data) => {
+    applyFreeBallPlacement(data);
+});
+
+socket.on('spectate_shot', (data) => {
+    applyOpponentShot(data);
+});
+socket.on('spectate_freeball', (data) => {
+    applyFreeBallPlacement(data);
+});
+
+// Request for ball state (from server for new spectator)
+socket.on('request_ball_state', ({ forSpectator }) => {
+    const bs = serializeBallStates();
+    socket.emit('ball_state_response', { forSpectator, ballStates: bs, matchId: currentMatchId });
+});
+
+// ── Game result ──
+socket.on('game_result', (data) => {
+    const overlay = document.getElementById('result-overlay');
+    const title = document.getElementById('result-title');
+    const desc = document.getElementById('result-desc');
+    if (data.result === 'win') {
+        title.textContent = '🏆 WIN'; title.className = 'win';
+        desc.textContent = data.reason === 'disconnect' ? '相手が切断しました' : data.reason === 'opponent_left' ? '相手がロビーへ戻りました' : 'あなたの勝利です！';
+    } else if (data.result === 'lose') {
+        title.textContent = '💀 LOSE'; title.className = 'lose';
+        desc.textContent = '残念でした...';
     } else {
-        ctx.fillStyle = colorStr; ctx.fillRect(0, 0, 256, 256);
+        title.textContent = '試合終了'; title.className = '';
+        desc.textContent = '観戦終了';
+    }
+    overlay.style.display = 'flex';
+    isMyTurn = false;
+    document.getElementById('waiting-overlay').style.display = 'none';
+    gameState = 'GAMEOVER';
+});
+
+function returnToLobby() {
+    socket.emit('return_to_lobby');
+    document.getElementById('result-overlay').style.display = 'none';
+    document.getElementById('waiting-overlay').style.display = 'none';
+    document.getElementById('spectator-banner').style.display = 'none';
+    showScreen('lobby-screen');
+    if (renderer) {
+        renderer.dispose();
+        document.getElementById('canvas-container').innerHTML = '';
+        document.getElementById('labels-container').innerHTML = '';
+        renderer = null;
+    }
+    balls = [];
+    currentMatchId = null;
+    isSpectator = false;
+    myRole = null;
+    gameState = 'PLAYING';
+    socket.emit('get_friends');
+}
+
+// ── Helpers ──
+function showGenericNotif(title, body) {
+    document.getElementById('generic-notif-title').textContent = title;
+    document.getElementById('generic-notif-body').textContent = body;
+    const n = document.getElementById('generic-notif');
+    n.classList.add('show');
+    setTimeout(() => n.classList.remove('show'), 4000);
+}
+function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.getElementById('login-code').addEventListener('keydown', e => e.key==='Enter' && doLogin());
+document.getElementById('login-name').addEventListener('keydown', e => e.key==='Enter' && doLogin());
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║                    3D BILLIARDS ENGINE                       ║
+// ╚══════════════════════════════════════════════════════════════╝
+const TABLE_W = 30, TABLE_L = 60, BALL_R = 0.7;
+const SPIN_FRICTION_X = 0.95, SPIN_FRICTION_Y = 0.996;
+const RESTITUTION = 0.975, POCKET_RADIUS = 1.95, STOP_THRESHOLD = 0.005;
+const AIR_DRAG_COEF = 0.015;
+
+let scene, camera, overviewCamera, renderer, cueBall, hitMarker, tableCloth;
+let balls = [], visualFramerails = [], tableWalls = [];
+let viewMode = 'OVERVIEW';
+let aimAngle = 0, aimElevation = 0.05;
+let isCharging = false, shotPower = 0, maxPower = 48, powerDirection = 1, chargeSpeed = 0.45;
+let spinOffset = new THREE.Vector2();
+const raycaster = new THREE.Raycaster(), mouse = new THREE.Vector2(), keys = {};
+let gameMode = '9BALL', currentPlayerLocal = 1, gameState = 'PLAYING';
+let shotInProgress = false, firstHitBall = null, pocketedBallsThisTurn = [], cueBallPocketed = false;
+let isFreeBallMode = false, uiTimeoutId = null, targetBallAtShotStart = null;
+let playerGroup = {1: null, 2: null}, calledPocket = 0;
+let guideLine = null;
+
+const pockets = [
+    {x:-TABLE_W/2, z:-TABLE_L/2}, {x:TABLE_W/2, z:-TABLE_L/2},
+    {x:-TABLE_W/2, z:0},          {x:TABLE_W/2, z:0},
+    {x:-TABLE_W/2, z:TABLE_L/2},  {x:TABLE_W/2, z:TABLE_L/2}
+];
+const BOUNDS_X = TABLE_W/2 - BALL_R, BOUNDS_Z = TABLE_L/2 - BALL_R;
+
+function startBilliards(matchData) {
+    gameMode = matchData.gameMode || '9BALL';
+    // If it's my turn = I'm player 1 in local logic; otherwise player 2
+    currentPlayerLocal = (matchData.firstPlayer === myCode) ? 1 : 2;
+
+    if (renderer) {
+        renderer.dispose();
+        document.getElementById('canvas-container').innerHTML = '';
+        document.getElementById('labels-container').innerHTML = '';
+        balls = []; visualFramerails = []; tableWalls = [];
     }
 
-    if (num > 0) {
-        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(128, 128, 45, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#000000'; ctx.font = 'bold 50px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(num, 128, 131);
-        
-        if (num === 9) {
-            ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
-            ctx.beginPath(); ctx.moveTo(95, 165); ctx.lineTo(161, 165); ctx.stroke();
+    scene = new THREE.Scene(); scene.background = new THREE.Color(0x111111);
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+    overviewCamera = new THREE.PerspectiveCamera(45, 30/60, 0.1, 1000);
+    overviewCamera.position.set(0, 72, 0); overviewCamera.lookAt(0,0,0);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true; renderer.autoClear = false;
+    document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+    const amb = new THREE.AmbientLight(0xffffff, 0.5); scene.add(amb);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+    dir.position.set(10,40,20); dir.castShadow = true;
+    dir.shadow.mapSize.width = dir.shadow.mapSize.height = 2048;
+    scene.add(dir);
+
+    createTable3D(); createBalls3D(); createGuideLine();
+    hitMarker = new THREE.Mesh(new THREE.SphereGeometry(0.12,16,16), new THREE.MeshBasicMaterial({color:0xff0000,depthTest:false}));
+    hitMarker.renderOrder = 999; hitMarker.visible = false; scene.add(hitMarker);
+
+    // Input events
+    window.onkeydown = onKeyDown;
+    window.onkeyup = (e) => {
+        keys[e.key] = false;
+        if (e.code==='KeyA') keys['A_KEY']=false;
+        if (e.code==='KeyD') keys['D_KEY']=false;
+        if (e.code==='KeyW') keys['W_KEY']=false;
+        if (e.code==='KeyS') keys['S_KEY']=false;
+    };
+    window.onmousedown = onMouseDown;
+    window.onmousemove = onMouseMove;
+    window.onmouseup = onMouseUp;
+    window.onresize = onWindowResize;
+
+    document.getElementById('game-mode-title').textContent = gameMode;
+    updateGameUI();
+    animate();
+}
+
+function onKeyDown(e) {
+    keys[e.key] = true;
+    if (e.code==='KeyA') keys['A_KEY']=true;
+    if (e.code==='KeyD') keys['D_KEY']=true;
+    if (e.code==='KeyW') keys['W_KEY']=true;
+    if (e.code==='KeyS') keys['S_KEY']=true;
+
+    if (e.code==='Space' && !areBallsStopped()) fastForwardPhysics();
+    if (gameState !== 'PLAYING') return;
+
+    // Spectator: only view switch allowed
+    if (isSpectator) return;
+    if (!isMyTurn) return; // Not my turn: no game input
+
+    if (e.key==='ArrowUp') {
+        viewMode = 'OVERVIEW';
+        document.getElementById('status').textContent = isFreeBallMode ? '視点: 俯瞰 (FREE BALL)' : '視点: 俯瞰 (OVERVIEW)';
+        document.getElementById('spin-indicator').style.display = 'none';
+        document.getElementById('pocket-call-panel').style.display = 'none';
+    }
+    if (e.key==='ArrowDown' && areBallsStopped()) {
+        viewMode = 'AIMING';
+        document.getElementById('status').textContent = '視点: プレイヤー (AIMING)';
+        document.getElementById('spin-indicator').style.display = 'block';
+        if (gameMode==='8BALL' && is8BallTargetNow())
+            document.getElementById('pocket-call-panel').style.display = 'flex';
+        resetSpinVisual();
+        triggerUiTimer();
+    }
+}
+
+// ─── Ball state serialization ───
+function serializeBallStates() {
+    return balls.map(b => ({
+        num: b.num, isCue: b.isCue, active: b.active,
+        x: b.mesh.position.x, y: b.mesh.position.y, z: b.mesh.position.z,
+        vx: b.vx, vz: b.vz
+    }));
+}
+
+function syncBallsFromState(states) {
+    if (!states || !balls.length) return;
+    states.forEach(s => {
+        const ball = balls.find(b => b.num === s.num && b.isCue === s.isCue);
+        if (!ball) return;
+        ball.active = s.active;
+        ball.mesh.position.set(s.x, s.y, s.z);
+        ball.vx = s.vx; ball.vz = s.vz;
+        if (!s.active && ball.labelEl && ball.labelEl.parentNode) {
+            ball.labelEl.parentNode.removeChild(ball.labelEl);
         }
+    });
+}
+
+function applyOpponentShot(data) {
+    if (!data.ballStates) return;
+    syncBallsFromState(data.ballStates);
+    // Apply velocity from shot
+    if (data.shotParams && cueBall) {
+        cueBall.vx = data.shotParams.vx;
+        cueBall.vz = data.shotParams.vz;
+        cueBall.spinX = data.shotParams.spinX || 0;
+        cueBall.spinY = data.shotParams.spinY || 0;
+        shotInProgress = true;
+        firstHitBall = null;
+        pocketedBallsThisTurn = [];
+        cueBallPocketed = false;
+    }
+}
+
+function applyFreeBallPlacement(data) {
+    if (cueBall && data.x !== undefined) {
+        cueBall.mesh.position.set(data.x, BALL_R, data.z);
+        cueBall.active = true; cueBall.vx = 0; cueBall.vz = 0;
+    }
+}
+
+// Send shot to server
+function sendShotToServer(vx, vz) {
+    const states = serializeBallStates();
+    socket.emit('shot_fired', {
+        matchId: currentMatchId,
+        ballStates: states,
+        shotParams: { vx, vz, spinX: spinOffset.x * 20, spinY: spinOffset.y * 20 }
+    });
+}
+
+// Send turn end
+function sendTurnEnd(nextTurnCode) {
+    const states = serializeBallStates();
+    socket.emit('turn_end_state', {
+        matchId: currentMatchId,
+        ballStates: states,
+        nextTurn: nextTurnCode
+    });
+    isMyTurn = (nextTurnCode === myCode);
+    if (!isSpectator) updateTurnUI();
+}
+
+// ─── Pocket call ───
+function selectCalledPocket(idx) {
+    calledPocket = idx;
+    document.querySelectorAll('.pocket-btn').forEach((b,i) => b.classList.toggle('selected', i===idx));
+}
+
+// ─── Texture ───
+function createBallTexture(colorStr, num) {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    if (num===0) { ctx.fillStyle='#fff'; ctx.fillRect(0,0,256,256); }
+    else if (num>=9) { ctx.fillStyle='#fff'; ctx.fillRect(0,0,256,256); ctx.fillStyle=colorStr; ctx.fillRect(0,64,256,128); }
+    else { ctx.fillStyle=colorStr; ctx.fillRect(0,0,256,256); }
+    if (num>0) {
+        ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(128,128,45,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#000'; ctx.font='bold 50px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(num,128,131);
+        if (num===9) { ctx.strokeStyle='#000'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(95,165); ctx.lineTo(161,165); ctx.stroke(); }
     }
     return new THREE.CanvasTexture(canvas);
 }
 
+// ─── Ball class ───
 class BilliardBall {
-    constructor(x, z, colorStr, isCue = false, num = 0) {
-        this.isCue = isCue; this.num = num;
-        this.vx = 0; this.vz = 0;
-        this.spinX = 0; this.spinY = 0; 
-        this.active = true;
-        this.camDistance = 0; 
-        this.isFalling = false;
-        
-        const geometry = new THREE.SphereGeometry(BALL_R, 32, 32);
-        const material = new THREE.MeshStandardMaterial({ map: createBallTexture(colorStr, num), roughness: 0.12, metalness: 0.1 });
-        this.mesh = new THREE.Mesh(geometry, material);
-        this.mesh.position.set(x, BALL_R, z);
-        this.mesh.castShadow = true; this.mesh.receiveShadow = true;
+    constructor(x, z, colorStr, isCue=false, num=0) {
+        this.isCue=isCue; this.num=num; this.vx=0; this.vz=0;
+        this.spinX=0; this.spinY=0; this.active=true; this.camDistance=0; this.isFalling=false;
+        const geo = new THREE.SphereGeometry(BALL_R,32,32);
+        const mat = new THREE.MeshStandardMaterial({map:createBallTexture(colorStr,num),roughness:0.12,metalness:0.1});
+        this.mesh = new THREE.Mesh(geo,mat);
+        this.mesh.position.set(x,BALL_R,z);
+        this.mesh.castShadow = this.mesh.receiveShadow = true;
         scene.add(this.mesh);
-
         this.labelEl = document.createElement('div');
         this.labelEl.className = isCue ? 'ball-label cue' : 'ball-label';
         this.setLabelText();
         document.getElementById('labels-container').appendChild(this.labelEl);
     }
-
     setLabelText() {
-        if (this.isCue) {
-            if (isFreeBallMode && viewMode === 'OVERVIEW') {
-                this.labelEl.innerText = 'クリックで再配置';
-            } else {
-                this.labelEl.innerText = '手球';
-            }
-            return;
-        }
-        if (gameMode === '8BALL' && this.num === 8) {
-            this.labelEl.innerText = '8 [黒球]';
-        } else {
-            this.labelEl.innerText = this.num;
-        }
+        if (this.isCue) { this.labelEl.innerText = (isFreeBallMode && viewMode==='OVERVIEW') ? 'クリックで再配置' : '手球'; return; }
+        this.labelEl.innerText = (gameMode==='8BALL' && this.num===8) ? '8 [黒球]' : this.num;
     }
-    
     update(dtFactor) {
         if (!this.active) {
-            if(this.labelEl && this.labelEl.parentNode) this.labelEl.parentNode.removeChild(this.labelEl);
+            if (this.labelEl?.parentNode) this.labelEl.parentNode.removeChild(this.labelEl);
             return;
         }
-
         if (this.isFalling) return;
-        
-        this.mesh.position.x += this.vx * dtFactor; 
+        this.mesh.position.x += this.vx * dtFactor;
         this.mesh.position.z += this.vz * dtFactor;
-        
         let speed = Math.hypot(this.vx, this.vz);
-        
-        let currentFriction = 0.985; 
-        if (speed > 0) {
-            if (speed > 0.08) {
-                currentFriction = 0.994; 
-            } else {
-                let t = speed / 0.08;
-                currentFriction = THREE.MathUtils.lerp(0.980, 0.994, t);
-            }
-        }
-        currentFriction = Math.pow(currentFriction, dtFactor);
-
+        let fric = speed > 0.08 ? 0.994 : THREE.MathUtils.lerp(0.980, 0.994, speed/0.08);
+        fric = Math.pow(fric, dtFactor);
         if (speed > 0.0002 || Math.abs(this.spinY) > 0.05) {
-            this.mesh.rotateOnWorldAxis(new THREE.Vector3(0, 0, -1), (this.vx * dtFactor) / BALL_R);
-            this.mesh.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), (this.vz * dtFactor) / BALL_R);
-            
-            // 左右スピンによるカーブ効果
-            let dirX = speed > 0 ? this.vx / speed : 0;
-            let dirZ = speed > 0 ? this.vz / speed : -1; // 停止時は手前向きを基準
+            this.mesh.rotateOnWorldAxis(new THREE.Vector3(0,0,-1), (this.vx*dtFactor)/BALL_R);
+            this.mesh.rotateOnWorldAxis(new THREE.Vector3(1,0,0), (this.vz*dtFactor)/BALL_R);
             if (speed > 0) {
-                let curveEffect = this.spinX * 0.0012 * dtFactor; 
-                this.vx += -dirZ * curveEffect; 
-                this.vz += dirX * curveEffect;
+                let dx=this.vx/speed, dz=this.vz/speed;
+                this.vx += -dz * this.spinX * 0.0012 * dtFactor;
+                this.vz += dx * this.spinX * 0.0012 * dtFactor;
             }
-            
-            // --- 【大幅修正】縦スピン（押し・引き）がラシャに噛み付いて手球を引っ張る力を激増(4.5倍以上) ---
-            // これにより、的球に当たって前進速度を失った瞬間に、バックスピンによって強烈に手前へ戻る推進力がかかります
-            let spinDriveX = 0;
-            let spinDriveZ = 0;
-
-            // ★バックスピン（this.spinY が負）の時だけ係数を弱める（例: 0.022 → 0.006）
             let spinCoef = this.spinY < 0 ? 0.0001 : 0.022;
-
-            if (speed > 0.01) {
-                spinDriveX = dirX * this.spinY * spinCoef * dtFactor;
-                spinDriveZ = dirZ * this.spinY * spinCoef * dtFactor;
-            } else {
-                // ほぼ停止状態のときは、純粋に狙っているアングル（あるいは回転軸）の方向へ引き戻す
-                let backAngle = aimAngle;
-                spinDriveX = -Math.sin(backAngle) * this.spinY * spinCoef * dtFactor;
-                spinDriveZ = -Math.cos(backAngle) * this.spinY * spinCoef * dtFactor;
-            }
-            this.vx += spinDriveX;
-            this.vz += spinDriveZ;
+            let backAngle = aimAngle;
+            let drX = speed>0.01 ? (this.vx/speed)*this.spinY*spinCoef*dtFactor : -Math.sin(backAngle)*this.spinY*spinCoef*dtFactor;
+            let drZ = speed>0.01 ? (this.vz/speed)*this.spinY*spinCoef*dtFactor : -Math.cos(backAngle)*this.spinY*spinCoef*dtFactor;
+            this.vx += drX; this.vz += drZ;
         }
-        
-        this.mesh.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), this.spinX * 0.05 * dtFactor);
-        
-        // === 追加：空気抵抗の適用 ===
+        this.mesh.rotateOnWorldAxis(new THREE.Vector3(0,1,0), this.spinX*0.05*dtFactor);
         if (speed > 0) {
-            // 空気抵抗力は速度の2乗に比例: F = C * v^2
-            let dragForce = AIR_DRAG_COEF * (speed * speed) * dtFactor;
-            
-            // 速度ベクトルから空気抵抗分を差し引くための係数を計算（逆走防止のため 0 以下にはしない）
-            let airDragFactor = Math.max(0, 1.0 - (dragForce / speed));
-            
-            this.vx *= airDragFactor;
-            this.vz *= airDragFactor;
+            let drag = AIR_DRAG_COEF*speed*speed*dtFactor;
+            let af = Math.max(0, 1 - drag/speed);
+            this.vx *= af; this.vz *= af;
         }
-        // ============================
-
-        // 最後にラシャ（床面）の摩擦を適用
-        this.vx *= currentFriction; 
-        this.vz *= currentFriction;
-        
-        this.spinX *= Math.pow(SPIN_FRICTION_X, dtFactor); 
+        this.vx *= fric; this.vz *= fric;
+        this.spinX *= Math.pow(SPIN_FRICTION_X, dtFactor);
         this.spinY *= Math.pow(SPIN_FRICTION_Y, dtFactor);
-        
-        if (speed < STOP_THRESHOLD && Math.abs(this.spinX) < 0.05 && Math.abs(this.spinY) < 0.05) { 
-            this.vx = 0; this.vz = 0; this.spinX = 0; this.spinY = 0;
+        if (speed < STOP_THRESHOLD && Math.abs(this.spinX) < 0.05 && Math.abs(this.spinY) < 0.05) {
+            this.vx=0; this.vz=0; this.spinX=0; this.spinY=0;
         }
-
-        this.updateLabelVisuals();
+        this.updateLabelStyle();
     }
-
-    updateLabelVisuals() {
-        if (!this.active || this.isCue) return;
-        
-        this.labelEl.classList.remove('low-group', 'high-group', 'my-target');
-
-        if (gameMode === '8BALL') {
-            if (this.num >= 1 && this.num <= 7) {
-                this.labelEl.classList.add('low-group');
-            } else if (this.num >= 9 && this.num <= 15) {
-                this.labelEl.classList.add('high-group');
-            } else if (this.num === 8) {
-                if (is8BallTargetNow()) {
-                    this.labelEl.classList.add('my-target');
-                }
-            }
+    updateLabelStyle() {
+        this.labelEl.classList.remove('my-target','low-group','high-group','freeball');
+        if (gameMode==='8BALL') {
+            if (this.num<=7 && this.num>0) this.labelEl.classList.add('low-group');
+            else if (this.num>=9) this.labelEl.classList.add('high-group');
+            else if (this.num===8 && is8BallTargetNow()) this.labelEl.classList.add('my-target');
         } else {
-            let minTarget = getLowestTargetBall();
-            if (this.num === minTarget) this.labelEl.classList.add('my-target');
+            let mt = getLowestTargetBall();
+            if (this.num===mt) this.labelEl.classList.add('my-target');
         }
     }
-
     projectLabelPosition() {
-        if (!this.active || !this.labelEl || gameState === 'GAMEOVER' || this.isFalling) {
-            if(this.labelEl) this.labelEl.style.display = 'none';
-            return;
+        if (!this.active || !this.labelEl || gameState==='GAMEOVER' || this.isFalling) {
+            if (this.labelEl) this.labelEl.style.display='none'; return;
         }
-        
         let wp = new THREE.Vector3();
         this.mesh.getWorldPosition(wp);
-        
         this.camDistance = camera.position.distanceTo(wp);
-
         wp.y += BALL_R * 1.3;
         wp.project(camera);
-        
-        if(wp.z > 1) { this.labelEl.style.display = 'none'; return; }
-
-        let x = (wp.x * .5 + .5) * window.innerWidth;
-        let y = (-(wp.y * .5) + .5) * window.innerHeight;
-
-        if (viewMode === 'AIMING') {
-            const mapH = window.innerHeight * 0.32;
-            const mapW = mapH * (30 / 60);
-            if (x > window.innerWidth - mapW && y < mapH) {
-                this.labelEl.style.display = 'none'; return;
-            }
+        if (wp.z > 1) { this.labelEl.style.display='none'; return; }
+        let x = (wp.x*.5+.5)*window.innerWidth;
+        let y = (-(wp.y*.5)+.5)*window.innerHeight;
+        if (viewMode==='AIMING') {
+            const mh=window.innerHeight*0.32, mw=mh*(30/60);
+            if (x>window.innerWidth-mw && y<mh) { this.labelEl.style.display='none'; return; }
         }
-
-        this.labelEl.style.display = 'block';
-        this.labelEl.style.left = x + 'px'; 
-        this.labelEl.style.top = y + 'px';
+        this.labelEl.style.display='block';
+        this.labelEl.style.left=x+'px'; this.labelEl.style.top=y+'px';
     }
 }
 
 function updateLabelsDepthOrder() {
-    let sorted = balls.filter(b => b.active && b.labelEl).sort((a, b) => a.camDistance - b.camDistance);
-    sorted.forEach((ball, index) => {
-        let zIndexBase = 100 + (sorted.length - index);
-        ball.labelEl.style.zIndex = zIndexBase;
-    });
+    let sorted = balls.filter(b=>b.active&&b.labelEl).sort((a,b)=>a.camDistance-b.camDistance);
+    sorted.forEach((ball,i) => ball.labelEl.style.zIndex = 100+(sorted.length-i));
 }
 
-function startGame(mode) {
-    gameMode = mode;
-    document.getElementById('start-overlay').style.display = 'none';
-    document.getElementById('game-mode-title').innerText = mode === '9BALL' ? '9-BALL MODE' : '8-BALL MODE';
-    init();
-}
-
-function init() {
-    scene = new THREE.Scene(); scene.background = new THREE.Color(0x111111);
-    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-    
-    overviewCamera = new THREE.PerspectiveCamera(45, 30 / 60, 0.1, 1000);
-    overviewCamera.position.set(0, 72, 0); overviewCamera.lookAt(0, 0, 0);
-
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true; renderer.autoClear = false; 
-    document.getElementById('canvas-container').appendChild(renderer.domElement);
-
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); scene.add(ambientLight);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight.position.set(10, 40, 20); dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
-    scene.add(dirLight);
-
-    createTable3D(); 
-    createBalls3D(); 
-    createGuideLine();
-
-    hitMarker = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), new THREE.MeshBasicMaterial({color: 0xff0000, depthTest: false}));
-    hitMarker.renderOrder = 999; hitMarker.visible = false; scene.add(hitMarker);
-
-    window.addEventListener('keydown', (e) => {
-        keys[e.key] = true;
-        if (e.code === 'KeyA' || e.key === 'a' || e.key === 'A') keys['A_KEY'] = true;
-        if (e.code === 'KeyD' || e.key === 'd' || e.key === 'D') keys['D_KEY'] = true;
-        if (e.code === 'KeyW' || e.key === 'w' || e.key === 'W') keys['W_KEY'] = true;
-        if (e.code === 'KeyS' || e.key === 's' || e.key === 'S') keys['S_KEY'] = true;
-
-        if (e.code === 'Space') {
-            if (!areBallsStopped()) {
-                fastForwardPhysics();
-            }
-        }
-
-        if (gameState !== 'PLAYING') return;
-
-        if (e.key === 'ArrowUp') { 
-            viewMode = 'OVERVIEW'; 
-            if (isFreeBallMode) {
-                document.getElementById('status').innerText = "視点: 俯瞰 (FREE BALL)";
-                cueBall.labelEl.classList.add('freeball');
-                cueBall.setLabelText();
-            } else {
-                document.getElementById('status').innerText = "視点: 俯瞰 (OVERVIEW)"; 
-            }
-            document.getElementById('spin-indicator').style.display = 'none';
-            document.getElementById('pocket-call-panel').style.display = 'none'; 
-            
-            document.getElementById('minimal-turn-indicator').style.right = '20px';
-            document.getElementById('minimal-turn-indicator').style.left = 'auto';
-        }
-        if (e.key === 'ArrowDown' && areBallsStopped()) { 
-            viewMode = 'AIMING'; 
-            aimElevation = 0.05; 
-            document.getElementById('status').innerText = "視点: プレイヤー (AIMING)"; 
-            document.getElementById('spin-indicator').style.display = 'block';
-            
-            if (isFreeBallMode) {
-                cueBall.labelEl.classList.remove('freeball');
-                cueBall.setLabelText();
-            }
-
-            if (gameMode === '8BALL' && is8BallTargetNow()) {
-                document.getElementById('pocket-call-panel').style.display = 'flex';
-                selectCalledPocket(calledPocket); 
-            } else {
-                document.getElementById('pocket-call-panel').style.display = 'none';
-            }
-            
-            document.getElementById('minimal-turn-indicator').style.right = 'auto';
-            document.getElementById('minimal-turn-indicator').style.left = '20px';
-            
-            resetSpinVisual();
-            triggerUiTimer();
-        }
-    });
-
-    window.addEventListener('keyup', (e) => {
-        keys[e.key] = false;
-        if (e.code === 'KeyA' || e.key === 'a' || e.key === 'A') keys['A_KEY'] = false;
-        if (e.code === 'KeyD' || e.key === 'd' || e.key === 'D') keys['D_KEY'] = false;
-        if (e.code === 'KeyW' || e.key === 'w' || e.key === 'W') keys['W_KEY'] = false;
-        if (e.code === 'KeyS' || e.key === 's' || e.key === 'S') keys['S_KEY'] = false;
-    });
-
-    window.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-    window.addEventListener('resize', onWindowResize);
-
-    updateGameUI();
-    triggerUiTimer();
-    animate();
-}
-
-function is8BallTargetNow() {
-    let group = playerGroup[currentPlayer];
-    if (!group) return false; 
-    
-    let hasGroupBalls = balls.some(b => b.active && !b.isCue && b.num !== 8 && 
-        ((group === 'LOW' && b.num <= 7) || (group === 'HIGH' && b.num >= 9))
-    );
-    return !hasGroupBalls; 
-}
-
-function createCustomCushionMesh(vertices, material) {
-    const geometry = new THREE.BufferGeometry();
-    const indices = [
-        0, 1, 2,   2, 3, 0, 
-        4, 5, 6,   6, 7, 4, 
-        0, 4, 5,   5, 1, 0, 
-        1, 5, 6,   6, 2, 1, 
-        2, 6, 7,   7, 3, 2, 
-        3, 7, 4,   4, 0, 3  
-    ];
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-    geometry.setIndex(indices);
-    geometry.computeVertexNormals();
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.castShadow = true; mesh.receiveShadow = true;
-    return mesh;
-}
-
+// ─── Table & Balls creation ───
 function createTable3D() {
-    tableCloth = new THREE.Mesh(new THREE.BoxGeometry(TABLE_W, 0.2, TABLE_L), new THREE.MeshStandardMaterial({ color: 0x0a6c36, roughness: 0.6 }));
-    tableCloth.position.y = -0.1; tableCloth.receiveShadow = true; scene.add(tableCloth);
+    tableCloth = new THREE.Mesh(new THREE.BoxGeometry(TABLE_W,0.2,TABLE_L), new THREE.MeshStandardMaterial({color:0x0a6c36,roughness:0.6}));
+    tableCloth.position.y=-0.1; tableCloth.receiveShadow=true; scene.add(tableCloth);
 
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x3d2314, roughness: 0.4 });
-    const h = 1.0;  
-    const w = 2.0;  
+    const fm = new THREE.MeshStandardMaterial({color:0x3d2314,roughness:0.4});
+    const h=1.0, w=2.0;
+    const cd=POCKET_RADIUS*0.707, xO=TABLE_W/2+w, xI=TABLE_W/2, zO=TABLE_L/2+w, zI=TABLE_L/2;
 
-    const pCornerDist = POCKET_RADIUS * 0.707;
-    const xOuter = TABLE_W / 2 + w;
-    const xInner = TABLE_W / 2;
-    const zOuter = TABLE_L / 2 + w;
-    const zInner = TABLE_L / 2;
-
-    visualFramerails = [];
-
-    let leftTopVerts = [
-        -xOuter, 0, -zInner + pCornerDist,        -xInner, 0, -zInner + POCKET_RADIUS,
-        -xInner, 0, -POCKET_RADIUS,               -xOuter, 0, -POCKET_RADIUS,
-        -xOuter, h, -zInner + pCornerDist,        -xInner, h, -zInner + POCKET_RADIUS + 0.5,
-        -xInner, h, -POCKET_RADIUS - 0.5,          -xOuter, h, -POCKET_RADIUS
-    ];
-    let m1 = createCustomCushionMesh(leftTopVerts, frameMat); scene.add(m1); visualFramerails.push(m1);
-
-    let leftBottomVerts = [
-        -xOuter, 0,  POCKET_RADIUS,               -xInner, 0,  POCKET_RADIUS,
-        -xInner, 0,  zInner - POCKET_RADIUS,       -xOuter, 0,  zInner - pCornerDist,
-        -xOuter, h,  POCKET_RADIUS,               -xInner, h,  POCKET_RADIUS + 0.5,
-        -xInner, h,  zInner - POCKET_RADIUS - 0.5, -xOuter, h,  zInner - pCornerDist
-    ];
-    let m2 = createCustomCushionMesh(leftBottomVerts, frameMat); scene.add(m2); visualFramerails.push(m2);
-
-    let rightTopVerts = [
-        xInner, 0, -zInner + POCKET_RADIUS,       xOuter, 0, -zInner + pCornerDist,
-        xOuter, 0, -POCKET_RADIUS,                xInner, 0, -POCKET_RADIUS,
-        xInner, h, -zInner + POCKET_RADIUS + 0.5, xOuter, h, -zInner + pCornerDist,
-        xOuter, h, -POCKET_RADIUS,                xInner, h, -POCKET_RADIUS - 0.5
-    ];
-    let m3 = createCustomCushionMesh(rightTopVerts, frameMat); scene.add(m3); visualFramerails.push(m3);
-
-    let rightBottomVerts = [
-        xInner, 0,  POCKET_RADIUS,                xOuter, 0,  POCKET_RADIUS,
-        xOuter, 0,  zInner - pCornerDist,        xInner, 0,  zInner - POCKET_RADIUS,
-        xInner, h,  POCKET_RADIUS + 0.5,          xOuter, h,  POCKET_RADIUS,
-        xOuter, h,  zInner - pCornerDist,        xInner, h,  zInner - POCKET_RADIUS - 0.5
-    ];
-    let m4 = createCustomCushionMesh(rightBottomVerts, frameMat); scene.add(m4); visualFramerails.push(m4);
-
-    let topVerts = [
-        -xInner + POCKET_RADIUS, 0, -zInner,       xInner - POCKET_RADIUS, 0, -zInner,
-         xInner - pCornerDist,   0, -zOuter,      -xInner + pCornerDist,   0, -zOuter,
-        -xInner + POCKET_RADIUS + 0.5, h, -zInner, xInner - POCKET_RADIUS - 0.5, h, -zInner,
-         xInner - pCornerDist,   h, -zOuter,      -xInner + pCornerDist,   h, -zOuter
-    ];
-    let m5 = createCustomCushionMesh(topVerts, frameMat); scene.add(m5); visualFramerails.push(m5);
-
-    let bottomVerts = [
-        -xInner + POCKET_RADIUS, 0,  zInner,      -xInner + pCornerDist,   0,  zOuter,
-         xInner - pCornerDist,   0,  zOuter,       xInner - POCKET_RADIUS, 0,  zInner,
-        -xInner + POCKET_RADIUS + 0.5, h,  zInner, -xInner + pCornerDist,   h,  zOuter,
-         xInner - pCornerDist,   h,  zOuter,       xInner - POCKET_RADIUS - 0.5, h,  zInner
-    ];
-    let m6 = createCustomCushionMesh(bottomVerts, frameMat); scene.add(m6); visualFramerails.push(m6);
-
-    const railW = 1.5; 
-    const railTop = new THREE.Mesh(new THREE.BoxGeometry(TABLE_W + w*2 + railW*2, h, railW), frameMat);
-    railTop.position.set(0, h/2, -zOuter - railW/2); railTop.castShadow = railTop.receiveShadow = true; scene.add(railTop); visualFramerails.push(railTop);
-
-    const railBottom = new THREE.Mesh(new THREE.BoxGeometry(TABLE_W + w*2 + railW*2, h, railW), frameMat);
-    railBottom.position.set(0, h/2, zOuter + railW/2); railBottom.castShadow = railBottom.receiveShadow = true; scene.add(railBottom); visualFramerails.push(railBottom);
-
-    const railLeft = new THREE.Mesh(new THREE.BoxGeometry(railW, h, TABLE_L + w*2), frameMat);
-    railLeft.position.set(-xOuter - railW/2, h/2, 0); railLeft.castShadow = railLeft.receiveShadow = true; scene.add(railLeft); visualFramerails.push(railLeft);
-
-    const railRight = new THREE.Mesh(new THREE.BoxGeometry(railW, h, TABLE_L + w*2), frameMat);
-    railRight.position.set(xOuter + railW/2, h/2, 0); railRight.castShadow = railRight.receiveShadow = true; scene.add(railRight); visualFramerails.push(railRight);
-
-    const topThickness = 0.08; 
-    const railTotalWidth = railW + w;
-    const longRailLen = zInner - POCKET_RADIUS - pCornerDist;
-    const longRailZOffset = POCKET_RADIUS + longRailLen / 2;
-
-    const trLeftTop = new THREE.Mesh(new THREE.BoxGeometry(railTotalWidth, topThickness, longRailLen), frameMat);
-    trLeftTop.position.set(-xOuter + (w - railW)/2, h + topThickness/2, -longRailZOffset);
-    trLeftTop.castShadow = trLeftTop.receiveShadow = true; scene.add(trLeftTop); visualFramerails.push(trLeftTop);
-
-    const trLeftBottom = new THREE.Mesh(new THREE.BoxGeometry(railTotalWidth, topThickness, longRailLen), frameMat);
-    trLeftBottom.position.set(-xOuter + (w - railW)/2, h + topThickness/2, longRailZOffset);
-    trLeftBottom.castShadow = trLeftBottom.receiveShadow = true; scene.add(trLeftBottom); visualFramerails.push(trLeftBottom);
-
-    const trRightTop = new THREE.Mesh(new THREE.BoxGeometry(railTotalWidth, topThickness, longRailLen), frameMat);
-    trRightTop.position.set(xOuter - (w - railW)/2, h + topThickness/2, -longRailZOffset);
-    trRightTop.castShadow = trRightTop.receiveShadow = true; scene.add(trRightTop); visualFramerails.push(trRightTop);
-
-    const trRightBottom = new THREE.Mesh(new THREE.BoxGeometry(railTotalWidth, topThickness, longRailLen), frameMat);
-    trRightBottom.position.set(xOuter - (w - railW)/2, h + topThickness/2, longRailZOffset);
-    trRightBottom.castShadow = trRightBottom.receiveShadow = true; scene.add(trRightBottom); visualFramerails.push(trRightBottom);
-
-    const shortRailLen = (xInner - POCKET_RADIUS) * 2;
-    const trTopEdge = new THREE.Mesh(new THREE.BoxGeometry(shortRailLen, topThickness, railTotalWidth), frameMat);
-    trTopEdge.position.set(0, h + topThickness/2, -zOuter + (w - railW)/2);
-    trTopEdge.castShadow = trTopEdge.receiveShadow = true; scene.add(trTopEdge); visualFramerails.push(trTopEdge);
-
-    const trBottomEdge = new THREE.Mesh(new THREE.BoxGeometry(shortRailLen, topThickness, railTotalWidth), frameMat);
-    trBottomEdge.position.set(0, h + topThickness/2, zOuter - (w - railW)/2);
-    trBottomEdge.castShadow = trBottomEdge.receiveShadow = true; scene.add(trBottomEdge); visualFramerails.push(trBottomEdge);
-
-    pockets.forEach(p => {
-        const rim = new THREE.Mesh(new THREE.CylinderGeometry(POCKET_RADIUS + 0.1, POCKET_RADIUS + 0.1, 0.4, 32), new THREE.MeshBasicMaterial({ color: 0x151515 }));
-        rim.position.set(p.x, -0.35, p.z); scene.add(rim);
-
-        const cup = new THREE.Mesh(new THREE.CylinderGeometry(POCKET_RADIUS, POCKET_RADIUS - 0.1, 3.5, 32), new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.5 }));
-        cup.position.set(p.x, -2.0, p.z); cup.receiveShadow = true; scene.add(cup);
+    visualFramerails=[];
+    const addRail=(verts)=>{
+        const geo=new THREE.BufferGeometry();
+        const idx=[0,1,2,2,3,0,4,5,6,6,7,4,0,4,5,5,1,0,1,5,6,6,2,1,2,6,7,7,3,2,3,7,4,4,0,3];
+        geo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
+        geo.setIndex(idx); geo.computeVertexNormals();
+        const m=new THREE.Mesh(geo,fm); m.castShadow=m.receiveShadow=true; scene.add(m); visualFramerails.push(m);
+    };
+    // Long rails
+    addRail([-xO,0,-zI+cd,-xI,0,-zI+POCKET_RADIUS,-xI,h,-zI+POCKET_RADIUS,-xO,h,-zI+cd,-xO,0,-cd,-xI,0,-POCKET_RADIUS,-xI,h,-POCKET_RADIUS,-xO,h,-cd]);
+    addRail([xI,0,-zI+POCKET_RADIUS,xO,0,-zI+cd,xO,h,-zI+cd,xI,h,-zI+POCKET_RADIUS,xI,0,-POCKET_RADIUS,xO,0,-cd,xO,h,-cd,xI,h,-POCKET_RADIUS]);
+    addRail([-xO,0,cd,-xI,0,POCKET_RADIUS,-xI,h,POCKET_RADIUS,-xO,h,cd,-xO,0,zI-cd,-xI,0,zI-POCKET_RADIUS,-xI,h,zI-POCKET_RADIUS,-xO,h,zI-cd]);
+    addRail([xI,0,POCKET_RADIUS,xO,0,cd,xO,h,cd,xI,h,POCKET_RADIUS,xI,0,zI-POCKET_RADIUS,xO,0,zI-cd,xO,h,zI-cd,xI,h,zI-POCKET_RADIUS]);
+    // Short rails
+    addRail([-xI+cd,0,-zO,-xI+cd,h,-zO,-xI+POCKET_RADIUS,h,-zI,-xI+POCKET_RADIUS,0,-zI,xI-POCKET_RADIUS,0,-zI,xI-POCKET_RADIUS,h,-zI,xI-cd,h,-zO,xI-cd,0,-zO]);
+    addRail([-xI+cd,0,zO,-xI+cd,h,zO,-xI+POCKET_RADIUS,h,zI,-xI+POCKET_RADIUS,0,zI,xI-POCKET_RADIUS,0,zI,xI-POCKET_RADIUS,h,zI,xI-cd,h,zO,xI-cd,0,zO]);
+    // Pockets
+    const pm=new THREE.MeshStandardMaterial({color:0x000000}); 
+    pockets.forEach(p=>{
+        const pg=new THREE.CylinderGeometry(POCKET_RADIUS,POCKET_RADIUS,0.5,16);
+        const pm2=new THREE.Mesh(pg,pm); pm2.position.set(p.x,0.1,p.z); scene.add(pm2);
     });
-
+    // Walls for collision
     tableWalls = [
-        { x1: -TABLE_W/2 + POCKET_RADIUS, z1: -TABLE_L/2, x2: TABLE_W/2 - POCKET_RADIUS, z2: -TABLE_L/2 },
-        { x1: -TABLE_W/2 + POCKET_RADIUS, z1: TABLE_L/2,  x2: TABLE_W/2 - POCKET_RADIUS, z2: TABLE_L/2 },
-        { x1: -TABLE_W/2, z1: -TABLE_L/2 + POCKET_RADIUS, x2: -TABLE_W/2, z2: -POCKET_RADIUS },
-        { x1: -TABLE_W/2, z1: POCKET_RADIUS,              x2: -TABLE_W/2, z2: TABLE_L/2 - POCKET_RADIUS },
-        { x1: TABLE_W/2,  z1: -TABLE_L/2 + POCKET_RADIUS, x2: TABLE_W/2,  z2: -POCKET_RADIUS },
-        { x1: TABLE_W/2,  z1: POCKET_RADIUS,              x2: TABLE_W/2,  z2: TABLE_L/2 - POCKET_RADIUS },
-
-        { x1: -TABLE_W/2, z1: -POCKET_RADIUS, x2: -xOuter, z2: -POCKET_RADIUS },
-        { x1: -TABLE_W/2, z1: POCKET_RADIUS,  x2: -xOuter, z2: POCKET_RADIUS },
-        { x1: TABLE_W/2,  z1: -POCKET_RADIUS, x2: xOuter,  z2: -POCKET_RADIUS },
-        { x1: TABLE_W/2,  z1: POCKET_RADIUS,  x2: xOuter,  z2: POCKET_RADIUS },
-
-        { x1: -TABLE_W/2 + POCKET_RADIUS, z1: -TABLE_L/2, x2: -TABLE_W/2 + pCornerDist, z2: -zOuter },
-        { x1:  TABLE_W/2 - POCKET_RADIUS, z1: -TABLE_L/2, x2:  TABLE_W/2 - pCornerDist, z2: -zOuter },
-        { x1: -TABLE_W/2 + POCKET_RADIUS, z1:  TABLE_L/2, x2: -TABLE_W/2 + pCornerDist, z2:  zOuter },
-        { x1:  TABLE_W/2 - POCKET_RADIUS, z1:  TABLE_L/2, x2:  TABLE_W/2 - pCornerDist, z2:  zOuter },
-
-        { x1: -xOuter, z1: -zOuter, x2: xOuter, z2: -zOuter }, 
-        { x1: -xOuter, z1: zOuter,  x2: xOuter, z2: zOuter },  
-        { x1: -xOuter, z1: -zOuter, x2: -xOuter, z2: zOuter }, 
-        { x1: xOuter,  z1: -zOuter, x2: xOuter,  z2: zOuter }  
+        {minX:-BOUNDS_X,maxX:-BOUNDS_X,minZ:-BOUNDS_Z,maxZ:0-POCKET_RADIUS,nx:-1,nz:0},
+        {minX:-BOUNDS_X,maxX:-BOUNDS_X,minZ:POCKET_RADIUS,maxZ:BOUNDS_Z,nx:-1,nz:0},
+        {minX:BOUNDS_X,maxX:BOUNDS_X,minZ:-BOUNDS_Z,maxZ:-POCKET_RADIUS,nx:1,nz:0},
+        {minX:BOUNDS_X,maxX:BOUNDS_X,minZ:POCKET_RADIUS,maxZ:BOUNDS_Z,nx:1,nz:0},
+        {minX:-BOUNDS_X+POCKET_RADIUS,maxX:BOUNDS_X-POCKET_RADIUS,minZ:-BOUNDS_Z,maxZ:-BOUNDS_Z,nx:0,nz:-1},
+        {minX:-BOUNDS_X+POCKET_RADIUS,maxX:BOUNDS_X-POCKET_RADIUS,minZ:BOUNDS_Z,maxZ:BOUNDS_Z,nx:0,nz:1},
     ];
 }
+
+const BALL_COLORS = ['#fff','#ffcc00','#003ecc','#ff2200','#7700aa','#ff6600','#005500','#990000','#111111','#ffcc00','#003ecc','#ff2200','#7700aa','#ff6600','#005500','#990000'];
 
 function createBalls3D() {
-    cueBall = new BilliardBall(0, 15, '#ffffff', true, 0); balls.push(cueBall);
-    
-    const colors = {
-        1: '#ffcc00', 2: '#0033cc', 3: '#cc0000', 4: '#660099', 5: '#ff6600',
-        6: '#006633', 7: '#990000', 8: '#222222', 
-        9: '#ffcc00', 10: '#0033cc', 11: '#cc0000', 12: '#660099', 13: '#ff6600',
-        14: '#006633', 15: '#990000'
-    };
-    
-    const startZ = -15, spacing = BALL_R * 2.055;
+    balls=[];
+    const s=BALL_R*2.02;
+    const r3=s*Math.sqrt(3)/2;
+    // Cue ball
+    const cb=new BilliardBall(0,BALL_R+TABLE_L*0.28,'#ffffff',true,0);
+    cueBall=cb; balls.push(cb);
 
-    if (gameMode === '9BALL') {
-        const rackPos = [
-            {dx:0, dz:0, num:1},
-            {dx:-0.5, dz:-1, num:2}, {dx:0.5, dz:-1, num:3},
-            {dx:-1, dz:-2, num:4}, {dx:0, dz:-2, num:9}, {dx:1, dz:-2, num:5},
-            {dx:-0.5, dz:-3, num:6}, {dx:0.5, dz:-3, num:7},
-            {dx:0, dz:-4, num:8}
+    if (gameMode==='9BALL') {
+        const nums=[1,2,3,4,9,5,6,7,8];
+        const pos=[
+            [0,0],[s,r3],[s,-r3],[s*2,s*Math.sqrt(3)],[s*2,0],[s*2,-s*Math.sqrt(3)],[s*3,r3+s*Math.sqrt(3)/2],[s*3,r3],[s*3,-r3],[s*4,0]
         ];
-        rackPos.forEach(p => {
-            balls.push(new BilliardBall(p.dx * spacing, startZ + p.dz * spacing, colors[p.num], false, p.num));
+        nums.forEach((n,i)=>{
+            if (i<pos.length) balls.push(new BilliardBall(pos[i][0]-TABLE_L*0.1, -TABLE_L*0.2+pos[i][1], BALL_COLORS[n], false, n));
         });
     } else {
-        const rackPos8 = [
-            {dx:0, dz:0, num:1},
-            {dx:-0.5, dz:-1, num:9}, {dx:0.5, dz:-1, num:2},
-            {dx:-1, dz:-2, num:10}, {dx:0, dz:-2, num:8}, {dx:1, dz:-2, num:3},
-            {dx:-1.5, dz:-3, num:4}, {dx:-0.5, dz:-3, num:11}, {dx:0.5, dz:-3, num:12}, {dx:1.5, dz:-3, num:5},
-            {dx:-2, dz:-4, num:13}, {dx:-1, dz:-4, num:6}, {dx:0, dz:-4, num:14}, {dx:1, dz:-4, num:7}, {dx:2, dz:-4, num:15}
+        // 8-ball rack
+        const rack=[
+            [1],[2,3],[4,8,5],[6,7,9,10],[11,12,13,14,15]
         ];
-        rackPos8.forEach(p => {
-            balls.push(new BilliardBall(p.dx * spacing, startZ + p.dz * spacing, colors[p.num], false, p.num));
+        rack.forEach((row,ri)=>{
+            row.forEach((n,ci)=>{
+                const x=(ri-2)*s;
+                const z=-TABLE_L*0.22+(ci-(row.length-1)/2)*s;
+                balls.push(new BilliardBall(x,z,BALL_COLORS[n],false,n));
+            });
         });
     }
 }
 
-let guideLine;
 function createGuideLine() {
-    guideLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0,0,-1)]), new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 1, gapSize: 0.5 }));
-    guideLine.position.y = BALL_R; scene.add(guideLine);
+    const mat=new THREE.LineDashedMaterial({color:0xffffff,linewidth:1,dashSize:0.8,gapSize:0.5,opacity:0.5,transparent:true});
+    const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3(0,0,-30)]);
+    guideLine=new THREE.Line(geo,mat); guideLine.computeLineDistances(); guideLine.visible=false; scene.add(guideLine);
 }
 
-function areBallsStopped() { 
-    return balls.every(b => !b.active || (b.vx === 0 && b.vz === 0 && Math.abs(b.spinX) < 0.05 && Math.abs(b.spinY) < 0.05)); 
-}
-
+// ─── Game logic helpers ───
 function getLowestTargetBall() {
-    let min = 99;
-    balls.forEach(b => { if (!b.isCue && b.active && b.num < min) min = b.num; });
-    return min === 99 ? null : min;
+    let active=balls.filter(b=>b.active&&!b.isCue&&b.num>0);
+    if (!active.length) return null;
+    return Math.min(...active.map(b=>b.num));
+}
+function is8BallTargetNow() {
+    let group=playerGroup[currentPlayerLocal];
+    if (!group) return false;
+    return !balls.some(b=>b.active&&!b.isCue&&b.num!==8&&((group==='LOW'&&b.num<=7)||(group==='HIGH'&&b.num>=9)));
+}
+function getLocalPlayerNum() {
+    // Which local player number am I?
+    return (myRole === 'p1') ? 1 : 2;
+}
+function isLocalTurn() {
+    return isMyTurn && !isSpectator;
 }
 
-function selectCalledPocket(index) {
-    calledPocket = index;
-    for (let i = 0; i < 6; i++) {
-        const btn = document.getElementById(`p-btn-${i}`);
-        if(i === index) btn.classList.add('selected');
-        else btn.classList.remove('selected');
+// ─── Mouse handlers ───
+let isDraggingSpin = false;
+
+function onMouseDown(e) {
+    if (!isLocalTurn() || gameState!=='PLAYING') return;
+    if (e.target.closest('#scoreboard, #pocket-call-panel, #game-hud, #spectator-banner, #result-overlay, #waiting-overlay, #setup-overlay')) return;
+    if (viewMode==='OVERVIEW' && isFreeBallMode) {
+        placeFreeBall(e); return;
+    }
+    if (viewMode==='AIMING') {
+        const si=document.getElementById('spin-indicator').getBoundingClientRect();
+        if (e.clientX>=si.left&&e.clientX<=si.right&&e.clientY>=si.top&&e.clientY<=si.bottom) {
+            isDraggingSpin=true; return;
+        }
+        if (!isCharging && areBallsStopped()) { isCharging=true; powerDirection=1; shotPower=0; document.getElementById('power-container').style.display='block'; }
+    }
+}
+function onMouseMove(e) {
+    if (!isLocalTurn()) return;
+    mouse.x=(e.clientX/window.innerWidth)*2-1; mouse.y=-(e.clientY/window.innerHeight)*2+1;
+    if (isDraggingSpin) {
+        const si=document.getElementById('spin-indicator').getBoundingClientRect();
+        const cx=si.left+si.width/2, cy=si.top+si.height/2;
+        const r=si.width/2-8;
+        let dx=(e.clientX-cx)/r, dy=(e.clientY-cy)/r;
+        let len=Math.hypot(dx,dy);
+        if (len>1) { dx/=len; dy/=len; }
+        spinOffset.set(dx*len, dy*len);
+        document.getElementById('spin-dot').style.left=(38+spinOffset.x*28)+'px';
+        document.getElementById('spin-dot').style.top=(38+spinOffset.y*28)+'px';
+    }
+    if (viewMode==='AIMING' && areBallsStopped() && cueBall) {
+        raycaster.setFromCamera(mouse, camera);
+        let plane=new THREE.Plane(new THREE.Vector3(0,1,0), -BALL_R);
+        let pt=new THREE.Vector3();
+        raycaster.ray.intersectPlane(plane, pt);
+        if (pt) {
+            let dx=pt.x-cueBall.mesh.position.x, dz=pt.z-cueBall.mesh.position.z;
+            if (Math.hypot(dx,dz)>0.1) aimAngle=Math.atan2(dx,dz)+Math.PI;
+        }
+    }
+}
+function onMouseUp(e) {
+    isDraggingSpin=false;
+    if (!isLocalTurn() || gameState!=='PLAYING') return;
+    if (isCharging) {
+        fireShot();
+        isCharging=false;
+        document.getElementById('power-container').style.display='none';
+        document.getElementById('spin-indicator').style.display='none';
+        document.getElementById('pocket-call-panel').style.display='none';
+        viewMode='OVERVIEW';
+        document.getElementById('status').textContent='視点: 俯瞰 (OVERVIEW)';
     }
 }
 
-function updateGameUI() {
-    if (gameState === 'GAMEOVER') return;
+function placeFreeBall(e) {
+    raycaster.setFromCamera(new THREE.Vector2((e.clientX/window.innerWidth)*2-1, -(e.clientY/window.innerHeight)*2+1), camera);
+    let plane=new THREE.Plane(new THREE.Vector3(0,1,0), -BALL_R);
+    let pt=new THREE.Vector3();
+    raycaster.ray.intersectPlane(plane, pt);
+    if (!pt) return;
+    pt.x=Math.max(-BOUNDS_X, Math.min(BOUNDS_X, pt.x));
+    pt.z=Math.max(-BOUNDS_Z, Math.min(BOUNDS_Z, pt.z));
+    let overlap=false;
+    balls.forEach(b=>{ if (!b.isCue&&b.active&&Math.hypot(b.mesh.position.x-pt.x,b.mesh.position.z-pt.z)<BALL_R*2.1) overlap=true; });
+    if (overlap) return;
+    cueBall.mesh.position.set(pt.x, BALL_R, pt.z);
+    cueBall.active=true; cueBall.vx=0; cueBall.vz=0;
+    isFreeBallMode=false;
+    cueBall.labelEl.classList.remove('freeball'); cueBall.setLabelText();
+    // Sync placement
+    socket.emit('freeball_placed', { matchId: currentMatchId, x: pt.x, z: pt.z });
+}
 
-    const playerText = `Player ${currentPlayer}`;
-    const playerColor = currentPlayer === 1 ? '#4CAF50' : '#2196F3';
+function resetSpinVisual() {
+    spinOffset.set(0,0);
+    document.getElementById('spin-dot').style.left='33px';
+    document.getElementById('spin-dot').style.top='33px';
+}
 
-    document.getElementById('player-turn').innerText = playerText;
-    document.getElementById('player-turn').style.color = playerColor;
-    
-    const minimalIndicator = document.getElementById('minimal-turn-indicator');
-    minimalIndicator.innerText = playerText;
-    minimalIndicator.style.color = playerColor;
-    minimalIndicator.style.borderColor = playerColor;
+function fireShot() {
+    if (!areBallsStopped() || !cueBall || !cueBall.active) return;
+    const power = shotPower;
+    const dir = aimAngle;
+    const vx = -Math.sin(dir)*power*0.15;
+    const vz = -Math.cos(dir)*power*0.15;
+    cueBall.vx = vx; cueBall.vz = vz;
+    cueBall.spinX = spinOffset.x * 20;
+    cueBall.spinY = -spinOffset.y * 20;
+    shotInProgress=true; firstHitBall=null; pocketedBallsThisTurn=[]; cueBallPocketed=false;
+    targetBallAtShotStart = gameMode==='9BALL' ? getLowestTargetBall() : null;
+    // Send to server/opponent
+    sendShotToServer(vx, vz);
+    document.getElementById('game-message').textContent='';
+}
 
-    const infoEl = document.getElementById('target-ball-info');
-    
-    if (gameMode === '9BALL') {
-        const target = getLowestTargetBall();
-        infoEl.innerText = target ? `ターゲット: ${target}番` : "ターゲット: なし";
-        infoEl.style.color = "#FFC107";
-    } else {
-        let group = playerGroup[currentPlayer];
-        if (!group) {
-            infoEl.innerText = "ターゲット: フリーボール\n(ロー/ハイ投入で確定)";
-            infoEl.style.color = "#FFC107";
-        } else {
-            if (!is8BallTargetNow()) {
-                if (group === 'LOW') {
-                    infoEl.innerText = "グループ: ローボール\n[赤枠 1~7番]";
-                    infoEl.style.color = "#FF5252"; 
-                } else {
-                    infoEl.innerText = "グループ: ハイボール\n[青枠 9~15番]";
-                    infoEl.style.color = "#2196F3"; 
+// ─── Physics ───
+function areBallsStopped() {
+    return balls.every(b=>!b.active||Math.hypot(b.vx,b.vz)<STOP_THRESHOLD);
+}
+function updatePhysicsSingleStep(dtFactor) {
+    balls.forEach(b=>b.active&&b.update(dtFactor));
+    // Ball-ball collisions
+    for (let i=0;i<balls.length;i++) {
+        for (let j=i+1;j<balls.length;j++) {
+            const a=balls[i], b=balls[j];
+            if (!a.active||!b.active||a.isFalling||b.isFalling) continue;
+            let dx=b.mesh.position.x-a.mesh.position.x, dz=b.mesh.position.z-a.mesh.position.z;
+            let dist=Math.hypot(dx,dz);
+            if (dist<BALL_R*2&&dist>0) {
+                if (shotInProgress&&!firstHitBall&&(a.isCue||b.isCue)) firstHitBall=a.isCue?b.num:a.num;
+                let nx=dx/dist, nz=dz/dist;
+                let overlap=(BALL_R*2-dist)/2;
+                a.mesh.position.x-=nx*overlap; a.mesh.position.z-=nz*overlap;
+                b.mesh.position.x+=nx*overlap; b.mesh.position.z+=nz*overlap;
+                let dvx=a.vx-b.vx, dvz=a.vz-b.vz;
+                let dot=dvx*nx+dvz*nz;
+                if (dot>0) {
+                    let imp=dot*RESTITUTION;
+                    a.vx-=imp*nx; a.vz-=imp*nz;
+                    b.vx+=imp*nx; b.vz+=imp*nz;
                 }
-            } else {
-                infoEl.innerText = "グループ完遂！\nターゲット: 8番 [金枠黒球]";
-                infoEl.style.color = "#FFC107";
             }
         }
+    }
+    // Wall collisions
+    tableWalls.forEach(wall=>{
+        balls.forEach(b=>{
+            if (!b.active||b.isFalling) return;
+            const {nx,nz}=wall;
+            let bx=b.mesh.position.x, bz=b.mesh.position.z;
+            const margin=BALL_R;
+            let hit=false;
+            if (nx!==0) {
+                let wallX=wall.minX;
+                if (bz>=wall.minZ&&bz<=wall.maxZ&&((nx<0&&bx<wallX+margin)||(nx>0&&bx>wallX-margin))) {
+                    hit=true;
+                    b.mesh.position.x=wallX+nx*margin;
+                    let dot=b.vx*nx+b.vz*nz;
+                    if ((nx<0&&dot<0)||(nx>0&&dot>0)) { b.vx=(b.vx-2*dot*nx)*RESTITUTION; b.vz=(b.vz-2*dot*nz)*RESTITUTION; b.vx+=nz*b.spinX*0.12; b.spinX*=0.5; b.spinY*=-0.6; }
+                }
+            } else {
+                let wallZ=wall.minZ;
+                if (bx>=wall.minX&&bx<=wall.maxX&&((nz<0&&bz<wallZ+margin)||(nz>0&&bz>wallZ-margin))) {
+                    hit=true;
+                    b.mesh.position.z=wallZ+nz*margin;
+                    let dot=b.vx*nx+b.vz*nz;
+                    if ((nz<0&&dot<0)||(nz>0&&dot>0)) { b.vx=(b.vx-2*dot*nx)*RESTITUTION; b.vz=(b.vz-2*dot*nz)*RESTITUTION; b.vz-=nx*b.spinX*0.12; b.spinX*=0.5; b.spinY*=-0.6; }
+                }
+            }
+        });
+    });
+    // Pocket
+    pockets.forEach((p,pIdx)=>{
+        balls.forEach(b=>{
+            if (!b.active) return;
+            if (Math.hypot(b.mesh.position.x-p.x, b.mesh.position.z-p.z)<POCKET_RADIUS) {
+                b.active=false;
+                if (!b.isCue&&shotInProgress) pocketedBallsThisTurn.push({ball:b,pocketIdx:pIdx});
+                if (b.isCue) { cueBallPocketed=true; b.mesh.position.set(0,-100,0); }
+                else scene.remove(b.mesh);
+            }
+        });
+    });
+}
+function updatePhysics() {
+    const sub=8, df=1/sub;
+    for (let i=0;i<sub;i++) updatePhysicsSingleStep(df);
+}
+function fastForwardPhysics() {
+    let safety=0;
+    while (!areBallsStopped()&&safety++<2000) updatePhysics();
+}
+
+// ─── Shot evaluation ───
+function evaluateShot() {
+    let myNum = getLocalPlayerNum();
+    let opponentNum = myNum === 1 ? 2 : 1;
+
+    if (gameMode==='9BALL') evaluate9Ball(myNum, opponentNum);
+    else evaluate8Ball(myNum, opponentNum);
+
+    updateGameUI();
+    // Determine next turn
+    let myCodeLocal = myCode;
+    let opponentCode = myRole==='p1' ? matchP2.code : matchP1.code;
+    let nextCode = currentPlayerLocal===myNum ? myCodeLocal : opponentCode;
+    sendTurnEnd(nextCode);
+}
+
+function evaluate9Ball(myNum, oppNum) {
+    const target = targetBallAtShotStart;
+    let msg = '';
+    let keepTurn = false;
+
+    if (cueBallPocketed) {
+        msg = 'ファウル: 手球ポケット！相手のターン';
+        isFreeBallMode = true;
+        cueBall.mesh.position.set(0,BALL_R,TABLE_L*0.2);
+        cueBall.active=true; cueBall.vx=0; cueBall.vz=0;
+        currentPlayerLocal = myNum === 1 ? 2 : 1;
+    } else if (!firstHitBall||firstHitBall!==target) {
+        msg = 'ファウル: 最初に当てる球が違います！';
+        isFreeBallMode=true; cueBall.mesh.position.set(0,BALL_R,TABLE_L*0.2);
+        cueBall.active=true; cueBall.vx=0; cueBall.vz=0;
+        currentPlayerLocal = myNum===1?2:1;
+    } else {
+        let pocketed9 = pocketedBallsThisTurn.find(p=>p.ball.num===9);
+        if (pocketed9) {
+            // Win!
+            socket.emit('game_over', { matchId: currentMatchId, reason: '9番ポケット' });
+            showResult('win'); return;
+        }
+        if (pocketedBallsThisTurn.length>0) { keepTurn=true; msg='ナイスショット！継続'; }
+        else msg='ターンチェンジ';
+        if (!keepTurn) currentPlayerLocal = myNum===1?2:1;
+    }
+    document.getElementById('game-message').textContent = msg;
+}
+
+function evaluate8Ball(myNum, oppNum) {
+    let group = playerGroup[myNum];
+    let msg = '';
+    let keepTurn = false;
+
+    if (cueBallPocketed) {
+        msg='ファウル: 手球ポケット！'; currentPlayerLocal=myNum===1?2:1;
+        isFreeBallMode=true; cueBall.mesh.position.set(0,BALL_R,TABLE_L*0.2); cueBall.active=true; cueBall.vx=0; cueBall.vz=0;
+    } else {
+        let pocketed8=pocketedBallsThisTurn.find(p=>p.ball.num===8);
+        if (pocketed8) {
+            if (is8BallTargetNow()&&pocketed8.pocketIdx===calledPocket) {
+                socket.emit('game_over',{matchId:currentMatchId,reason:'8番ポケット'}); showResult('win'); return;
+            } else {
+                socket.emit('game_over',{matchId:currentMatchId,reason:'8番ファウル'}); showResult('lose'); return;
+            }
+        }
+        // Group assignment
+        if (!group&&pocketedBallsThisTurn.length>0) {
+            let first=pocketedBallsThisTurn[0].ball.num;
+            playerGroup[myNum]=first<=7?'LOW':'HIGH';
+            playerGroup[oppNum]=first<=7?'HIGH':'LOW';
+            group=playerGroup[myNum];
+        }
+        // Count valid pockets
+        let valid=pocketedBallsThisTurn.filter(p=>{
+            let n=p.ball.num;
+            return (group==='LOW'&&n<=7)||(group==='HIGH'&&n>=9)||(group===null);
+        });
+        if (valid.length>0) { keepTurn=true; msg='ナイスショット！継続'; }
+        else msg='ターンチェンジ';
+        if (!keepTurn) currentPlayerLocal=myNum===1?2:1;
+    }
+    document.getElementById('game-message').textContent=msg;
+}
+
+function showResult(res) {
+    gameState='GAMEOVER';
+    if (res==='win') {
+        document.getElementById('result-title').textContent='🏆 WIN';
+        document.getElementById('result-title').className='win';
+        document.getElementById('result-desc').textContent='おめでとうございます！';
+    } else {
+        document.getElementById('result-title').textContent='💀 LOSE';
+        document.getElementById('result-title').className='lose';
+        document.getElementById('result-desc').textContent='残念でした...';
+    }
+    document.getElementById('result-overlay').style.display='flex';
+    isMyTurn=false;
+    document.getElementById('waiting-overlay').style.display='none';
+}
+
+// ─── UI ───
+function updateGameUI() {
+    const myPlayerNum = getLocalPlayerNum();
+    const isMyLocalTurn = currentPlayerLocal === myPlayerNum;
+    document.getElementById('player-turn').textContent = isMyLocalTurn ? 'あなたのターン' : '相手のターン';
+    if (gameMode==='9BALL') {
+        const t=getLowestTargetBall();
+        document.getElementById('target-ball-info').textContent = t?`ターゲット: ${t}番`:'---';
+    } else {
+        const g=playerGroup[myPlayerNum];
+        document.getElementById('target-ball-info').textContent = g ? (g==='LOW'?'あなた: 1-7':`あなた: 9-15`) : 'グループ未確定';
     }
 }
 
 function triggerUiTimer() {
-    if (gameState === 'GAMEOVER') return;
-
-    const isVisibleSetting = document.getElementById('ui-display-switch').checked;
-    if (uiTimeoutId) clearTimeout(uiTimeoutId);
-    
-    const scoreboard = document.getElementById('scoreboard');
-    if (isVisibleSetting) {
-        scoreboard.style.opacity = '1';
-        scoreboard.style.visibility = 'visible';
-    }
-    applyUiVisibility();
-
-    uiTimeoutId = setTimeout(() => {
-        if (!shotInProgress && gameState === 'PLAYING') {
-            scoreboard.style.opacity = '0';
-            scoreboard.style.visibility = 'hidden';
-            applyUiVisibility(); 
-        }
-    }, 4000);
-}
-
-function setGameMessage(msg, isFoul = false) {
-    const el = document.getElementById('game-message');
-    el.innerText = msg;
-    el.style.color = isFoul ? '#FF5252' : '#FFF';
-    if (isFoul || gameState === 'GAMEOVER') {
-        applyUiVisibility();
-    }
-}
-
-function resetSpinVisual() {
-    spinOffset.set(0, 0);
-    const dot = document.getElementById('spin-dot');
-    dot.style.left = '35px'; dot.style.top = '35px';
-}
-
-function onMouseDown(e) {
-    if (!areBallsStopped() || gameState !== 'PLAYING') return;
-
-    mouse.x = (e.clientX / window.innerWidth) * 2 - 1; mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-    raycaster.setFromCamera(mouse, camera);
-
-    if (isFreeBallMode && viewMode === 'OVERVIEW') {
-        const intersects = raycaster.intersectObject(tableCloth);
-        if (intersects.length > 0) {
-            let pt = intersects[0].point;
-            let targetX = Math.max(-BOUNDS_X, Math.min(BOUNDS_X, pt.x));
-            let targetZ = Math.max(-BOUNDS_Z, Math.min(BOUNDS_Z, pt.z));
-            
-            let collision = balls.some(b => b !== cueBall && b.active && Math.hypot(b.mesh.position.x - targetX, b.mesh.position.z - targetZ) < BALL_R * 2.1);
-            if (!collision) {
-                cueBall.mesh.position.set(targetX, BALL_R, targetZ);
-                cueBall.isFalling = false;
-                cueBall.mesh.position.y = BALL_R;
-                cueBall.setLabelText(); 
-                setGameMessage("手球の位置を調整しました。↓キーで視点を切り替えて狙ってください。");
-                triggerUiTimer();
-            } else {
-                setGameMessage("他の球と重なる位置には置けません！", true);
-                triggerUiTimer();
-            }
-        }
-        return;
-    }
-
-    if (viewMode !== 'AIMING') return;
-    const intersects = raycaster.intersectObject(cueBall.mesh);
-    if (intersects.length > 0) {
-        isCharging = true; shotPower = 0; powerDirection = 1;
-        document.getElementById('power-container').style.display = 'block';
-        updateSpinFromHit(intersects[0].point);
-    }
-}
-
-function onMouseMove(e) {
-    if (!isCharging || viewMode !== 'AIMING') return;
-    mouse.x = (e.clientX / window.innerWidth) * 2 - 1; mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObject(cueBall.mesh);
-    if (intersects.length === 0) {
-        isCharging = false; shotPower = 0; hitMarker.visible = false;
-        document.getElementById('power-container').style.display = 'none'; return;
-    }
-    updateSpinFromHit(intersects[0].point);
-}
-
-function updateSpinFromHit(hitPoint) {
-    hitMarker.position.copy(hitPoint); hitMarker.visible = true;
-    let v = new THREE.Vector3().subVectors(hitPoint, cueBall.mesh.position);
-    
-    spinOffset.y = v.y / BALL_R; 
-    let sideVec = new THREE.Vector3(Math.cos(aimAngle), 0, -Math.sin(aimAngle));
-    spinOffset.x = v.dot(sideVec) / BALL_R;
-
-    const dot = document.getElementById('spin-dot');
-    let uiX = 35 + (spinOffset.x * 35);
-    let uiY = 35 - (spinOffset.y * 35); 
-    dot.style.left = uiX + 'px';
-    dot.style.top = uiY + 'px';
-}
-
-function onMouseUp() {
-    if (!isCharging) return;
-    isCharging = false; hitMarker.visible = false;
-    document.getElementById('power-container').style.display = 'none';
-    document.getElementById('spin-indicator').style.display = 'none';
-    document.getElementById('pocket-call-panel').style.display = 'none'; 
-    
-    if (shotPower > 0.5) {
-        isFreeBallMode = false;
-        shotInProgress = true; firstHitBall = null; pocketedBallsThisTurn = []; cueBallPocketed = false;
-        targetBallAtShotStart = getLowestTargetBall();
-        setGameMessage(""); 
-        applyUiVisibility();
-
-        let deflect = -spinOffset.x * 0.012; 
-        cueBall.vx = -Math.sin(aimAngle + deflect) * shotPower * 0.038;
-        cueBall.vz = -Math.cos(aimAngle + deflect) * shotPower * 0.038;
-        
-        cueBall.spinX = -spinOffset.x * shotPower * 0.6; 
-        cueBall.spinY = spinOffset.y * shotPower * 0.6; 
-        
-        viewMode = 'OVERVIEW'; document.getElementById('status').innerText = "視点: 俯瞰 (OVERVIEW)";
-        
-        document.getElementById('minimal-turn-indicator').style.right = '20px';
-        document.getElementById('minimal-turn-indicator').style.left = 'auto';
-    }
-    shotPower = 0; document.getElementById('power-bar').style.width = '0%';
-}
-
-function startFreeBall() {
-    isFreeBallMode = true;
-    cueBall.active = true;
-    cueBall.isFalling = false;
-    cueBall.mesh.position.set(0, BALL_R, 15);
-    cueBall.vx = cueBall.vz = cueBall.spinX = cueBall.spinY = 0;
-    scene.add(cueBall.mesh);
-    cueBall.labelEl.classList.add('freeball');
-    cueBall.labelEl.innerText = 'クリックで再配置';
-    viewMode = 'OVERVIEW';
-    document.getElementById('status').innerText = "視点: 俯瞰 (FREE BALL)";
-    triggerUiTimer();
-}
-
-function evaluateShot() {
-    const isTurnSwitchOn = document.getElementById('turn-switch').checked;
-    if (gameMode === '9BALL') {
-        evaluate9Ball(isTurnSwitchOn);
-    } else {
-        evaluate8Ball(isTurnSwitchOn);
-    }
-    balls.forEach(b => { if(b.active) b.setLabelText(); });
-    applyUiVisibility();
-}
-
-function evaluate9Ball(isTurnSwitchOn) {
-    let isFoul = false;
-    let msg = "";
-
-    if (cueBallPocketed) { isFoul = true; msg = "ファウル！手球がポケットに落ちました（スクラッチ）。"; }
-    else if (!firstHitBall) { isFoul = true; msg = "ファウル！手球がどの的球にも当たりませんでした（ノーヒット）。"; }
-    else if (firstHitBall.num !== targetBallAtShotStart) { isFoul = true; msg = `ファウル！最初に最小の${targetBallAtShotStart}番ではなく、${firstHitBall.num}番のボールに当たりました。`; }
-
-    let nineBallPocketed = pocketedBallsThisTurn.find(info => info.ball.num === 9);
-
-    if (isFoul) {
-        if (nineBallPocketed) { 
-            let b9 = nineBallPocketed.ball;
-            b9.active = true; b9.isFalling = false; b9.mesh.position.set(0, BALL_R, -15);
-            b9.vx = b9.vz = 0; scene.add(b9.mesh);
-        }
-        if (isTurnSwitchOn) currentPlayer = currentPlayer === 1 ? 2 : 1;
-        setGameMessage(msg + ` Player ${currentPlayer} のフリーボール。`, true);
-        updateGameUI();
-        startFreeBall(); 
-    } else {
-        if (nineBallPocketed) {
-            gameState = 'GAMEOVER';
-            setGameMessage(`🎉 Player ${currentPlayer} の勝利！！！ (9番のボールイン) 🎉`, false);
-            return;
-        }
-        if (pocketedBallsThisTurn.length > 0) {
-            let ballNumbers = pocketedBallsThisTurn.map(info => `${info.ball.num}番`).join(', ');
-            setGameMessage(`ナイスショット！ ${ballNumbers}のボールがポケットに入ったため Player ${currentPlayer} 継続`, false);
-        } else {
-            if (isTurnSwitchOn) currentPlayer = currentPlayer === 1 ? 2 : 1;
-            setGameMessage("ボールは入りませんでした。Player " + currentPlayer + " に交代。", false);
-        }
-        updateGameUI();
-        triggerUiTimer();
-    }
-}
-
-function evaluate8Ball(isTurnSwitchOn) {
-    let isFoul = false;
-    let msg = "";
-    let nextPlayer = currentPlayer === 1 ? 2 : 1;
-
-    if (cueBallPocketed) { isFoul = true; msg = "ファウル！手球がポケットに落ちました（スクラッチ）。"; }
-    else if (!firstHitBall) { isFoul = true; msg = "ファウル！手球がどの的球にも当たりませんでした（ノーヒット）。"; }
-    else if (playerGroup[currentPlayer]) {
-        let g = playerGroup[currentPlayer];
-        let hasGroupBalls = balls.some(b => b.active && !b.isCue && b.num !== 8 && ((g === 'LOW' && b.num <= 7) || (g === 'HIGH' && b.num >= 9)));
-        if (hasGroupBalls) {
-            if (g === 'LOW' && firstHitBall.num > 7) { isFoul = true; msg = "ファウル！自分のローボール(赤枠)以外に先頭衝突しました。"; }
-            if (g === 'HIGH' && (firstHitBall.num <= 7 || firstHitBall.num === 8)) { isFoul = true; msg = "ファウル！自分のハイボール(青枠)以外に先頭衝突しました。"; }
-        } else {
-            if (firstHitBall.num !== 8) { msg = "ファウル！8番(黒球)に最初に当ててください。"; }
-        }
-    }
-
-    let eightBallPocketed = pocketedBallsThisTurn.find(pInfo => pInfo.ball.num === 8);
-
-    if (eightBallPocketed) {
-        let g = playerGroup[currentPlayer];
-        let hasGroupBalls = g ? balls.some(b => b.active && !b.isCue && b.num !== 8 && ((g === 'LOW' && b.num <= 7) || (g === 'HIGH' && b.num >= 9))) : true;
-        gameState = 'GAMEOVER';
-        if (hasGroupBalls || isFoul || eightBallPocketed.pocketIdx !== calledPocket) {
-            let detail = eightBallPocketed.pocketIdx !== calledPocket ? "（指定外のポケットに入ったため）" : "（グループ完遂前またはファウル発生のため）";
-            setGameMessage(`❌ Player ${currentPlayer} の負け！ ${detail} ❌`, true);
-        } else {
-            setGameMessage(`🎉🎉 Player ${currentPlayer} の勝利！！！ (8番のボール コールショット成功) 🎉🎉`, false);
-        }
-        return;
-    }
-
-    if (isFoul) {
-        if (isTurnSwitchOn) currentPlayer = nextPlayer;
-        setGameMessage(msg + ` Player ${currentPlayer} のフリーボール。`, true);
-        updateGameUI();
-        startFreeBall();
-        return;
-    }
-
-    let validPocketed = pocketedBallsThisTurn.filter(pInfo => pInfo.ball.num !== 0 && pInfo.ball.num !== 8);
-    if (validPocketed.length > 0) {
-        let ballNumbers = validPocketed.map(info => `${info.ball.num}番`).join(', ');
-        if (!playerGroup[currentPlayer]) {
-            let firstPocketed = validPocketed[0].ball;
-            if (firstPocketed.num <= 7) {
-                playerGroup[currentPlayer] = 'LOW'; playerGroup[nextPlayer] = 'HIGH';
-                setGameMessage(`${ballNumbers}が入りグループ確定! P${currentPlayer}:ロー(赤) / P${nextPlayer}:ハイ(青)`, false);
-            } else {
-                playerGroup[currentPlayer] = 'HIGH'; playerGroup[nextPlayer] = 'LOW';
-                setGameMessage(`${ballNumbers}が入りグループ確定! P${currentPlayer}:ハイ(青) / P${nextPlayer}:ロー(赤)`, false);
-            }
-        } else {
-            let g = playerGroup[currentPlayer];
-            let ownGroupPocketed = validPocketed.some(pInfo => (g === 'LOW' && pInfo.ball.num <= 7) || (g === 'HIGH' && pInfo.ball.num >= 9));
-            if (ownGroupPocketed) {
-                setGameMessage(`ナイスイン！ ${ballNumbers}がポケットに入ったためターン継続。`, false);
-            } else {
-                if (isTurnSwitchOn) currentPlayer = nextPlayer;
-                setGameMessage(`相手球のみ（${ballNumbers}）インのため、Player ${currentPlayer} に交代。`, false);
-            }
-        }
-    } else {
-        if (isTurnSwitchOn) currentPlayer = nextPlayer;
-        setGameMessage(`Player ${currentPlayer} のターン。`, false);
-    }
-    updateGameUI();
-    triggerUiTimer();
-}
-
-function updatePhysicsSingleStep(dtFactor) {
-    balls.forEach(b => b.update(dtFactor));
-    
-    // ① ボール同士の衝突判定
-    for (let i = 0; i < balls.length; i++) {
-        if (!balls[i].active || balls[i].isFalling) continue;
-        for (let j = i + 1; j < balls.length; j++) {
-            if (!balls[j].active || balls[j].isFalling) continue;
-            let b1 = balls[i], b2 = balls[j];
-            let dx = b2.mesh.position.x - b1.mesh.position.x;
-            let dz = b2.mesh.position.z - b1.mesh.position.z;
-            let dist = Math.hypot(dx, dz);
-            
-            if (dist < BALL_R * 2) {
-                if (shotInProgress && !firstHitBall) {
-                    if (b1.isCue && b2.num > 0) firstHitBall = b2;
-                    else if (b2.isCue && b1.num > 0) firstHitBall = b1;
-                }
-
-                let overlap = (BALL_R * 2) - dist;
-                let nx = dx / dist, nz = dz / dist;
-                b1.mesh.position.x -= nx * overlap * 0.5; b1.mesh.position.z -= nz * overlap * 0.5;
-                b2.mesh.position.x += nx * overlap * 0.5; b2.mesh.position.z += nz * overlap * 0.5;
-                
-                let kx = b1.vx - b2.vx, kz = b1.vz - b2.vz;
-                
-                // --- 【調整】正面衝突時の手球エネルギー伝達率を向上 ---
-                // バックスピンがかかっている際、前進力（弾性エネルギー）をきれいに的球へ逃がすことで、その場でスピンだけを残しやすくします
-                let currentRestitution = RESTITUTION;
-                if((b1.isCue || b2.isCue) && Math.abs(nx * kx + nz * kz) > 0.1) {
-                    currentRestitution = 0.985; // 吸収率を微調整
-                }
-                let p = (nx * kx + nz * kz) * currentRestitution;
-                
-                let residualFactor = 0.05; 
-                let clusterPop = 0.015; 
-                
-                if (b1.isCue) {
-                    b1.vx = (b1.vx - p * nx) + (kx * residualFactor); 
-                    b1.vz = (b1.vz - p * nz) + (kz * residualFactor);
-                    b2.vx += p * nx; b2.vz += p * nz;
-                } else if (b2.isCue) {
-                    b1.vx -= p * nx; b1.vz -= p * nz;
-                    b2.vx = (b2.vx + p * nx) - (kx * residualFactor);
-                    b2.vz = (b2.vz + p * nz) - (kz * residualFactor);
-                } else {
-                    b1.vx = b1.vx - p * nx - nx * clusterPop;
-                    b1.vz = b1.vz - p * nz - nz * clusterPop;
-                    b2.vx = b2.vx + p * nx + nx * clusterPop;
-                    b2.vz = b2.vz + p * nz + nz * clusterPop;
-                }
-                
-                // スピンの相互伝達（バックスピンが完全に死なないように適度に残す）
-                let tX = b1.spinX; b1.spinX = b2.spinX * 0.2; b2.spinX = tX * 0.2;
-                let tY = b1.spinY; b1.spinY = b2.spinY * 0.25; b2.spinY = tY * 0.45; // 手球のスピンが的球に食われすぎないよう比率を調整
-            }
-        }
-    }
-    
-    // ② クッション反射判定
-    tableWalls.forEach(w => {
-        balls.forEach(b => {
-            if (!b.active || b.isFalling) return;
-            
-            let segX = w.x2 - w.x1; let segZ = w.z2 - w.z1;
-            let lenSq = segX * segX + segZ * segZ;
-            if (lenSq === 0) return;
-
-            let t = ((b.mesh.position.x - w.x1) * segX + (b.mesh.position.z - w.z1) * segZ) / lenSq;
-            t = Math.max(0, Math.min(1, t)); 
-
-            let closestX = w.x1 + t * segX; let closestZ = w.z1 + t * segZ;
-            let dist = Math.hypot(b.mesh.position.x - closestX, b.mesh.position.z - closestZ);
-
-            if (dist < BALL_R) {
-                let nx = (b.mesh.position.x - closestX) / dist;
-                let nz = (b.mesh.position.z - closestZ) / dist;
-
-                b.mesh.position.x = closestX + nx * BALL_R;
-                b.mesh.position.z = closestZ + nz * BALL_R;
-
-                let dot = b.vx * nx + b.vz * nz;
-                if (dot < 0) {
-                    b.vx = (b.vx - 2 * dot * nx) * RESTITUTION;
-                    b.vz = (b.vz - 2 * dot * nz) * RESTITUTION;
-                    
-                    b.vx += nz * b.spinX * 0.12; 
-                    b.vz -= nx * b.spinX * 0.12;
-                    b.spinX *= 0.5;
-                    
-                    // クッション衝突時、縦スピンは反転（押し球がクッションで跳ね返ると引き球方向になる特性を擬似再現）
-                    b.spinY *= -0.6;
-                }
-            }
-        });
-    });
-    
-    // ③ ポケット処理
-    pockets.forEach((p, pIdx) => {
-        balls.forEach(b => {
-            if (!b.active) return;
-            let distToPocket = Math.hypot(b.mesh.position.x - p.x, b.mesh.position.z - p.z);
-            
-            if (distToPocket < POCKET_RADIUS) {
-                b.active = false;
-                if (!b.isCue && shotInProgress) {
-                    pocketedBallsThisTurn.push({ ball: b, pocketIdx: pIdx });
-                }
-                
-                if (b.isCue) {
-                    cueBallPocketed = true;
-                    b.mesh.position.set(0, -100, 0); 
-                } else {
-                    scene.remove(b.mesh); 
-                }
-            }
-        });
-    });
-}
-
-function updatePhysics() {
-    const subSteps = 8; 
-    const dtFactor = 1.0 / subSteps;
-    for (let step = 0; step < subSteps; step++) {
-        updatePhysicsSingleStep(dtFactor);
-    }
-}
-
-function fastForwardPhysics() {
-    // 完全にすべての球が止まるまで、制限なしで物理演算をループさせます
-    while (!areBallsStopped()) { 
-        updatePhysics(); 
-    }
+    clearTimeout(uiTimeoutId);
+    const sb=document.getElementById('scoreboard');
+    sb.style.opacity='1'; sb.style.visibility='visible';
+    uiTimeoutId=setTimeout(()=>{ sb.style.opacity='0'; sb.style.visibility='hidden'; }, 4000);
 }
 
 function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+    if (!camera||!renderer) return;
+    camera.aspect=window.innerWidth/window.innerHeight; camera.updateProjectionMatrix();
     overviewCamera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+// ─── Animate ───
 function animate() {
+    if (!renderer) return;
     requestAnimationFrame(animate);
-    
-    if (gameState === 'GAMEOVER') {
-        renderer.clear(); 
-        renderer.setViewport(0, 0, window.innerWidth, window.innerHeight); 
-        renderer.setScissorTest(false);
-        camera.position.set(0, 50, 20); camera.lookAt(0, 0, -10); 
+    if (gameState==='GAMEOVER') {
+        renderer.clear();
         renderer.render(scene, camera);
-        balls.forEach(b => { if(b.labelEl) b.labelEl.style.display = 'none'; });
         return;
     }
 
-    if (keys['A_KEY']) aimAngle += 0.03;      
-    if (keys['D_KEY']) aimAngle -= 0.03;      
-    if (keys['ArrowLeft']) aimAngle += 0.0035;  
-    if (keys['ArrowRight']) aimAngle -= 0.0035; 
-    
-    if (viewMode === 'AIMING') {
-        if (keys['W_KEY']) aimElevation = Math.min(1.5, aimElevation + 0.02); 
-        if (keys['S_KEY']) aimElevation = Math.max(0.01, aimElevation - 0.02); 
-    }
-    
-    if (isCharging) {
-        shotPower += chargeSpeed * powerDirection;
-        if (shotPower >= maxPower) { shotPower = maxPower; powerDirection = -1; } 
-        else if (shotPower <= 0) { shotPower = 0; powerDirection = 1; }
-        document.getElementById('power-bar').style.width = (shotPower / maxPower * 100) + '%';
+    // Key input (only active player or spectator for camera)
+    if (keys['A_KEY']) aimAngle+=0.03;
+    if (keys['D_KEY']) aimAngle-=0.03;
+    if (keys['ArrowLeft']) aimAngle+=0.0035;
+    if (keys['ArrowRight']) aimAngle-=0.0035;
+    if (viewMode==='AIMING' && isLocalTurn()) {
+        if (keys['W_KEY']) aimElevation=Math.min(1.5, aimElevation+0.02);
+        if (keys['S_KEY']) aimElevation=Math.max(0.01, aimElevation-0.02);
     }
 
-    let maxSpeed = 0;
-    balls.forEach(b => { if(b.active) maxSpeed = Math.max(maxSpeed, Math.hypot(b.vx, b.vz)); });
-    if (maxSpeed > 0 && maxSpeed < STOP_THRESHOLD) fastForwardPhysics();
+    if (isCharging && isLocalTurn()) {
+        shotPower+=chargeSpeed*powerDirection;
+        if (shotPower>=maxPower){shotPower=maxPower;powerDirection=-1;}
+        else if (shotPower<=0){shotPower=0;powerDirection=1;}
+        document.getElementById('power-bar').style.width=(shotPower/maxPower*100)+'%';
+    }
+
+    let maxSpeed=0;
+    balls.forEach(b=>{ if(b.active) maxSpeed=Math.max(maxSpeed, Math.hypot(b.vx,b.vz)); });
+    if (maxSpeed>0&&maxSpeed<STOP_THRESHOLD) fastForwardPhysics();
     else updatePhysics();
 
-    if (shotInProgress && areBallsStopped()) {
-        shotInProgress = false;
-        evaluateShot();
+    if (shotInProgress&&areBallsStopped()) {
+        shotInProgress=false;
+        if (isLocalTurn()) evaluateShot(); // only evaluates for the one who shot
     }
 
-    if (viewMode === 'OVERVIEW') {
-        camera.position.set(0, 70, 40); camera.lookAt(0, -5, 0);
-        visualFramerails.forEach(rail => rail.visible = true);
+    // Camera
+    if (isSpectator) {
+        updateSpectatorCamera();
+    } else if (viewMode==='OVERVIEW') {
+        camera.position.set(0,70,40); camera.lookAt(0,-5,0);
+        visualFramerails.forEach(r=>r.visible=true);
     } else {
-        let camRadius = 5.0; 
-        let camDistXz = camRadius * Math.cos(aimElevation);
-        let camHeight = BALL_R + (camRadius * Math.sin(aimElevation));
-        
-        camera.position.set(
-            cueBall.mesh.position.x + Math.sin(aimAngle) * camDistXz, 
-            camHeight, 
-            cueBall.mesh.position.z + Math.cos(aimAngle) * camDistXz
-        );
+        let cr=5.0, cdxz=cr*Math.cos(aimElevation), ch=BALL_R+cr*Math.sin(aimElevation);
+        camera.position.set(cueBall.mesh.position.x+Math.sin(aimAngle)*cdxz, ch, cueBall.mesh.position.z+Math.cos(aimAngle)*cdxz);
         camera.lookAt(cueBall.mesh.position);
-
-        visualFramerails.forEach(rail => {
-            if (rail.geometry.boundingSphere === null) rail.geometry.computeBoundingSphere();
-            
-            let railCenter = new THREE.Vector3();
-            railCenter.copy(rail.position);
-            
-            if (rail.position.x === 0 && rail.position.z === 0) {
-                rail.geometry.computeBoundingBox();
-                rail.geometry.boundingBox.getCenter(railCenter);
-            }
-
-            let distToCamXZ = Math.hypot(camera.position.x - railCenter.x, camera.position.z - railCenter.z);
-            let threshold = 5.0;
-            if (Math.abs(railCenter.x) > TABLE_W/2 || Math.abs(railCenter.z) > TABLE_L/2) {
-                threshold = 6.2;
-            }
-
-            if (distToCamXZ < threshold && camera.position.y < 3.8) {
-                rail.visible = false; 
-            } else {
-                rail.visible = true;  
-            }
+        visualFramerails.forEach(r=>{
+            if (!r.geometry.boundingBox) r.geometry.computeBoundingBox();
+            let c=new THREE.Vector3(); r.geometry.boundingBox.getCenter(c); c.add(r.position);
+            let d=Math.hypot(camera.position.x-c.x, camera.position.z-c.z);
+            r.visible = !(d<6.2&&camera.position.y<3.8);
         });
     }
 
-    balls.forEach(b => b.projectLabelPosition());
+    // Guide line
+    if (viewMode==='AIMING'&&areBallsStopped()&&!isSpectator&&isMyTurn) {
+        guideLine.visible=true; guideLine.position.copy(cueBall.mesh.position);
+        guideLine.geometry.setFromPoints([new THREE.Vector3(), new THREE.Vector3(-Math.sin(aimAngle)*30,0,-Math.cos(aimAngle)*30)]);
+        guideLine.computeLineDistances();
+    } else { guideLine.visible=false; }
+
+    balls.forEach(b=>b.projectLabelPosition());
     updateLabelsDepthOrder();
 
-    if (viewMode === 'AIMING' && areBallsStopped()) {
-        guideLine.visible = true; guideLine.position.copy(cueBall.mesh.position);
-        guideLine.geometry.setFromPoints([new THREE.Vector3(), new THREE.Vector3(-Math.sin(aimAngle) * 30, 0, -Math.cos(aimAngle) * 30)]);
-        guideLine.computeLineDistances();
-    } else {
-        guideLine.visible = false;
-    }
-    
     renderer.clear();
-    renderer.setViewport(0, 0, window.innerWidth, window.innerHeight); renderer.setScissorTest(false);
-    renderer.render(scene, camera);
+    renderer.setViewport(0,0,window.innerWidth,window.innerHeight); renderer.setScissorTest(false);
+    renderer.render(scene,camera);
 
-    if (viewMode === 'AIMING') {
-        const mapH = window.innerHeight * 0.32; 
-        const mapW = mapH * (30 / 60); 
-        const vx = window.innerWidth - mapW; 
-        const vy = window.innerHeight - mapH;
-        
-        renderer.setViewport(vx, vy, mapW, mapH);
-        renderer.setScissor(vx, vy, mapW, mapH);
-        renderer.setScissorTest(true);
-        
-        visualFramerails.forEach(rail => rail.visible = true);
-        renderer.render(scene, overviewCamera);
+    if ((viewMode==='AIMING'&&!isSpectator) || isSpectator) {
+        const mh=window.innerHeight*0.3, mw=mh*(30/60);
+        const vx=window.innerWidth-mw, vy=window.innerHeight-mh;
+        renderer.setViewport(vx,vy,mw,mh);
+        renderer.setScissor(vx,vy,mw,mh); renderer.setScissorTest(true);
+        visualFramerails.forEach(r=>r.visible=true);
+        renderer.render(scene,overviewCamera);
     }
+}
+
+function updateSpectatorCamera() {
+    if (spectatorView==='overview') {
+        camera.position.set(0,70,40); camera.lookAt(0,-5,0);
+    } else {
+        // Show from p1 or p2 side
+        const side = spectatorView==='p1' ? 1 : -1;
+        camera.position.set(0,30,side*50); camera.lookAt(0,0,0);
+    }
+    visualFramerails.forEach(r=>r.visible=true);
 }
 </script>
 </body>
