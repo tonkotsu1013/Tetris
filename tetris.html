@@ -3994,7 +3994,7 @@ window.socket.on('vc_signal', async (data) => {
             });
 
             // グループVCシグナル受信
-            window.socket.on('group_vc_signal', async (data) => {
+            window.socket?.on('group_vc_signal', async (data) => {
                 const { sender, groupId, signal } = data;
                 if (!isVcEnabled || !currentChatTarget || currentChatTarget.id !== groupId) return;
                 
