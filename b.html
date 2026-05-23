@@ -1,0 +1,2172 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI学習プランナー</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        .app-container {
+            max-width: 100%;
+            width: 100%;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ヘッダー */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .user-level {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        /* ナビゲーション */
+        .nav-tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e0e0e0;
+            overflow-x: auto;
+        }
+
+        .nav-tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .nav-tab.active {
+            background: white;
+            color: #667eea;
+            font-weight: bold;
+            border-bottom: 3px solid #667eea;
+        }
+
+        /* コンテンツエリア */
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* カード */
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            font-size: 20px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .card h3 {
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        /* フォーム */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        /* ボタン */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        /* カレンダー */
+        .calendar {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .calendar-header button {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 5px 10px;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+        }
+
+        .calendar-day-header {
+            text-align: center;
+            font-weight: bold;
+            padding: 10px 5px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            padding: 5px;
+            position: relative;
+        }
+
+        .calendar-day:hover {
+            background: #f0f0f0;
+        }
+
+        .calendar-day.today {
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+        }
+
+        .calendar-day.has-schedule {
+            background: #e0e7ff;
+        }
+
+        .calendar-day.completed {
+            background: #d1fae5;
+        }
+
+        .calendar-day.behind {
+            background: #fee2e2;
+        }
+
+        .calendar-day-number {
+            font-size: 14px;
+        }
+
+        .calendar-day-indicator {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: #667eea;
+            margin-top: 2px;
+        }
+
+        /* モーダル */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            margin: 20px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        /* 進捗バー */
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* ポモドーロタイマー */
+        .pomodoro {
+            text-align: center;
+            padding: 30px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 12px;
+            color: white;
+        }
+
+        .pomodoro-timer {
+            font-size: 48px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        .pomodoro-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .pomodoro-controls button {
+            padding: 10px 20px;
+            border: 2px solid white;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        /* RPGステータス */
+        .rpg-status {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            border-radius: 12px;
+            padding: 20px;
+            color: white;
+        }
+
+        .avatar {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .avatar-icon {
+            font-size: 64px;
+            margin-bottom: 10px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .stat-item {
+            background: rgba(255,255,255,0.2);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        /* バッジ */
+        .badges {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .badge {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .badge-icon {
+            font-size: 32px;
+            margin-bottom: 5px;
+        }
+
+        .badge-name {
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* タイムライン */
+        .timeline {
+            position: relative;
+            padding-left: 30px;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 10px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #e0e0e0;
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -24px;
+            top: 5px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #667eea;
+        }
+
+        .timeline-time {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 5px;
+        }
+
+        .timeline-content {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        /* ローディング */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* アラート */
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border-left: 4px solid #10b981;
+        }
+
+        .alert-warning {
+            background: #fef3c7;
+            color: #92400e;
+            border-left: 4px solid #f59e0b;
+        }
+
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border-left: 4px solid #3b82f6;
+        }
+
+        /* スケジュール詳細 */
+        .schedule-detail {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+
+        .schedule-time {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .time-label {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .schedule-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px dashed #e0e0e0;
+        }
+
+        .schedule-item:last-child {
+            border-bottom: none;
+        }
+
+        /* チェックリスト */
+        .checklist-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .checklist-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        .checklist-item.completed {
+            opacity: 0.6;
+            text-decoration: line-through;
+        }
+
+        /* メンターチャット */
+        .mentor-chat {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+
+        .chat-message {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .chat-message.ai {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-left: 0;
+            margin-right: 20px;
+        }
+
+        .chat-message.user {
+            background: #e5e7eb;
+            margin-left: 20px;
+            margin-right: 0;
+        }
+
+        .chat-input-area {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input-area input {
+            flex: 1;
+        }
+
+        /* レスポンシブ調整 */
+        @media (max-width: 600px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .badges {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- ヘッダー -->
+        <div class="header">
+            <h1>📚 AI学習プランナー</h1>
+            <div class="user-level">レベル <span id="userLevel">1</span> | EXP: <span id="userExp">0</span>/100</div>
+        </div>
+
+        <!-- ナビゲーション -->
+        <div class="nav-tabs">
+            <button class="nav-tab active" data-tab="home">🏠 ホーム</button>
+            <button class="nav-tab" data-tab="calendar">📅 カレンダー</button>
+            <button class="nav-tab" data-tab="progress">📊 進捗</button>
+            <button class="nav-tab" data-tab="pomodoro">⏱️ 集中</button>
+            <button class="nav-tab" data-tab="rpg">🎮 ステータス</button>
+        </div>
+
+        <!-- コンテンツ -->
+        <div class="content">
+            <!-- ホームタブ -->
+            <div class="tab-content active" id="home">
+                <div class="card">
+                    <h2>🎯 新しい学習計画を作成</h2>
+                    
+                    <div class="form-group">
+                        <label>計画タイプを選択</label>
+                        <select id="planType">
+                            <option value="deadline">目標逆算型（期限から設定）</option>
+                            <option value="pace">ペース維持型（毎日の量から設定）</option>
+                        </select>
+                    </div>
+
+                    <div id="deadlineInputs">
+                        <div class="form-group">
+                            <label>参考書名</label>
+                            <input type="text" id="bookName" placeholder="例：基礎英文法問題集">
+                        </div>
+
+                        <div class="form-group">
+                            <label>試験日 / 終了予定日</label>
+                            <input type="date" id="targetDate">
+                        </div>
+
+                        <div class="form-group">
+                            <label>開始ページ</label>
+                            <input type="number" id="startPage" value="1">
+                        </div>
+
+                        <div class="form-group">
+                            <label>終了ページ</label>
+                            <input type="number" id="endPage" placeholder="例：300">
+                        </div>
+
+                        <div class="form-group">
+                            <label>1ページあたりの所要時間（分）</label>
+                            <input type="number" id="timePerPage" placeholder="わからない場合は空欄でOK">
+                        </div>
+                    </div>
+
+                    <div id="paceInputs" style="display: none;">
+                        <div class="form-group">
+                            <label>参考書名</label>
+                            <input type="text" id="bookNamePace" placeholder="例：基礎英文法問題集">
+                        </div>
+
+                        <div class="form-group">
+                            <label>開始ページ</label>
+                            <input type="number" id="startPagePace" value="1">
+                        </div>
+
+                        <div class="form-group">
+                            <label>終了ページ</label>
+                            <input type="number" id="endPagePace" placeholder="例：300">
+                        </div>
+
+                        <div class="form-group">
+                            <label>1日に進めるページ数</label>
+                            <input type="number" id="dailyPages" placeholder="例：5">
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="generateSchedule()">AIでスケジュールを自動生成 🤖</button>
+                </div>
+
+                <div class="card">
+                    <h2>⚙️ マイ情報登録</h2>
+                    <button class="btn btn-secondary" onclick="showRoutineModal()">📆 週間ルーティン設定</button>
+                    <button class="btn btn-secondary" onclick="showSpecialDaysModal()">🎌 特別な予定を登録</button>
+                    <button class="btn btn-secondary" onclick="showMentorModal()">🤖 AIメンター設定</button>
+                </div>
+
+                <div class="card">
+                    <h2>💬 今日のAIメンター</h2>
+                    <div class="mentor-chat" id="mentorChat">
+                        <div class="chat-message ai">
+                            おはよう！今日も一緒に頑張ろう✨ 何か困ってることある？
+                        </div>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" id="mentorInput" placeholder="メッセージを入力...">
+                        <button class="btn btn-primary" onclick="sendMentorMessage()" style="width: auto;">送信</button>
+                    </div>
+                    <button class="btn btn-danger" onclick="showGiveUpModal()" style="margin-top: 10px;">😭 もう無理・愚痴聞いて</button>
+                </div>
+            </div>
+
+            <!-- カレンダータブ -->
+            <div class="tab-content" id="calendar">
+                <div class="card">
+                    <div class="calendar">
+                        <div class="calendar-header">
+                            <button onclick="changeMonth(-1)">◀</button>
+                            <h2 id="currentMonth">2024年1月</h2>
+                            <button onclick="changeMonth(1)">▶</button>
+                        </div>
+                        <div class="calendar-grid" id="calendarGrid"></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>📖 進行中の学習計画</h2>
+                    <div id="activeSchedules"></div>
+                </div>
+            </div>
+
+            <!-- 進捗タブ -->
+            <div class="tab-content" id="progress">
+                <div class="card">
+                    <h2>📈 今日の進捗報告</h2>
+                    <div class="form-group">
+                        <label>今日達成したページ数</label>
+                        <input type="number" id="completedPages" placeholder="例：10">
+                    </div>
+                    <button class="btn btn-success" onclick="reportProgress()">進捗を報告 ✅</button>
+                </div>
+
+                <div class="card">
+                    <h2>📊 全体の進捗状況</h2>
+                    <div id="overallProgress"></div>
+                </div>
+
+                <div class="card">
+                    <h2>🔄 自動リスケジュール</h2>
+                    <div class="alert alert-info">
+                        計画から遅れている場合、AIが自動で最適な計画を再提案します
+                    </div>
+                    <button class="btn btn-primary" onclick="showRescheduleModal()">リスケジュールオプションを見る</button>
+                </div>
+
+                <div class="card">
+                    <h2>📸 写真で自動採点（OCR機能）</h2>
+                    <p style="color: #666; margin-bottom: 15px;">解答ページと解説ページを撮影してアップロード</p>
+                    <div class="form-group">
+                        <label>解答ページ（あなたの答え）</label>
+                        <input type="file" accept="image/*" id="answerImage">
+                    </div>
+                    <div class="form-group">
+                        <label>解説ページ（正解）</label>
+                        <input type="file" accept="image/*" id="solutionImage">
+                    </div>
+                    <button class="btn btn-primary" onclick="autoGrade()">AI自動採点 🤖</button>
+                </div>
+            </div>
+
+            <!-- ポモドーロタブ -->
+            <div class="tab-content" id="pomodoro">
+                <div class="card">
+                    <div class="pomodoro">
+                        <h2>🍅 ポモドーロタイマー</h2>
+                        <div class="pomodoro-timer" id="pomodoroTimer">25:00</div>
+                        <div class="pomodoro-controls">
+                            <button onclick="startPomodoro()">▶️ 開始</button>
+                            <button onclick="pausePomodoro()">⏸️ 一時停止</button>
+                            <button onclick="resetPomodoro()">🔄 リセット</button>
+                        </div>
+                        <p style="margin-top: 20px; font-size: 14px;">
+                            セッション: <span id="pomodoroSessions">0</span>/8
+                        </p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>🔒 集中モード</h2>
+                    <p style="color: #666; margin-bottom: 15px;">
+                        タイマー稼働中はSNSや動画アプリの通知をブロック（シミュレーション）
+                    </p>
+                    <div class="alert alert-warning" id="focusModeAlert" style="display: none;">
+                        🔒 集中モード起動中！目標達成まであと <span id="focusRemaining">0</span>分
+                    </div>
+                    <button class="btn btn-primary" onclick="toggleFocusMode()" id="focusModeBtn">集中モードON 🔒</button>
+                </div>
+
+                <div class="card">
+                    <h2>📊 今日の集中記録</h2>
+                    <div id="focusStats">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <span>総集中時間:</span>
+                            <strong id="totalFocusTime">0分</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <span>完了セッション:</span>
+                            <strong id="completedSessions">0回</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>達成率:</span>
+                            <strong id="achievementRate">0%</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RPGタブ -->
+            <div class="tab-content" id="rpg">
+                <div class="card">
+                    <div class="rpg-status">
+                        <div class="avatar">
+                            <div class="avatar-icon">🧙‍♂️</div>
+                            <h2 id="avatarTitle">見習い魔法使い</h2>
+                            <div class="progress-bar" style="background: rgba(255,255,255,0.3);">
+                                <div class="progress-fill" id="expBar" style="width: 0%;">0%</div>
+                            </div>
+                        </div>
+
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div class="stat-label">計算力</div>
+                                <div class="stat-value" id="statCalc">1</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">暗記力</div>
+                                <div class="stat-value" id="statMemory">1</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">集中力</div>
+                                <div class="stat-value" id="statFocus">1</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">持続力</div>
+                                <div class="stat-value" id="statEndurance">1</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>🏆 獲得バッジ</h2>
+                    <div class="badges" id="badgesContainer">
+                        <div class="badge" style="opacity: 0.3;">
+                            <div class="badge-icon">🔥</div>
+                            <div class="badge-name">5連続ログイン</div>
+                        </div>
+                        <div class="badge" style="opacity: 0.3;">
+                            <div class="badge-icon">🌙</div>
+                            <div class="badge-name">深夜の誘惑に勝利</div>
+                        </div>
+                        <div class="badge" style="opacity: 0.3;">
+                            <div class="badge-icon">💪</div>
+                            <div class="badge-name">完全復活</div>
+                        </div>
+                        <div class="badge" style="opacity: 0.3;">
+                            <div class="badge-icon">📚</div>
+                            <div class="badge-name">100ページ達成</div>
+                        </div>
+                        <div class="badge" style="opacity: 0.3;">
+                            <div class="badge-icon">⚡</div>
+                            <div class="badge-name">ポモドーロマスター</div>
+                        </div>
+                        <div class="badge" style="opacity: 0.3;">
+                            <div class="badge-icon">🎯</div>
+                            <div class="badge-name">目標達成</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>📜 学習履歴</h2>
+                    <div class="timeline" id="studyHistory">
+                        <div class="timeline-item">
+                            <div class="timeline-time">今日</div>
+                            <div class="timeline-content">アプリを開始しました 🎉</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- モーダル群 -->
+    <!-- 日付詳細モーダル -->
+    <div class="modal" id="dayDetailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalDate">1月1日（月）</h2>
+                <button class="modal-close" onclick="closeModal('dayDetailModal')">×</button>
+            </div>
+            <div id="dayScheduleContent"></div>
+        </div>
+    </div>
+
+    <!-- 週間ルーティンモーダル -->
+    <div class="modal" id="routineModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📆 週間ルーティン設定</h2>
+                <button class="modal-close" onclick="closeModal('routineModal')">×</button>
+            </div>
+            <div id="routineSettings"></div>
+            <button class="btn btn-primary" onclick="saveRoutine()">保存</button>
+        </div>
+    </div>
+
+    <!-- リスケジュールモーダル -->
+    <div class="modal" id="rescheduleModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔄 リスケジュールオプション</h2>
+                <button class="modal-close" onclick="closeModal('rescheduleModal')">×</button>
+            </div>
+            <div class="alert alert-info">
+                昨日はゆっくり休めましたか？計画を調整しておいたよ！
+            </div>
+            <div class="card">
+                <h3>期間死守モード</h3>
+                <p>終了日は変えずに、残り日数で未達成分を再分配します</p>
+                <button class="btn btn-primary" onclick="reschedule('deadline')">このモードで再計画</button>
+            </div>
+            <div class="card">
+                <h3>ストレスフリーモード</h3>
+                <p>1日の勉強量は変えず、終了予定日を延長します</p>
+                <button class="btn btn-success" onclick="reschedule('stress-free')">このモードで再計画</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- メンター設定モーダル -->
+    <div class="modal" id="mentorModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🤖 AIメンター設定</h2>
+                <button class="modal-close" onclick="closeModal('mentorModal')">×</button>
+            </div>
+            <div class="form-group">
+                <label>メンターのタイプ</label>
+                <select id="mentorType">
+                    <option value="praise">褒めちぎり型</option>
+                    <option value="strict">鬼コーチ型</option>
+                    <option value="gentle">共感・癒やし型</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="saveMentorType()">保存</button>
+        </div>
+    </div>
+
+    <!-- 愚痴モーダル -->
+    <div class="modal" id="giveUpModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>💬 辛いときは話そう</h2>
+                <button class="modal-close" onclick="closeModal('giveUpModal')">×</button>
+            </div>
+            <div class="form-group">
+                <label>今の気持ちを教えて</label>
+                <textarea id="giveUpText" rows="4" placeholder="だるい、受かる気がしない...なんでも大丈夫"></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="getEncouragement()">AIメンターに相談</button>
+            <div id="encouragementResponse" style="margin-top: 20px;"></div>
+        </div>
+    </div>
+
+    <!-- 特別な予定モーダル -->
+    <div class="modal" id="specialDaysModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🎌 特別な予定を登録</h2>
+                <button class="modal-close" onclick="closeModal('specialDaysModal')">×</button>
+            </div>
+            <div class="form-group">
+                <label>日付</label>
+                <input type="date" id="specialDate">
+            </div>
+            <div class="form-group">
+                <label>予定内容</label>
+                <input type="text" id="specialEvent" placeholder="例：修学旅行">
+            </div>
+            <button class="btn btn-primary" onclick="addSpecialDay()">追加</button>
+            <div id="specialDaysList" style="margin-top: 20px;"></div>
+        </div>
+    </div>
+
+    <!-- ローディング -->
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p style="margin-top: 15px;">AIが最適なスケジュールを生成中...</p>
+    </div>
+
+    <script>
+        // グローバル変数
+        let currentDate = new Date();
+        let schedules = [];
+        let userStats = {
+            level: 1,
+            exp: 0,
+            statCalc: 1,
+            statMemory: 1,
+            statFocus: 1,
+            statEndurance: 1
+        };
+        let pomodoroInterval = null;
+        let pomodoroTimeLeft = 25 * 60;
+        let pomodoroRunning = false;
+        let focusModeActive = false;
+        let weeklyRoutine = {};
+        let specialDays = [];
+        let mentorType = 'praise';
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            renderCalendar();
+            setupEventListeners();
+            loadFromLocalStorage();
+            updateRPGDisplay();
+            generateRoutineSettings();
+        });
+
+        // イベントリスナー設定
+        function setupEventListeners() {
+            // タブ切り替え
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabName = this.dataset.tab;
+                    switchTab(tabName);
+                });
+            });
+
+            // 計画タイプ切り替え
+            document.getElementById('planType').addEventListener('change', function() {
+                const isPace = this.value === 'pace';
+                document.getElementById('deadlineInputs').style.display = isPace ? 'none' : 'block';
+                document.getElementById('paceInputs').style.display = isPace ? 'block' : 'none';
+            });
+
+            // Enterキーでメッセージ送信
+            document.getElementById('mentorInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMentorMessage();
+                }
+            });
+        }
+
+        // タブ切り替え
+        function switchTab(tabName) {
+            document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        // カレンダー描画
+        function renderCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            
+            document.getElementById('currentMonth').textContent = 
+                `${year}年${month + 1}月`;
+            
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const startDay = firstDay.getDay();
+            const totalDays = lastDay.getDate();
+            
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+            
+            // 曜日ヘッダー
+            const dayHeaders = ['日', '月', '火', '水', '木', '金', '土'];
+            dayHeaders.forEach(day => {
+                const header = document.createElement('div');
+                header.className = 'calendar-day-header';
+                header.textContent = day;
+                grid.appendChild(header);
+            });
+            
+            // 空白セル
+            for (let i = 0; i < startDay; i++) {
+                const emptyCell = document.createElement('div');
+                grid.appendChild(emptyCell);
+            }
+            
+            // 日付セル
+            const today = new Date();
+            for (let day = 1; day <= totalDays; day++) {
+                const cell = document.createElement('div');
+                cell.className = 'calendar-day';
+                
+                const dateObj = new Date(year, month, day);
+                const isToday = dateObj.toDateString() === today.toDateString();
+                
+                if (isToday) {
+                    cell.classList.add('today');
+                }
+                
+                // スケジュールチェック
+                const hasSchedule = checkScheduleForDate(dateObj);
+                if (hasSchedule) {
+                    cell.classList.add('has-schedule');
+                }
+                
+                const dayNumber = document.createElement('div');
+                dayNumber.className = 'calendar-day-number';
+                dayNumber.textContent = day;
+                cell.appendChild(dayNumber);
+                
+                if (hasSchedule) {
+                    const indicator = document.createElement('div');
+                    indicator.className = 'calendar-day-indicator';
+                    cell.appendChild(indicator);
+                }
+                
+                cell.onclick = () => showDayDetail(dateObj);
+                grid.appendChild(cell);
+            }
+        }
+
+        function changeMonth(delta) {
+            currentDate.setMonth(currentDate.getMonth() + delta);
+            renderCalendar();
+        }
+
+        function checkScheduleForDate(date) {
+            return schedules.some(schedule => {
+                if (!schedule.dailyPlan) return false;
+                const dateStr = date.toISOString().split('T')[0];
+                return schedule.dailyPlan.some(plan => plan.date === dateStr);
+            });
+        }
+
+        // 日付詳細表示
+        function showDayDetail(date) {
+            const modal = document.getElementById('dayDetailModal');
+            const content = document.getElementById('dayScheduleContent');
+            
+            const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+            const dateStr = `${date.getMonth() + 1}月${date.getDate()}日（${weekdays[date.getDay()]}）`;
+            document.getElementById('modalDate').textContent = dateStr;
+            
+            const dayOfWeek = weekdays[date.getDay()];
+            const routine = weeklyRoutine[dayOfWeek] || { start: '9:00', end: '17:00', studyHours: 2 };
+            
+            let html = `
+                <div class="schedule-detail">
+                    <h3>📅 基本スケジュール</h3>
+                    <div class="schedule-time">
+                        <span class="time-label">勉強可能時間</span>
+                        <span>${routine.start} - ${routine.end}</span>
+                    </div>
+                    <div class="schedule-item">
+                        <span>確保できる勉強時間</span>
+                        <span><strong>${routine.studyHours}時間</strong></span>
+                    </div>
+                </div>
+
+                <div class="schedule-detail">
+                    <h3>📚 今日の学習計画</h3>
+            `;
+            
+            const dateKey = date.toISOString().split('T')[0];
+            let hasPlans = false;
+            
+            schedules.forEach(schedule => {
+                if (schedule.dailyPlan) {
+                    const dayPlan = schedule.dailyPlan.find(p => p.date === dateKey);
+                    if (dayPlan) {
+                        hasPlans = true;
+                        html += `
+                            <div class="schedule-item">
+                                <div>
+                                    <strong>${schedule.bookName}</strong><br>
+                                    <small>p.${dayPlan.startPage} - p.${dayPlan.endPage} (${dayPlan.pages}ページ)</small>
+                                </div>
+                                <div style="text-align: right;">
+                                    <span style="color: #667eea; font-weight: bold;">
+                                        約${dayPlan.estimatedMinutes}分
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+            });
+            
+            if (!hasPlans) {
+                html += '<p style="color: #999; text-align: center; padding: 20px;">この日の学習計画はありません</p>';
+            }
+            
+            html += '</div>';
+            
+            // 特別な予定チェック
+            const specialDay = specialDays.find(sd => sd.date === dateKey);
+            if (specialDay) {
+                html += `
+                    <div class="schedule-detail" style="background: #fef3c7;">
+                        <h3>🎌 特別な予定</h3>
+                        <div class="schedule-item">
+                            <span>${specialDay.event}</span>
+                            <span>勉強できません</span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            content.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // AIスケジュール生成
+        async function generateSchedule() {
+            const planType = document.getElementById('planType').value;
+            let bookName, startPage, endPage, targetDate, dailyPages;
+            
+            if (planType === 'deadline') {
+                bookName = document.getElementById('bookName').value;
+                startPage = parseInt(document.getElementById('startPage').value);
+                endPage = parseInt(document.getElementById('endPage').value);
+                targetDate = document.getElementById('targetDate').value;
+                
+                if (!bookName || !endPage || !targetDate) {
+                    alert('必要な情報を入力してください');
+                    return;
+                }
+            } else {
+                bookName = document.getElementById('bookNamePace').value;
+                startPage = parseInt(document.getElementById('startPagePace').value);
+                endPage = parseInt(document.getElementById('endPagePace').value);
+                dailyPages = parseInt(document.getElementById('dailyPages').value);
+                
+                if (!bookName || !endPage || !dailyPages) {
+                    alert('必要な情報を入力してください');
+                    return;
+                }
+            }
+            
+            document.getElementById('loading').classList.add('active');
+            
+            try {
+                const prompt = planType === 'deadline' 
+                    ? `学習スケジュールを作成してください。
+
+参考書: ${bookName}
+開始ページ: ${startPage}
+終了ページ: ${endPage}
+目標日: ${targetDate}
+週間ルーティン: ${JSON.stringify(weeklyRoutine)}
+特別な予定: ${JSON.stringify(specialDays)}
+
+以下のJSON形式で、日ごとの学習計画を作成してください。週間ルーティンに基づいて、各曜日の勉強可能時間を考慮し、特別な予定がある日は避けてください。余裕を持った計画にしてください。
+
+{
+  "dailyPlan": [
+    {
+      "date": "2024-01-15",
+      "startPage": 1,
+      "endPage": 5,
+      "pages": 5,
+      "estimatedMinutes": 30
+    }
+  ],
+  "totalDays": 60,
+  "averagePagesPerDay": 5,
+  "completionDate": "2024-03-15",
+  "advice": "無理のないペースで進められる計画です。週末に少し多めに配分しています。"
+}
+
+JSON以外は出力しないでください。`
+                    : `学習スケジュールを作成してください。
+
+参考書: ${bookName}
+開始ページ: ${startPage}
+終了ページ: ${endPage}
+1日のページ数: ${dailyPages}
+週間ルーティン: ${JSON.stringify(weeklyRoutine)}
+特別な予定: ${JSON.stringify(specialDays)}
+
+以下のJSON形式で、完了予定日を逆算した学習計画を作成してください。
+
+{
+  "dailyPlan": [
+    {
+      "date": "2024-01-15",
+      "startPage": 1,
+      "endPage": 5,
+      "pages": 5,
+      "estimatedMinutes": 30
+    }
+  ],
+  "totalDays": 60,
+  "averagePagesPerDay": ${dailyPages},
+  "completionDate": "2024-03-15",
+  "advice": "このペースで進めると、約2ヶ月で完了できます。"
+}
+
+JSON以外は出力しないでください。`;
+
+                const response = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-sonnet-4-20250514',
+                        max_tokens: 1000,
+                        messages: [{
+                            role: 'user',
+                            content: prompt
+                        }]
+                    })
+                });
+
+                const data = await response.json();
+                const aiResponse = data.content[0].text;
+                
+                // JSONを抽出
+                const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) {
+                    throw new Error('AI応答からJSONを抽出できませんでした');
+                }
+                
+                const scheduleData = JSON.parse(jsonMatch[0]);
+                
+                const newSchedule = {
+                    id: Date.now(),
+                    bookName: bookName,
+                    startPage: startPage,
+                    endPage: endPage,
+                    currentPage: startPage,
+                    planType: planType,
+                    createdAt: new Date().toISOString(),
+                    ...scheduleData
+                };
+                
+                schedules.push(newSchedule);
+                saveToLocalStorage();
+                
+                // 成功メッセージ
+                addMentorMessage(`📚 ${bookName}の学習計画を作成したよ！${scheduleData.advice}`, 'ai');
+                
+                // カレンダーを更新
+                renderCalendar();
+                updateActiveSchedules();
+                updateOverallProgress();
+                
+                // 経験値獲得
+                gainExp(50, '学習計画を作成');
+                
+                alert('✅ スケジュールを作成しました！カレンダータブで確認できます。');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('スケジュール生成中にエラーが発生しました。もう一度お試しください。');
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        // 進行中のスケジュール表示
+        function updateActiveSchedules() {
+            const container = document.getElementById('activeSchedules');
+            if (schedules.length === 0) {
+                container.innerHTML = '<p style="color: #999; text-align: center;">まだ学習計画がありません</p>';
+                return;
+            }
+            
+            let html = '';
+            schedules.forEach(schedule => {
+                const progress = ((schedule.currentPage - schedule.startPage) / (schedule.endPage - schedule.startPage)) * 100;
+                html += `
+                    <div class="card" style="background: #f8f9fa;">
+                        <h3>${schedule.bookName}</h3>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${progress}%;">${Math.round(progress)}%</div>
+                        </div>
+                        <div style="margin-top: 10px; display: flex; justify-content: space-between;">
+                            <span>進捗: ${schedule.currentPage}/${schedule.endPage}ページ</span>
+                            <span>完了予定: ${schedule.completionDate}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // 進捗報告
+        function reportProgress() {
+            const completedPages = parseInt(document.getElementById('completedPages').value);
+            
+            if (!completedPages || schedules.length === 0) {
+                alert('ページ数を入力してください');
+                return;
+            }
+            
+            // 最新のスケジュールを更新
+            const schedule = schedules[schedules.length - 1];
+            schedule.currentPage += completedPages;
+            
+            // 経験値獲得
+            gainExp(completedPages * 5, `${completedPages}ページ達成`);
+            
+            // ステータス更新
+            updateStats('statEndurance', Math.floor(completedPages / 5));
+            
+            // メッセージ
+            const encouragement = getEncouragementMessage(completedPages);
+            addMentorMessage(encouragement, 'ai');
+            
+            // 学習履歴に追加
+            addToHistory(`${completedPages}ページ達成！`);
+            
+            saveToLocalStorage();
+            updateActiveSchedules();
+            updateOverallProgress();
+            
+            document.getElementById('completedPages').value = '';
+            alert('✅ 進捗を記録しました！');
+        }
+
+        function getEncouragementMessage(pages) {
+            const messages = {
+                praise: [
+                    `すごい！${pages}ページも進めたんだね！✨`,
+                    `素晴らしい！この調子で頑張ろう！🎉`,
+                    `完璧だよ！毎日の積み重ねが大事だからね！💪`
+                ],
+                strict: [
+                    `よし、${pages}ページクリアだ！まだまだいけるぞ！`,
+                    `悪くない。でも気を抜くなよ！`,
+                    `その調子だ。明日はもっと頑張れ！`
+                ],
+                gentle: [
+                    `お疲れ様💕 ${pages}ページも進められたね`,
+                    `今日もよく頑張ったね。無理しないでね`,
+                    `少しずつでも進んでて偉いよ✨`
+                ]
+            };
+            
+            const typeMessages = messages[mentorType] || messages.praise;
+            return typeMessages[Math.floor(Math.random() * typeMessages.length)];
+        }
+
+        // 全体進捗表示
+        function updateOverallProgress() {
+            const container = document.getElementById('overallProgress');
+            
+            if (schedules.length === 0) {
+                container.innerHTML = '<p style="color: #999;">学習計画を作成すると表示されます</p>';
+                return;
+            }
+            
+            let html = '';
+            schedules.forEach(schedule => {
+                const totalPages = schedule.endPage - schedule.startPage;
+                const completedPages = schedule.currentPage - schedule.startPage;
+                const progress = (completedPages / totalPages) * 100;
+                const remaining = schedule.endPage - schedule.currentPage;
+                
+                html += `
+                    <div class="schedule-detail">
+                        <h3>${schedule.bookName}</h3>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${progress}%;">${Math.round(progress)}%</div>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <span>完了:</span>
+                                <span><strong>${completedPages}/${totalPages}ページ</strong></span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <span>残り:</span>
+                                <span><strong>${remaining}ページ</strong></span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>完了予定:</span>
+                                <span><strong>${schedule.completionDate}</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // リスケジュール
+        function showRescheduleModal() {
+            if (schedules.length === 0) {
+                alert('学習計画がありません');
+                return;
+            }
+            document.getElementById('rescheduleModal').classList.add('active');
+        }
+
+        async function reschedule(mode) {
+            document.getElementById('loading').classList.add('active');
+            closeModal('rescheduleModal');
+            
+            try {
+                const schedule = schedules[schedules.length - 1];
+                const remaining = schedule.endPage - schedule.currentPage;
+                
+                const prompt = `学習計画のリスケジュールを行ってください。
+
+現在の状況:
+参考書: ${schedule.bookName}
+残りページ数: ${remaining}
+現在のページ: ${schedule.currentPage}
+目標ページ: ${schedule.endPage}
+元の完了予定日: ${schedule.completionDate}
+モード: ${mode === 'deadline' ? '期間死守モード（完了日は変えない）' : 'ストレスフリーモード（1日の量は変えない）'}
+
+週間ルーティン: ${JSON.stringify(weeklyRoutine)}
+特別な予定: ${JSON.stringify(specialDays)}
+
+以下のJSON形式で、新しい学習計画を作成してください。
+
+{
+  "dailyPlan": [
+    {
+      "date": "2024-01-15",
+      "startPage": 50,
+      "endPage": 55,
+      "pages": 5,
+      "estimatedMinutes": 30
+    }
+  ],
+  "totalDays": 30,
+  "averagePagesPerDay": 5,
+  "completionDate": "2024-02-15",
+  "advice": "無理のない範囲で調整しました。"
+}
+
+JSON以外は出力しないでください。`;
+
+                const response = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-sonnet-4-20250514',
+                        max_tokens: 1000,
+                        messages: [{
+                            role: 'user',
+                            content: prompt
+                        }]
+                    })
+                });
+
+                const data = await response.json();
+                const aiResponse = data.content[0].text;
+                
+                const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) {
+                    throw new Error('AI応答からJSONを抽出できませんでした');
+                }
+                
+                const rescheduleData = JSON.parse(jsonMatch[0]);
+                
+                // スケジュール更新
+                schedule.dailyPlan = rescheduleData.dailyPlan;
+                schedule.completionDate = rescheduleData.completionDate;
+                schedule.averagePagesPerDay = rescheduleData.averagePagesPerDay;
+                
+                saveToLocalStorage();
+                renderCalendar();
+                updateActiveSchedules();
+                
+                addMentorMessage(`🔄 計画を再調整したよ！${rescheduleData.advice}`, 'ai');
+                gainExp(30, 'リスケジュール実行');
+                
+                alert('✅ リスケジュールが完了しました！');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('リスケジュール中にエラーが発生しました。');
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        // OCR自動採点
+        async function autoGrade() {
+            const answerImage = document.getElementById('answerImage').files[0];
+            const solutionImage = document.getElementById('solutionImage').files[0];
+            
+            if (!answerImage || !solutionImage) {
+                alert('両方の画像をアップロードしてください');
+                return;
+            }
+            
+            document.getElementById('loading').classList.add('active');
+            
+            try {
+                // 画像をBase64に変換
+                const answerBase64 = await fileToBase64(answerImage);
+                const solutionBase64 = await fileToBase64(solutionImage);
+                
+                const prompt = `以下の2つの画像を分析してください。
+
+1枚目: 生徒の解答
+2枚目: 正解の解説
+
+各問題を採点し、以下のJSON形式で結果を返してください。
+
+{
+  "results": [
+    {
+      "questionNumber": 1,
+      "isCorrect": true,
+      "score": 10,
+      "feedback": "完璧です！"
+    }
+  ],
+  "totalScore": 85,
+  "totalQuestions": 10,
+  "weaknesses": ["三角関数の符号", "公式の変形"],
+  "advice": "三角関数の符号に注意しましょう。"
+}
+
+JSON以外は出力しないでください。`;
+
+                const response = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-sonnet-4-20250514',
+                        max_tokens: 1000,
+                        messages: [{
+                            role: 'user',
+                            content: [
+                                {
+                                    type: 'image',
+                                    source: {
+                                        type: 'base64',
+                                        media_type: answerImage.type,
+                                        data: answerBase64
+                                    }
+                                },
+                                {
+                                    type: 'image',
+                                    source: {
+                                        type: 'base64',
+                                        media_type: solutionImage.type,
+                                        data: solutionBase64
+                                    }
+                                },
+                                {
+                                    type: 'text',
+                                    text: prompt
+                                }
+                            ]
+                        }]
+                    })
+                });
+
+                const data = await response.json();
+                const aiResponse = data.content[0].text;
+                
+                const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) {
+                    throw new Error('AI応答からJSONを抽出できませんでした');
+                }
+                
+                const gradeData = JSON.parse(jsonMatch[0]);
+                
+                // 結果を表示
+                let resultHtml = `
+                    <div class="alert alert-success">
+                        <h3>📝 採点結果</h3>
+                        <p style="font-size: 24px; font-weight: bold;">
+                            ${gradeData.totalScore}点 / ${gradeData.totalQuestions * 10}点
+                        </p>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>弱点分析</h3>
+                        <ul>
+                            ${gradeData.weaknesses.map(w => `<li>${w}</li>`).join('')}
+                        </ul>
+                        <p style="margin-top: 15px; color: #667eea; font-weight: bold;">
+                            ${gradeData.advice}
+                        </p>
+                    </div>
+                `;
+                
+                addMentorMessage(`📊 自動採点完了！${gradeData.totalScore}点でした。${gradeData.advice}`, 'ai');
+                
+                // 経験値とステータス更新
+                gainExp(20, '自動採点実施');
+                updateStats('statMemory', 2);
+                
+                alert('✅ 自動採点が完了しました！');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('自動採点中にエラーが発生しました。');
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // ポモドーロタイマー
+        function startPomodoro() {
+            if (pomodoroRunning) return;
+            
+            pomodoroRunning = true;
+            focusModeActive = true;
+            updateFocusModeUI();
+            
+            pomodoroInterval = setInterval(() => {
+                pomodoroTimeLeft--;
+                updatePomodoroDisplay();
+                
+                if (pomodoroTimeLeft <= 0) {
+                    pausePomodoro();
+                    alert('🎉 ポモドーロ完了！5分休憩しよう！');
+                    
+                    // セッション数更新
+                    const sessions = parseInt(document.getElementById('pomodoroSessions').textContent);
+                    document.getElementById('pomodoroSessions').textContent = sessions + 1;
+                    
+                    // 経験値獲得
+                    gainExp(25, 'ポモドーロ完了');
+                    updateStats('statFocus', 1);
+                    
+                    // 統計更新
+                    updateFocusStats(25);
+                    
+                    pomodoroTimeLeft = 5 * 60; // 5分休憩
+                }
+            }, 1000);
+        }
+
+        function pausePomodoro() {
+            pomodoroRunning = false;
+            focusModeActive = false;
+            updateFocusModeUI();
+            clearInterval(pomodoroInterval);
+        }
+
+        function resetPomodoro() {
+            pausePomodoro();
+            pomodoroTimeLeft = 25 * 60;
+            updatePomodoroDisplay();
+        }
+
+        function updatePomodoroDisplay() {
+            const minutes = Math.floor(pomodoroTimeLeft / 60);
+            const seconds = pomodoroTimeLeft % 60;
+            document.getElementById('pomodoroTimer').textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function toggleFocusMode() {
+            focusModeActive = !focusModeActive;
+            updateFocusModeUI();
+            
+            if (focusModeActive) {
+                addMentorMessage('🔒 集中モードON！通知をブロックしたよ。頑張って！', 'ai');
+            }
+        }
+
+        function updateFocusModeUI() {
+            const btn = document.getElementById('focusModeBtn');
+            const alert = document.getElementById('focusModeAlert');
+            
+            if (focusModeActive) {
+                btn.textContent = '集中モードOFF 🔓';
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-danger');
+                alert.style.display = 'block';
+                document.getElementById('focusRemaining').textContent = 
+                    Math.floor(pomodoroTimeLeft / 60);
+            } else {
+                btn.textContent = '集中モードON 🔒';
+                btn.classList.remove('btn-danger');
+                btn.classList.add('btn-primary');
+                alert.style.display = 'none';
+            }
+        }
+
+        function updateFocusStats(minutes) {
+            const totalMinutes = parseInt(document.getElementById('totalFocusTime').textContent) + minutes;
+            document.getElementById('totalFocusTime').textContent = totalMinutes + '分';
+            
+            const sessions = parseInt(document.getElementById('completedSessions').textContent) + 1;
+            document.getElementById('completedSessions').textContent = sessions + '回';
+            
+            const targetSessions = 8;
+            const rate = Math.min(100, Math.round((sessions / targetSessions) * 100));
+            document.getElementById('achievementRate').textContent = rate + '%';
+        }
+
+        // RPG機能
+        function gainExp(amount, reason) {
+            userStats.exp += amount;
+            
+            // レベルアップチェック
+            const expNeeded = userStats.level * 100;
+            if (userStats.exp >= expNeeded) {
+                userStats.level++;
+                userStats.exp = 0;
+                alert(`🎉 レベルアップ！レベル${userStats.level}になりました！`);
+                addToHistory(`レベル${userStats.level}に到達！`);
+            }
+            
+            updateRPGDisplay();
+            addToHistory(`${reason} (+${amount} EXP)`);
+            saveToLocalStorage();
+        }
+
+        function updateStats(statName, amount) {
+            userStats[statName] += amount;
+            updateRPGDisplay();
+            saveToLocalStorage();
+        }
+
+        function updateRPGDisplay() {
+            document.getElementById('userLevel').textContent = userStats.level;
+            document.getElementById('userExp').textContent = userStats.exp;
+            
+            const expNeeded = userStats.level * 100;
+            const expPercent = (userStats.exp / expNeeded) * 100;
+            document.getElementById('expBar').style.width = expPercent + '%';
+            document.getElementById('expBar').textContent = Math.round(expPercent) + '%';
+            
+            document.getElementById('statCalc').textContent = userStats.statCalc;
+            document.getElementById('statMemory').textContent = userStats.statMemory;
+            document.getElementById('statFocus').textContent = userStats.statFocus;
+            document.getElementById('statEndurance').textContent = userStats.statEndurance;
+            
+            // アバタータイトル更新
+            const titles = ['見習い魔法使い', '魔法使い', '大魔法使い', '賢者', '大賢者'];
+            const titleIndex = Math.min(Math.floor(userStats.level / 5), titles.length - 1);
+            document.getElementById('avatarTitle').textContent = titles[titleIndex];
+        }
+
+        function addToHistory(text) {
+            const timeline = document.getElementById('studyHistory');
+            const now = new Date();
+            const timeStr = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+            
+            const item = document.createElement('div');
+            item.className = 'timeline-item';
+            item.innerHTML = `
+                <div class="timeline-time">${timeStr}</div>
+                <div class="timeline-content">${text}</div>
+            `;
+            
+            timeline.insertBefore(item, timeline.firstChild);
+        }
+
+        // メンター機能
+        function sendMentorMessage() {
+            const input = document.getElementById('mentorInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            addMentorMessage(message, 'user');
+            input.value = '';
+            
+            // AI応答をシミュレート
+            setTimeout(async () => {
+                try {
+                    const response = await fetch('https://api.anthropic.com/v1/messages', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            model: 'claude-sonnet-4-20250514',
+                            max_tokens: 1000,
+                            messages: [{
+                                role: 'user',
+                                content: `あなたは学習を応援するAIメンターです。タイプ: ${mentorType}
+                                
+ユーザーのメッセージ: ${message}
+
+${mentorType === 'praise' ? '褒めて励ます' : mentorType === 'strict' ? '厳しくも優しく鼓舞する' : '共感して癒やす'}口調で、短く（2-3文）応答してください。`
+                            }]
+                        })
+                    });
+
+                    const data = await response.json();
+                    const aiMessage = data.content[0].text;
+                    addMentorMessage(aiMessage, 'ai');
+                } catch (error) {
+                    console.error('Error:', error);
+                    addMentorMessage('ごめん、今ちょっと調子が悪いみたい...💦', 'ai');
+                }
+            }, 500);
+        }
+
+        function addMentorMessage(text, sender) {
+            const chat = document.getElementById('mentorChat');
+            const message = document.createElement('div');
+            message.className = `chat-message ${sender}`;
+            message.textContent = text;
+            chat.appendChild(message);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        async function getEncouragement() {
+            const text = document.getElementById('giveUpText').value;
+            
+            if (!text) {
+                alert('気持ちを入力してください');
+                return;
+            }
+            
+            document.getElementById('loading').classList.add('active');
+            
+            try {
+                const stats = {
+                    level: userStats.level,
+                    totalPages: schedules.reduce((sum, s) => sum + (s.currentPage - s.startPage), 0),
+                    consecutiveDays: 5 // サンプル
+                };
+                
+                const response = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-sonnet-4-20250514',
+                        max_tokens: 1000,
+                        messages: [{
+                            role: 'user',
+                            content: `あなたは優しく寄り添うAIメンターです。
+
+ユーザーの悩み: ${text}
+
+これまでの努力:
+- レベル: ${stats.level}
+- 達成ページ数: ${stats.totalPages}
+- 継続日数: ${stats.consecutiveDays}日
+
+ユーザーのこれまでの努力を具体的に示しながら、徹底的に肯定して励ましてください。200文字程度で。`
+                        }]
+                    })
+                });
+
+                const data = await response.json();
+                const encouragement = data.content[0].text;
+                
+                document.getElementById('encouragementResponse').innerHTML = `
+                    <div class="alert alert-success">
+                        ${encouragement}
+                    </div>
+                `;
+                
+                gainExp(10, '弱音を吐いた勇気');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('エラーが発生しました');
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        function showGiveUpModal() {
+            document.getElementById('giveUpModal').classList.add('active');
+        }
+
+        // ルーティン設定
+        function showRoutineModal() {
+            document.getElementById('routineModal').classList.add('active');
+        }
+
+        function generateRoutineSettings() {
+            const days = ['月', '火', '水', '木', '金', '土', '日'];
+            const container = document.getElementById('routineSettings');
+            
+            let html = '';
+            days.forEach(day => {
+                const routine = weeklyRoutine[day] || { start: '18:00', end: '22:00', studyHours: 2 };
+                html += `
+                    <div class="card">
+                        <h3>${day}曜日</h3>
+                        <div class="form-group">
+                            <label>勉強開始時刻</label>
+                            <input type="time" id="start-${day}" value="${routine.start}">
+                        </div>
+                        <div class="form-group">
+                            <label>勉強終了時刻</label>
+                            <input type="time" id="end-${day}" value="${routine.end}">
+                        </div>
+                        <div class="form-group">
+                            <label>確保できる勉強時間（時間）</label>
+                            <input type="number" id="hours-${day}" value="${routine.studyHours}" min="0" max="12" step="0.5">
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function saveRoutine() {
+            const days = ['月', '火', '水', '木', '金', '土', '日'];
+            
+            days.forEach(day => {
+                weeklyRoutine[day] = {
+                    start: document.getElementById(`start-${day}`).value,
+                    end: document.getElementById(`end-${day}`).value,
+                    studyHours: parseFloat(document.getElementById(`hours-${day}`).value)
+                };
+            });
+            
+            saveToLocalStorage();
+            closeModal('routineModal');
+            alert('✅ 週間ルーティンを保存しました');
+        }
+
+        // 特別な予定
+        function showSpecialDaysModal() {
+            document.getElementById('specialDaysModal').classList.add('active');
+            updateSpecialDaysList();
+        }
+
+        function addSpecialDay() {
+            const date = document.getElementById('specialDate').value;
+            const event = document.getElementById('specialEvent').value;
+            
+            if (!date || !event) {
+                alert('日付と予定を入力してください');
+                return;
+            }
+            
+            specialDays.push({ date, event });
+            saveToLocalStorage();
+            updateSpecialDaysList();
+            
+            document.getElementById('specialDate').value = '';
+            document.getElementById('specialEvent').value = '';
+        }
+
+        function updateSpecialDaysList() {
+            const container = document.getElementById('specialDaysList');
+            
+            if (specialDays.length === 0) {
+                container.innerHTML = '<p style="color: #999;">特別な予定はありません</p>';
+                return;
+            }
+            
+            let html = '<div class="card">';
+            specialDays.forEach((sd, index) => {
+                html += `
+                    <div class="schedule-item">
+                        <div>
+                            <strong>${sd.date}</strong><br>
+                            <small>${sd.event}</small>
+                        </div>
+                        <button onclick="removeSpecialDay(${index})" style="border: none; background: #ef4444; color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer;">削除</button>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+
+        function removeSpecialDay(index) {
+            specialDays.splice(index, 1);
+            saveToLocalStorage();
+            updateSpecialDaysList();
+        }
+
+        // メンター設定
+        function showMentorModal() {
+            document.getElementById('mentorModal').classList.add('active');
+            document.getElementById('mentorType').value = mentorType;
+        }
+
+        function saveMentorType() {
+            mentorType = document.getElementById('mentorType').value;
+            saveToLocalStorage();
+            closeModal('mentorModal');
+            
+            const messages = {
+                praise: '褒めちぎり型に設定したよ！一緒に頑張ろう！✨',
+                strict: '鬼コーチ型に設定した。甘えは許さんぞ！💪',
+                gentle: '共感・癒やし型に設定したよ。無理しないでね💕'
+            };
+            
+            addMentorMessage(messages[mentorType], 'ai');
+        }
+
+        // ローカルストレージ
+        function saveToLocalStorage() {
+            const data = {
+                schedules,
+                userStats,
+                weeklyRoutine,
+                specialDays,
+                mentorType
+            };
+            localStorage.setItem('studyPlannerData', JSON.stringify(data));
+        }
+
+        function loadFromLocalStorage() {
+            const data = localStorage.getItem('studyPlannerData');
+            if (data) {
+                const parsed = JSON.parse(data);
+                schedules = parsed.schedules || [];
+                userStats = parsed.userStats || userStats;
+                weeklyRoutine = parsed.weeklyRoutine || {};
+                specialDays = parsed.specialDays || [];
+                mentorType = parsed.mentorType || 'praise';
+                
+                updateActiveSchedules();
+                updateOverallProgress();
+            }
+        }
+    </script>
+</body>
+</html>
