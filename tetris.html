@@ -2375,7 +2375,12 @@ function gamepadConfigCheck(gamepads) {
 }
 
 function gamepadLoop() {
-  const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+  let gamepads = [];
+  try {
+    gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+  } catch (e) {
+    // Permissions Policy によりゲームパッドへのアクセスが禁止されている場合は無視
+  }
   
   if (awaitingKeyAssign) { gamepadConfigCheck(gamepads); }
   updateGamepadStatus(gamepads);
@@ -3976,12 +3981,8 @@ window.socket.on('vc_signal', async (data) => {
                     await pc.addIceCandidate(new RTCIceCandidate(signal.ice));
                 }
             });
-        }
-    }, 500); // 0.5秒ごとにsocketが作られたかチェックする
-})();
-// ----- ここまで追加 -----
 
-// アカウント削除完了
+            // アカウント削除完了
             window.socket.on('account_deleted', () => {
                 alert('アカウントが削除されました。');
                 location.reload();
@@ -3994,7 +3995,7 @@ window.socket.on('vc_signal', async (data) => {
             });
 
             // グループVCシグナル受信
-            window.socket?.on('group_vc_signal', async (data) => {
+            window.socket.on('group_vc_signal', async (data) => {
                 const { sender, groupId, signal } = data;
                 if (!isVcEnabled || !currentChatTarget || currentChatTarget.id !== groupId) return;
                 
@@ -4016,6 +4017,10 @@ window.socket.on('vc_signal', async (data) => {
                     await pc.addIceCandidate(new RTCIceCandidate(signal.ice));
                 }
             });
+        }
+    }, 500); // 0.5秒ごとにsocketが作られたかチェックする
+})();
+// ----- ここまで追加 -----
 
 </script>
 </body>
