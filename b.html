@@ -2291,16 +2291,19 @@ async function callAI(prompt) {
     throw new Error('APIキーが設定されていません。設定ページでAPIキーを入力してください。');
   }
   
-  const url = STATE.proxyUrl ? 
-    `${STATE.proxyUrl}/v1/messages` : 
-    'https://api.anthropic.com/v1/messages';
+  // URLの二重付与（404エラー）を防止する処理
+  let cleanProxy = STATE.proxyUrl ? STATE.proxyUrl.replace(/\/+$/, '') : '';
+  if (cleanProxy.endsWith('/v1/messages')) {
+    cleanProxy = cleanProxy.replace('/v1/messages', '');
+  }
+  const url = cleanProxy ? `${cleanProxy}/v1/messages` : 'https://api.anthropic.com/v1/messages';
   
   const headers = {
     'Content-Type': 'application/json',
     'anthropic-version': '2023-06-01',
   };
   
-  if (!STATE.proxyUrl) {
+  if (!cleanProxy) {
     headers['x-api-key'] = STATE.apiKey;
     headers['anthropic-dangerous-direct-browser-access'] = 'true';
   } else {
@@ -2311,7 +2314,7 @@ async function callAI(prompt) {
     method: 'POST',
     headers,
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-3-5-sonnet-20241022', // 🚨 存在しないモデル名を正しいものに修正
       max_tokens: 1500,
       messages: [{ role: 'user', content: prompt }]
     })
@@ -2341,12 +2344,15 @@ async function callAIWithImages(prompt, imageDataUrls) {
   });
   content.push({ type: 'text', text: prompt });
   
-  const url = STATE.proxyUrl ? `${STATE.proxyUrl}/v1/messages` : 'https://api.anthropic.com/v1/messages';
+  let cleanProxy = STATE.proxyUrl ? STATE.proxyUrl.replace(/\/+$/, '') : '';
+  if (cleanProxy.endsWith('/v1/messages')) cleanProxy = cleanProxy.replace('/v1/messages', '');
+  const url = cleanProxy ? `${cleanProxy}/v1/messages` : 'https://api.anthropic.com/v1/messages';
+  
   const headers = {
     'Content-Type': 'application/json',
     'anthropic-version': '2023-06-01',
   };
-  if (!STATE.proxyUrl) {
+  if (!cleanProxy) {
     headers['x-api-key'] = STATE.apiKey;
     headers['anthropic-dangerous-direct-browser-access'] = 'true';
   } else {
@@ -2357,7 +2363,7 @@ async function callAIWithImages(prompt, imageDataUrls) {
     method: 'POST',
     headers,
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-3-5-sonnet-20241022', // 🚨 ここも修正
       max_tokens: 2000,
       messages: [{ role: 'user', content }]
     })
@@ -2375,12 +2381,15 @@ async function callAIWithImages(prompt, imageDataUrls) {
 async function callAIWithHistory(systemPrompt, history) {
   if (!STATE.apiKey) throw new Error('APIキーが設定されていません。');
   
-  const url = STATE.proxyUrl ? `${STATE.proxyUrl}/v1/messages` : 'https://api.anthropic.com/v1/messages';
+  let cleanProxy = STATE.proxyUrl ? STATE.proxyUrl.replace(/\/+$/, '') : '';
+  if (cleanProxy.endsWith('/v1/messages')) cleanProxy = cleanProxy.replace('/v1/messages', '');
+  const url = cleanProxy ? `${cleanProxy}/v1/messages` : 'https://api.anthropic.com/v1/messages';
+  
   const headers = {
     'Content-Type': 'application/json',
     'anthropic-version': '2023-06-01',
   };
-  if (!STATE.proxyUrl) {
+  if (!cleanProxy) {
     headers['x-api-key'] = STATE.apiKey;
     headers['anthropic-dangerous-direct-browser-access'] = 'true';
   } else {
@@ -2391,7 +2400,7 @@ async function callAIWithHistory(systemPrompt, history) {
     method: 'POST',
     headers,
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-3-5-sonnet-20241022', // 🚨 ここも修正
       max_tokens: 500,
       system: systemPrompt,
       messages: history
