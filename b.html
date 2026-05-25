@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>StudyAI - 学習専用AIアプリ</title>
+<title>StudyQuest AI - 学習専用AIアプリ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
@@ -2284,161 +2284,77 @@ function renderBadges() {
 }
 
 // ===========================
-// API CALLS
+// API CALLS (Gemini Version)
 // ===========================
+
+// Geminiはプロキシ不要（ブラウザから直接叩けます）
+// APIキーは Google AI Studio で取得したものを使用してください
+const GEMINI_MODEL = "gemini-1.5-flash"; 
+
 async function callAI(prompt) {
-  if (!STATE.apiKey) {
-    throw new Error('APIキーが設定されていません。設定ページでAPIキーを入力してください。');
-  }
+  if (!STATE.apiKey) throw new Error('APIキーが設定されていません。');
   
-  // URLの二重付与（404エラー）を防止する処理
-  let cleanProxy = STATE.proxyUrl ? STATE.proxyUrl.replace(/\/+$/, '') : '';
-  if (cleanProxy.endsWith('/v1/messages')) {
-    cleanProxy = cleanProxy.replace('/v1/messages', '');
-  }
-  const url = cleanProxy ? `${cleanProxy}/v1/messages` : 'https://api.anthropic.com/v1/messages';
-  
-  const headers = {
-    'Content-Type': 'application/json',
-    'anthropic-version': '2023-06-01',
-  };
-  
-  if (!cleanProxy) {
-    headers['x-api-key'] = STATE.apiKey;
-    headers['anthropic-dangerous-direct-browser-access'] = 'true';
-  } else {
-    headers['Authorization'] = 'Bearer ' + STATE.apiKey;
-  }
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${STATE.apiKey}`;
   
   const response = await fetch(url, {
     method: 'POST',
-    headers,
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-3-5-sonnet-20241022', // 🚨 存在しないモデル名を正しいものに修正
-      max_tokens: 1500,
-      messages: [{ role: 'user', content: prompt }]
+      contents: [{ parts: [{ text: prompt }] }]
     })
   });
   
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    const status = response.status;
-    if (status === 401) throw new Error('APIキーが無効です。正しいキーを設定してください。');
-    if (status === 429) throw new Error('APIリクエスト制限に達しました。少し待ってから再試行してください。');
-    if (status === 400) throw new Error(`リクエストエラー: ${err.error?.message || 'Bad Request'}`);
-    throw new Error(`APIエラー ${status}: ${err.error?.message || response.statusText}`);
-  }
-  
   const data = await response.json();
-  return data.content?.[0]?.text || '';
+  if (!response.ok) throw new Error(`Geminiエラー: ${data.error?.message || '不明なエラー'}`);
+  return data.candidates[0].content.parts[0].text;
 }
 
 async function callAIWithImages(prompt, imageDataUrls) {
   if (!STATE.apiKey) throw new Error('APIキーが設定されていません。');
   
-  const content = [];
-  imageDataUrls.forEach(dataUrl => {
+  const parts = imageDataUrls.map(dataUrl => {
     const [meta, b64] = dataUrl.split(',');
-    const mediaType = meta.match(/:(.*?);/)[1];
-    content.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } });
+    const mimeType = meta.match(/:(.*?);/)[1];
+    return { inline_data: { mime_type: mimeType, data: b64 } };
   });
-  content.push({ type: 'text', text: prompt });
+  parts.push({ text: prompt });
   
-  let cleanProxy = STATE.proxyUrl ? STATE.proxyUrl.replace(/\/+$/, '') : '';
-  if (cleanProxy.endsWith('/v1/messages')) cleanProxy = cleanProxy.replace('/v1/messages', '');
-  const url = cleanProxy ? `${cleanProxy}/v1/messages` : 'https://api.anthropic.com/v1/messages';
-  
-  const headers = {
-    'Content-Type': 'application/json',
-    'anthropic-version': '2023-06-01',
-  };
-  if (!cleanProxy) {
-    headers['x-api-key'] = STATE.apiKey;
-    headers['anthropic-dangerous-direct-browser-access'] = 'true';
-  } else {
-    headers['Authorization'] = 'Bearer ' + STATE.apiKey;
-  }
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${STATE.apiKey}`;
   
   const response = await fetch(url, {
     method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model: 'claude-3-5-sonnet-20241022', // 🚨 ここも修正
-      max_tokens: 2000,
-      messages: [{ role: 'user', content }]
-    })
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents: [{ parts }] })
   });
   
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(`APIエラー ${response.status}: ${err.error?.message || response.statusText}`);
-  }
-  
   const data = await response.json();
-  return data.content?.[0]?.text || '';
+  if (!response.ok) throw new Error(`Geminiエラー: ${data.error?.message || '不明なエラー'}`);
+  return data.candidates[0].content.parts[0].text;
 }
 
 async function callAIWithHistory(systemPrompt, history) {
   if (!STATE.apiKey) throw new Error('APIキーが設定されていません。');
   
-  // 🚨 【重要】Claudeの厳しいルールに合わせて履歴を自動修正する
-  let validHistory = [];
-  for (const msg of history) {
-    if (validHistory.length === 0) {
-      // ルール1：一番最初は絶対に 'user' から始める（AIの挨拶は除外）
-      if (msg.role === 'user') validHistory.push({ ...msg });
-    } else {
-      const lastRole = validHistory[validHistory.length - 1].role;
-      if (msg.role !== lastRole) {
-        // ルール2：userとassistantが交互なら追加
-        validHistory.push({ ...msg });
-      } else {
-        // もしuserが2回連続した場合は、1つのメッセージに合体させる（エラー回避）
-        validHistory[validHistory.length - 1].content += "\n\n" + msg.content;
-      }
-    }
-  }
+  // Geminiの形式(model/user)に変換
+  const contents = history.map(msg => ({
+    role: msg.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: msg.content }]
+  }));
   
-  // もし履歴が空になってしまった場合の安全策
-  if (validHistory.length === 0) {
-    validHistory = [{ role: 'user', content: 'こんにちは' }];
-  }
-
-  // URLの構成（以前直した部分）
-  let cleanProxy = STATE.proxyUrl ? STATE.proxyUrl.replace(/\/+$/, '') : '';
-  if (cleanProxy && !cleanProxy.startsWith('http')) cleanProxy = 'https://' + cleanProxy;
-  if (cleanProxy.endsWith('/v1/messages')) cleanProxy = cleanProxy.replace('/v1/messages', '');
-  const url = cleanProxy ? `${cleanProxy}/v1/messages` : 'https://api.anthropic.com/v1/messages';
-  
-  const headers = {
-    'Content-Type': 'application/json',
-    'anthropic-version': '2023-06-01',
-  };
-  if (!cleanProxy) {
-    headers['x-api-key'] = STATE.apiKey;
-    headers['anthropic-dangerous-direct-browser-access'] = 'true';
-  } else {
-    headers['Authorization'] = 'Bearer ' + STATE.apiKey;
-  }
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${STATE.apiKey}`;
   
   const response = await fetch(url, {
     method: 'POST',
-    headers,
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 500,
-      system: systemPrompt,
-      messages: validHistory // ← 整頓した履歴を送る
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents: contents
     })
   });
   
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(`APIエラー ${response.status}: ${err.error?.message || response.statusText}`);
-  }
-  
   const data = await response.json();
-  return data.content?.[0]?.text || '';
+  if (!response.ok) throw new Error(`Geminiエラー: ${data.error?.message || '不明なエラー'}`);
+  return data.candidates[0].content.parts[0].text;
 }
 
 function parseJSON(text) {
