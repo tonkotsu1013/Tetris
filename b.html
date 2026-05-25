@@ -1,2347 +1,2535 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI学習プランナー Pro</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-
-        .app-container {
-            max-width: 100%;
-            margin: 0 auto;
-            background: white;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* APIキー設定モーダル */
-        .api-key-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.9);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-        }
-
-        .api-key-modal.hidden {
-            display: none;
-        }
-
-        .api-key-content {
-            background: white;
-            padding: 30px;
-            border-radius: 16px;
-            max-width: 500px;
-            width: 90%;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
-
-        .api-key-content h2 {
-            margin-bottom: 20px;
-            color: #667eea;
-            font-size: 24px;
-        }
-
-        .api-key-content p {
-            margin-bottom: 15px;
-            color: #666;
-            line-height: 1.6;
-        }
-
-        .api-key-content a {
-            color: #667eea;
-            text-decoration: none;
-            font-weight: bold;
-        }
-
-        /* ヘッダー */
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            position: relative;
-        }
-
-        .header h1 {
-            font-size: 24px;
-            margin-bottom: 10px;
-        }
-
-        .user-stats {
-            display: flex;
-            gap: 15px;
-            font-size: 14px;
-            flex-wrap: wrap;
-        }
-
-        .stat-item {
-            background: rgba(255,255,255,0.2);
-            padding: 5px 12px;
-            border-radius: 20px;
-        }
-
-        .api-key-indicator {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(255, 255, 255, 0.2);
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .api-key-indicator:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        .api-key-indicator.active {
-            background: #10b981;
-        }
-
-        /* ナビゲーション */
-        .nav-tabs {
-            display: flex;
-            background: #f8f9fa;
-            border-bottom: 2px solid #e0e0e0;
-            overflow-x: auto;
-        }
-
-        .nav-tab {
-            flex: 1;
-            padding: 15px 10px;
-            text-align: center;
-            border: none;
-            background: none;
-            cursor: pointer;
-            font-size: 13px;
-            transition: all 0.3s;
-            white-space: nowrap;
-            min-width: 80px;
-        }
-
-        .nav-tab.active {
-            background: white;
-            color: #667eea;
-            font-weight: bold;
-            border-bottom: 3px solid #667eea;
-        }
-
-        /* コンテンツ */
-        .content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            background: #f8f9fa;
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        /* カード */
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-
-        .card h2 {
-            font-size: 20px;
-            margin-bottom: 15px;
-            color: #333;
-        }
-
-        .card h3 {
-            font-size: 16px;
-            margin-bottom: 10px;
-            color: #555;
-        }
-
-        /* フォーム */
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-            color: #555;
-            font-size: 14px;
-        }
-
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-        }
-
-        .form-group input:focus,
-        .form-group select:focus,
-        .form-group textarea:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-
-        /* ボタン */
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s;
-            width: 100%;
-            margin-bottom: 10px;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-primary:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-
-        .btn-secondary {
-            background: #f0f0f0;
-            color: #333;
-        }
-
-        .btn-success {
-            background: #10b981;
-            color: white;
-        }
-
-        .btn-danger {
-            background: #ef4444;
-            color: white;
-        }
-
-        .btn-small {
-            padding: 8px 16px;
-            font-size: 14px;
-        }
-
-        /* スケジュールタイプ選択 */
-        .schedule-type-selector {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .schedule-type-card {
-            border: 3px solid #e0e0e0;
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .schedule-type-card:hover {
-            border-color: #667eea;
-        }
-
-        .schedule-type-card.active {
-            border-color: #667eea;
-            background: #f0f4ff;
-        }
-
-        .schedule-type-card h3 {
-            margin-bottom: 10px;
-            font-size: 18px;
-        }
-
-        .schedule-type-card p {
-            font-size: 13px;
-            color: #666;
-        }
-
-        /* カレンダー */
-        .calendar {
-            background: white;
-            border-radius: 12px;
-            padding: 15px;
-        }
-
-        .calendar-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .calendar-header button {
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        .calendar-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 5px;
-        }
-
-        .calendar-day-header {
-            text-align: center;
-            font-weight: bold;
-            padding: 10px 5px;
-            font-size: 12px;
-            color: #666;
-        }
-
-        .calendar-day {
-            aspect-ratio: 1;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s;
-            padding: 5px;
-            position: relative;
-            background: white;
-        }
-
-        .calendar-day:hover {
-            background: #f0f0f0;
-            transform: scale(1.05);
-        }
-
-        .calendar-day.today {
-            background: #667eea;
-            color: white;
-            font-weight: bold;
-        }
-
-        .calendar-day.has-schedule {
-            background: #e0e7ff;
-        }
-
-        .calendar-day.completed {
-            background: #d1fae5;
-        }
-
-        .calendar-day.behind {
-            background: #fee2e2;
-        }
-
-        .calendar-day.blocked {
-            background: #f3f4f6;
-            opacity: 0.6;
-        }
-
-        .calendar-day-number {
-            font-size: 14px;
-            font-weight: bold;
-        }
-
-        .calendar-day-tasks {
-            font-size: 10px;
-            margin-top: 3px;
-            color: #667eea;
-        }
-
-        /* プログレスバー */
-        .progress-bar {
-            height: 30px;
-            background: #f0f0f0;
-            border-radius: 15px;
-            overflow: hidden;
-            margin-bottom: 10px;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #667eea, #764ba2);
-            transition: width 0.5s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 14px;
-            font-weight: bold;
-        }
-
-        /* スケジュールカード */
-        .schedule-card {
-            background: white;
-            border: 2px solid #e0e0e0;
-            border-radius: 12px;
-            padding: 15px;
-            margin-bottom: 15px;
-            transition: all 0.3s;
-        }
-
-        .schedule-card:hover {
-            border-color: #667eea;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
-        }
-
-        .schedule-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-
-        .schedule-title {
-            font-size: 18px;
-            font-weight: bold;
-            color: #333;
-        }
-
-        .schedule-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        .badge-easy { background: #d1fae5; color: #065f46; }
-        .badge-normal { background: #fef3c7; color: #92400e; }
-        .badge-hard { background: #fee2e2; color: #991b1b; }
-
-        .schedule-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin: 10px 0;
-        }
-
-        .stat-box {
-            text-align: center;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-
-        .stat-value {
-            font-size: 20px;
-            font-weight: bold;
-            color: #667eea;
-        }
-
-        .stat-label {
-            font-size: 12px;
-            color: #666;
-        }
-
-        /* ポモドーロタイマー */
-        .pomodoro-timer {
-            text-align: center;
-            padding: 30px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 12px;
-            color: white;
-        }
-
-        .timer-display {
-            font-size: 64px;
-            font-weight: bold;
-            margin: 20px 0;
-            font-family: 'Courier New', monospace;
-        }
-
-        .timer-controls {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
-
-        .timer-btn {
-            padding: 15px 30px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            background: white;
-            color: #667eea;
-            transition: all 0.3s;
-        }
-
-        .timer-btn:hover {
-            transform: scale(1.05);
-        }
-
-        /* RPG要素 */
-        .avatar-section {
-            text-align: center;
-            padding: 20px;
-            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-            border-radius: 12px;
-            color: white;
-            margin-bottom: 20px;
-        }
-
-        .avatar-image {
-            font-size: 80px;
-            margin-bottom: 10px;
-        }
-
-        .level-badge {
-            display: inline-block;
-            background: rgba(255,255,255,0.3);
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: bold;
-        }
-
-        .exp-bar {
-            height: 20px;
-            background: rgba(0,0,0,0.2);
-            border-radius: 10px;
-            overflow: hidden;
-            margin-top: 10px;
-        }
-
-        .exp-fill {
-            height: 100%;
-            background: white;
-            transition: width 0.5s ease;
-        }
-
-        .badges-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .badge-item {
-            background: white;
-            padding: 15px 10px;
-            border-radius: 8px;
-            text-align: center;
-            color: #333;
-        }
-
-        .badge-icon {
-            font-size: 32px;
-            margin-bottom: 5px;
-        }
-
-        .badge-name {
-            font-size: 11px;
-            font-weight: bold;
-        }
-
-        .badge-locked {
-            opacity: 0.3;
-            filter: grayscale(100%);
-        }
-
-        /* チャット */
-        .chat-container {
-            height: 400px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            overflow-y: auto;
-            padding: 15px;
-            margin-bottom: 15px;
-            background: #f9fafb;
-        }
-
-        .chat-message {
-            margin-bottom: 15px;
-            padding: 12px;
-            border-radius: 12px;
-            max-width: 80%;
-            word-wrap: break-word;
-            animation: fadeIn 0.3s;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .chat-message.user {
-            background: #667eea;
-            color: white;
-            margin-left: auto;
-            border-bottom-right-radius: 4px;
-        }
-
-        .chat-message.ai {
-            background: white;
-            border: 2px solid #e0e0e0;
-            border-bottom-left-radius: 4px;
-        }
-
-        .chat-input-container {
-            display: flex;
-            gap: 10px;
-        }
-
-        .chat-input-container input {
-            flex: 1;
-        }
-
-        .chat-input-container button {
-            width: auto;
-            min-width: 80px;
-        }
-
-        /* モーダル */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 1000;
-            overflow-y: auto;
-        }
-
-        .modal.active {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .modal-content {
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            max-width: 600px;
-            width: 100%;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 28px;
-            cursor: pointer;
-            color: #999;
-            line-height: 1;
-        }
-
-        /* ローディング */
-        .loading {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            z-index: 9999;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .loading.active {
-            display: flex;
-        }
-
-        .loading-content {
-            text-align: center;
-            color: white;
-        }
-
-        .spinner {
-            border: 4px solid rgba(255,255,255,0.3);
-            border-top: 4px solid white;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* アラート */
-        .alert {
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            animation: slideIn 0.3s;
-        }
-
-        @keyframes slideIn {
-            from { transform: translateY(-20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        .alert-success { background: #d1fae5; color: #065f46; }
-        .alert-info { background: #dbeafe; color: #1e40af; }
-        .alert-warning { background: #fef3c7; color: #92400e; }
-        .alert-danger { background: #fee2e2; color: #991b1b; }
-
-        /* リマインダー通知 */
-        .reminder-toast {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: white;
-            padding: 15px 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-            z-index: 9998;
-            max-width: 300px;
-            display: none;
-            animation: slideUp 0.3s;
-        }
-
-        @keyframes slideUp {
-            from { transform: translateY(100px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        .reminder-toast.active {
-            display: block;
-        }
-
-        /* レスポンシブ */
-        @media (max-width: 768px) {
-            .header h1 { font-size: 20px; }
-            .nav-tab { font-size: 11px; padding: 12px 5px; }
-            .card { padding: 15px; }
-            .form-row { grid-template-columns: 1fr; }
-            .schedule-type-selector { grid-template-columns: 1fr; }
-            .timer-display { font-size: 48px; }
-            .badges-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>StudyQuest AI - 学習専用AIアプリ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a14;
+  --bg2: #0f0f20;
+  --bg3: #14142a;
+  --card: #1a1a30;
+  --card2: #1f1f38;
+  --border: #2a2a4a;
+  --accent: #7c3aed;
+  --accent2: #a855f7;
+  --accent3: #c084fc;
+  --gold: #f59e0b;
+  --gold2: #fbbf24;
+  --cyan: #06b6d4;
+  --green: #10b981;
+  --red: #ef4444;
+  --orange: #f97316;
+  --text: #e2e8f0;
+  --text2: #94a3b8;
+  --text3: #64748b;
+  --glow: 0 0 20px rgba(124,58,237,0.4);
+  --glow2: 0 0 40px rgba(124,58,237,0.2);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body { height:100%; overflow:hidden; background:var(--bg); color:var(--text); font-family:'Zen Kaku Gothic New',sans-serif; }
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* APP SHELL */
+#app { display:flex; flex-direction:column; height:100dvh; max-width:430px; margin:0 auto; position:relative; }
+
+/* HEADER */
+.header { 
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px; background:var(--bg2); border-bottom:1px solid var(--border);
+  position:relative; z-index:10; flex-shrink:0;
+}
+.header-logo { font-family:'Orbitron',sans-serif; font-size:16px; font-weight:900; background:linear-gradient(135deg,var(--accent2),var(--cyan)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.header-right { display:flex; align-items:center; gap:10px; }
+.level-badge { 
+  display:flex; align-items:center; gap:6px; background:linear-gradient(135deg,rgba(245,158,11,0.2),rgba(251,191,36,0.1));
+  border:1px solid rgba(245,158,11,0.4); border-radius:20px; padding:4px 10px; font-size:11px; font-weight:700; color:var(--gold);
+}
+.avatar-mini { width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--cyan)); display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer; border:2px solid var(--accent2); }
+
+/* MAIN CONTENT */
+.main { flex:1; overflow-y:auto; overflow-x:hidden; }
+
+/* BOTTOM NAV */
+.bottom-nav { 
+  display:flex; background:var(--bg2); border-top:1px solid var(--border);
+  padding:8px 0 calc(8px + var(--safe-bottom)); flex-shrink:0; z-index:10;
+}
+.nav-item { 
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+  cursor:pointer; padding:6px 0; transition:all 0.2s; position:relative;
+}
+.nav-icon { font-size:22px; transition:transform 0.2s; }
+.nav-label { font-size:10px; color:var(--text3); transition:color 0.2s; font-weight:500; }
+.nav-item.active .nav-icon { transform:scale(1.1); }
+.nav-item.active .nav-label { color:var(--accent2); }
+.nav-item.active::before { content:''; position:absolute; top:0; left:50%; transform:translateX(-50%); width:40px; height:2px; background:var(--accent2); border-radius:0 0 4px 4px; }
+
+/* PAGES */
+.page { display:none; padding:16px; }
+.page.active { display:block; }
+
+/* CARDS */
+.card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:12px; }
+.card-glass { background:rgba(26,26,48,0.7); backdrop-filter:blur(10px); border:1px solid rgba(124,58,237,0.2); }
+
+/* SECTION TITLE */
+.section-title { font-size:13px; font-weight:700; color:var(--text2); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+.section-title::before { content:''; width:3px; height:14px; background:var(--accent2); border-radius:2px; display:block; }
+
+/* BUTTONS */
+.btn { 
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  padding:10px 20px; border-radius:10px; font-size:14px; font-weight:700;
+  cursor:pointer; border:none; transition:all 0.2s; font-family:inherit;
+}
+.btn-primary { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; box-shadow:var(--glow); }
+.btn-primary:hover { transform:translateY(-1px); box-shadow:0 0 30px rgba(124,58,237,0.5); }
+.btn-secondary { background:var(--card2); color:var(--text); border:1px solid var(--border); }
+.btn-gold { background:linear-gradient(135deg,var(--gold),var(--gold2)); color:#1a1a00; }
+.btn-danger { background:linear-gradient(135deg,#dc2626,#ef4444); color:#fff; }
+.btn-green { background:linear-gradient(135deg,#059669,#10b981); color:#fff; }
+.btn-sm { padding:6px 14px; font-size:12px; border-radius:8px; }
+.btn-full { width:100%; }
+.btn:active { transform:scale(0.97); }
+
+/* INPUT */
+.input-group { margin-bottom:14px; }
+.input-label { font-size:12px; color:var(--text2); margin-bottom:6px; font-weight:500; display:block; }
+.input { 
+  width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:10px;
+  padding:10px 14px; font-size:14px; color:var(--text); font-family:inherit;
+  transition:border-color 0.2s; outline:none;
+}
+.input:focus { border-color:var(--accent2); }
+.input::placeholder { color:var(--text3); }
+select.input { cursor:pointer; }
+textarea.input { resize:vertical; min-height:80px; }
+
+/* PROGRESS BAR */
+.progress-bar { height:8px; background:var(--bg3); border-radius:4px; overflow:hidden; }
+.progress-fill { height:100%; border-radius:4px; transition:width 0.6s ease; }
+.progress-fill.purple { background:linear-gradient(90deg,var(--accent),var(--accent2)); }
+.progress-fill.gold { background:linear-gradient(90deg,var(--gold),var(--gold2)); }
+.progress-fill.green { background:linear-gradient(90deg,#059669,var(--green)); }
+.progress-fill.cyan { background:linear-gradient(90deg,#0284c7,var(--cyan)); }
+
+/* EXP BAR */
+.exp-bar { height:6px; background:var(--bg3); border-radius:3px; overflow:hidden; }
+.exp-fill { height:100%; background:linear-gradient(90deg,var(--gold),var(--gold2)); transition:width 0.8s ease; border-radius:3px; }
+
+/* STAT CHIP */
+.stat-chip { 
+  display:inline-flex; align-items:center; gap:4px; 
+  padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700;
+}
+.chip-purple { background:rgba(124,58,237,0.2); color:var(--accent2); border:1px solid rgba(124,58,237,0.3); }
+.chip-gold { background:rgba(245,158,11,0.2); color:var(--gold); border:1px solid rgba(245,158,11,0.3); }
+.chip-green { background:rgba(16,185,129,0.2); color:var(--green); border:1px solid rgba(16,185,129,0.3); }
+.chip-red { background:rgba(239,68,68,0.2); color:var(--red); border:1px solid rgba(239,68,68,0.3); }
+.chip-cyan { background:rgba(6,182,212,0.2); color:var(--cyan); border:1px solid rgba(6,182,212,0.3); }
+
+/* TOAST */
+#toast-container { position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; gap:8px; pointer-events:none; width:calc(100% - 32px); max-width:398px; }
+.toast { 
+  background:var(--card2); border:1px solid var(--border); border-radius:10px;
+  padding:12px 16px; font-size:13px; font-weight:500; display:flex; align-items:center; gap:10px;
+  animation:slideIn 0.3s ease; box-shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+.toast.success { border-color:rgba(16,185,129,0.4); color:var(--green); }
+.toast.error { border-color:rgba(239,68,68,0.4); color:var(--red); }
+.toast.info { border-color:rgba(124,58,237,0.4); color:var(--accent2); }
+.toast.warning { border-color:rgba(245,158,11,0.4); color:var(--gold); }
+@keyframes slideIn { from{opacity:0;transform:translateY(-10px)} to{opacity:1;transform:translateY(0)} }
+@keyframes slideOut { from{opacity:1;transform:translateY(0)} to{opacity:0;transform:translateY(-10px)} }
+
+/* MODAL */
+.modal-overlay { 
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); 
+  z-index:100; align-items:flex-end; justify-content:center;
+}
+.modal-overlay.active { display:flex; }
+.modal { 
+  background:var(--bg2); border:1px solid var(--border); border-radius:20px 20px 0 0;
+  width:100%; max-width:430px; padding:20px; max-height:90dvh; overflow-y:auto;
+  animation:slideUp 0.3s ease;
+}
+@keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+.modal-handle { width:40px; height:4px; background:var(--border); border-radius:2px; margin:0 auto 16px; }
+.modal-title { font-size:18px; font-weight:700; margin-bottom:16px; text-align:center; }
+
+/* LOADING SPINNER */
+.spinner { width:24px; height:24px; border:3px solid var(--border); border-top-color:var(--accent2); border-radius:50%; animation:spin 0.8s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.loading-overlay { display:none; position:fixed; inset:0; background:rgba(10,10,20,0.8); z-index:200; align-items:center; justify-content:center; flex-direction:column; gap:12px; }
+.loading-overlay.active { display:flex; }
+
+/* TABS */
+.tabs { display:flex; background:var(--bg3); border-radius:10px; padding:3px; margin-bottom:16px; gap:3px; }
+.tab { flex:1; padding:8px; text-align:center; font-size:12px; font-weight:600; border-radius:8px; cursor:pointer; transition:all 0.2s; color:var(--text3); }
+.tab.active { background:var(--card2); color:var(--accent2); box-shadow:0 2px 8px rgba(0,0,0,0.3); }
+
+/* ===== HOME PAGE ===== */
+.home-hero { 
+  background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(6,182,212,0.1));
+  border:1px solid rgba(124,58,237,0.2); border-radius:var(--radius);
+  padding:20px; margin-bottom:16px; position:relative; overflow:hidden;
+}
+.home-hero::before { 
+  content:''; position:absolute; top:-40px; right:-40px; width:120px; height:120px;
+  background:radial-gradient(circle,rgba(124,58,237,0.3),transparent 70%); border-radius:50%;
+}
+.greeting { font-size:18px; font-weight:700; margin-bottom:4px; }
+.greeting span { color:var(--accent2); }
+.hero-sub { font-size:12px; color:var(--text2); margin-bottom:14px; }
+.today-stats { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.today-stat { text-align:center; }
+.today-stat-val { font-size:20px; font-weight:900; font-family:'Orbitron',sans-serif; }
+.today-stat-label { font-size:10px; color:var(--text3); margin-top:2px; }
+
+.books-list { display:flex; flex-direction:column; gap:10px; }
+.book-item { 
+  display:flex; align-items:center; gap:12px; background:var(--card2); 
+  border:1px solid var(--border); border-radius:12px; padding:12px; cursor:pointer;
+  transition:all 0.2s; position:relative; overflow:hidden;
+}
+.book-item:hover { border-color:rgba(124,58,237,0.4); }
+.book-spine { width:36px; height:46px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+.book-info { flex:1; min-width:0; }
+.book-title { font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.book-subject { font-size:11px; color:var(--text2); margin-top:2px; }
+.book-progress-wrap { margin-top:8px; }
+.book-progress-bar { height:4px; background:var(--bg3); border-radius:2px; overflow:hidden; margin-bottom:4px; }
+.book-progress-fill { height:100%; border-radius:2px; background:linear-gradient(90deg,var(--accent),var(--cyan)); }
+.book-meta { display:flex; justify-content:space-between; font-size:10px; color:var(--text3); }
+
+/* CALENDAR */
+.calendar-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+.cal-header { text-align:center; font-size:10px; font-weight:700; color:var(--text3); padding:4px 0; }
+.cal-day { 
+  aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  border-radius:8px; cursor:pointer; transition:all 0.2s; position:relative; font-size:12px;
+}
+.cal-day:hover { background:var(--card2); }
+.cal-day.today { background:var(--accent); color:#fff; font-weight:700; }
+.cal-day.has-study::after { content:''; position:absolute; bottom:3px; width:4px; height:4px; border-radius:50%; background:var(--green); }
+.cal-day.blocked { color:var(--text3); opacity:0.4; }
+.cal-day.other-month { opacity:0.3; }
+.cal-day.selected { background:rgba(124,58,237,0.3); border:1px solid var(--accent2); }
+
+/* SCHEDULE DAY DETAIL */
+.schedule-timeline { display:flex; flex-direction:column; gap:6px; }
+.time-block { 
+  display:flex; gap:10px; align-items:stretch; padding:8px 0;
+  border-bottom:1px solid rgba(42,42,74,0.5);
+}
+.time-label { font-size:11px; color:var(--text3); width:44px; flex-shrink:0; padding-top:2px; }
+.time-bar { width:4px; border-radius:2px; flex-shrink:0; }
+.time-content { flex:1; }
+.time-title { font-size:13px; font-weight:600; }
+.time-sub { font-size:11px; color:var(--text2); margin-top:2px; }
+
+/* POMODORO */
+.pomodoro-ring { 
+  width:180px; height:180px; border-radius:50%; margin:0 auto 20px;
+  display:flex; align-items:center; justify-content:center;
+  position:relative;
+}
+.pomodoro-ring svg { position:absolute; inset:0; transform:rotate(-90deg); }
+.pomodoro-time { font-family:'Orbitron',sans-serif; font-size:36px; font-weight:700; text-align:center; }
+.pomodoro-label { font-size:12px; color:var(--text2); text-align:center; margin-top:4px; }
+.pomo-controls { display:flex; gap:10px; justify-content:center; margin-top:16px; }
+
+/* RADAR CHART */
+.radar-wrap { display:flex; justify-content:center; margin:12px 0; }
+
+/* AVATAR */
+.avatar-display { 
+  width:100px; height:100px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--cyan));
+  display:flex; align-items:center; justify-content:center; font-size:46px; margin:0 auto 12px;
+  border:3px solid var(--accent2); box-shadow:var(--glow2);
+  animation:float 3s ease-in-out infinite;
+}
+@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+
+/* BADGE */
+.badge-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.badge-item { 
+  background:var(--card2); border:1px solid var(--border); border-radius:12px;
+  padding:12px; text-align:center; transition:all 0.2s;
+}
+.badge-item.earned { border-color:rgba(245,158,11,0.4); background:rgba(245,158,11,0.05); }
+.badge-icon { font-size:28px; margin-bottom:6px; display:block; }
+.badge-name { font-size:11px; font-weight:700; margin-bottom:2px; }
+.badge-desc { font-size:10px; color:var(--text3); }
+.badge-item:not(.earned) { opacity:0.4; filter:grayscale(1); }
+
+/* AI CHAT */
+.chat-messages { display:flex; flex-direction:column; gap:10px; margin-bottom:12px; max-height:300px; overflow-y:auto; }
+.msg { display:flex; gap:8px; max-width:85%; }
+.msg.ai { align-self:flex-start; }
+.msg.user { align-self:flex-end; flex-direction:row-reverse; }
+.msg-avatar { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+.msg-ai-avatar { background:linear-gradient(135deg,var(--accent),var(--accent2)); }
+.msg-user-avatar { background:linear-gradient(135deg,var(--gold),var(--gold2)); }
+.msg-bubble { 
+  padding:10px 14px; border-radius:14px; font-size:13px; line-height:1.5;
+}
+.msg.ai .msg-bubble { background:var(--card2); border:1px solid var(--border); border-top-left-radius:4px; }
+.msg.user .msg-bubble { background:var(--accent); color:#fff; border-top-right-radius:4px; }
+.chat-input-row { display:flex; gap:8px; }
+.chat-input { flex:1; }
+
+/* OCR */
+.ocr-drop { 
+  border:2px dashed var(--border); border-radius:14px; padding:30px 20px;
+  text-align:center; cursor:pointer; transition:all 0.2s; position:relative;
+}
+.ocr-drop:hover { border-color:var(--accent2); background:rgba(124,58,237,0.05); }
+.ocr-drop input { position:absolute; inset:0; opacity:0; cursor:pointer; }
+.ocr-icon { font-size:40px; margin-bottom:10px; }
+.ocr-text { font-size:13px; color:var(--text2); }
+
+/* WRONG NOTE */
+.wrong-item { 
+  background:var(--card2); border:1px solid var(--border); border-radius:12px;
+  padding:14px; margin-bottom:10px;
+}
+.wrong-subject { font-size:11px; color:var(--accent2); font-weight:700; margin-bottom:4px; }
+.wrong-q { font-size:13px; font-weight:600; margin-bottom:8px; }
+.wrong-analysis { font-size:12px; color:var(--text2); line-height:1.5; padding:8px 10px; background:rgba(239,68,68,0.05); border:1px solid rgba(239,68,68,0.2); border-radius:8px; }
+
+/* SETTINGS */
+.settings-section { margin-bottom:20px; }
+.settings-row { 
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 0; border-bottom:1px solid var(--border);
+}
+.settings-label { font-size:14px; }
+.settings-sub { font-size:11px; color:var(--text3); margin-top:2px; }
+.toggle { 
+  width:44px; height:26px; background:var(--bg3); border-radius:13px; 
+  position:relative; cursor:pointer; border:1px solid var(--border); transition:background 0.3s;
+}
+.toggle.on { background:var(--accent); border-color:var(--accent); }
+.toggle::after { 
+  content:''; position:absolute; top:3px; left:3px; width:18px; height:18px;
+  border-radius:50%; background:#fff; transition:transform 0.3s; box-shadow:0 2px 4px rgba(0,0,0,0.3);
+}
+.toggle.on::after { transform:translateX(18px); }
+
+/* API KEY */
+.api-key-input { font-family:monospace; letter-spacing:1px; }
+
+/* MENTOR SELECTION */
+.mentor-options { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+.mentor-card { 
+  background:var(--card2); border:2px solid var(--border); border-radius:12px;
+  padding:14px; text-align:center; cursor:pointer; transition:all 0.2s;
+}
+.mentor-card.selected { border-color:var(--accent2); background:rgba(124,58,237,0.1); }
+.mentor-emoji { font-size:30px; margin-bottom:8px; }
+.mentor-name { font-size:12px; font-weight:700; }
+.mentor-desc { font-size:10px; color:var(--text3); margin-top:3px; }
+
+/* NOTIFICATION DOT */
+.notif-dot { 
+  position:absolute; top:2px; right:calc(50% - 18px); width:8px; height:8px;
+  background:var(--red); border-radius:50%; border:2px solid var(--bg2);
+}
+
+/* WEEKLY BAR */
+.weekly-bars { display:flex; align-items:flex-end; gap:4px; height:60px; }
+.wbar { flex:1; border-radius:4px 4px 0 0; transition:height 0.4s ease; min-height:4px; }
+.wbar-label { font-size:9px; color:var(--text3); text-align:center; margin-top:4px; }
+
+/* SCHEDULE FORM */
+.schedule-mode-tabs { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px; }
+.mode-card { 
+  background:var(--card2); border:2px solid var(--border); border-radius:12px;
+  padding:14px; text-align:center; cursor:pointer; transition:all 0.2s;
+}
+.mode-card.selected { border-color:var(--accent2); background:rgba(124,58,237,0.1); }
+.mode-icon { font-size:24px; margin-bottom:6px; }
+.mode-name { font-size:13px; font-weight:700; }
+
+/* ANIMATIONS */
+@keyframes popIn { 0%{transform:scale(0);opacity:0} 70%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
+.pop-in { animation:popIn 0.4s ease forwards; }
+
+/* EXP GAIN NOTIFICATION */
+.exp-popup { 
+  position:fixed; right:16px; z-index:300; background:linear-gradient(135deg,var(--gold),var(--gold2));
+  color:#1a1a00; padding:8px 14px; border-radius:20px; font-size:13px; font-weight:700;
+  pointer-events:none; animation:expFloat 2s ease forwards;
+}
+@keyframes expFloat { 0%{opacity:0;transform:translateY(0)} 20%{opacity:1} 80%{opacity:1;transform:translateY(-40px)} 100%{opacity:0;transform:translateY(-60px)} }
+
+/* RESPONSIVE */
+@media (max-width: 360px) {
+  .today-stats { grid-template-columns:1fr 1fr 1fr; gap:6px; }
+  .today-stat-val { font-size:18px; }
+  .badge-grid { grid-template-columns:repeat(3,1fr); gap:6px; }
+}
+@media (min-height: 800px) {
+  .header { padding:14px 16px; }
+}
+</style>
 </head>
 <body>
-    <!-- APIキー設定モーダル -->
-    <div id="apiKeyModal" class="api-key-modal">
-        <div class="api-key-content">
-            <h2>🔑 APIキー設定</h2>
-            <p>このアプリを使用するには、Anthropic APIキーが必要です。</p>
-            <p><a href="https://console.anthropic.com/" target="_blank">Anthropic Console</a>でAPIキーを取得してください。</p>
-            <div class="form-group">
-                <label>APIキー</label>
-                <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
-            </div>
-            <p style="font-size: 12px; color: #999; margin-top: 10px;">
-                ※APIキーはブラウザのローカルストレージに安全に保存されます
-            </p>
-            <button class="btn btn-primary" onclick="saveApiKey()">保存して開始</button>
+<div id="app">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-logo">StudyQuest</div>
+    <div class="header-right">
+      <div class="level-badge">⚔️ Lv.<span id="header-level">1</span></div>
+      <div class="avatar-mini" onclick="showPage('profile')">🧙</div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main" id="main-content">
+    <!-- HOME -->
+    <div class="page active" id="page-home">
+      <div class="home-hero">
+        <div class="greeting">おはよう、<span id="user-name-display">冒険者</span>さん！⚡</div>
+        <div class="hero-sub" id="hero-message">今日も一歩ずつ進もう。小さな進歩が大きな力になる。</div>
+        <div class="today-stats">
+          <div class="today-stat">
+            <div class="today-stat-val purple-text" id="today-pages" style="color:var(--accent2)">0</div>
+            <div class="today-stat-label">今日のP</div>
+          </div>
+          <div class="today-stat">
+            <div class="today-stat-val" id="today-streak" style="color:var(--gold)">🔥0</div>
+            <div class="today-stat-label">連続日数</div>
+          </div>
+          <div class="today-stat">
+            <div class="today-stat-val" id="today-exp" style="color:var(--cyan)">0</div>
+            <div class="today-stat-label">EXP</div>
+          </div>
         </div>
+        <div style="margin-top:12px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:4px">
+            <span>今日のEXP進捗</span>
+            <span id="exp-today-ratio">0 / 100</span>
+          </div>
+          <div class="exp-bar"><div class="exp-fill" id="exp-bar-fill" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <!-- MENTOR MSG -->
+      <div class="card" style="background:linear-gradient(135deg,rgba(124,58,237,0.1),rgba(6,182,212,0.05));border-color:rgba(124,58,237,0.3)" id="mentor-home-msg">
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <div style="font-size:24px" id="mentor-home-emoji">🎓</div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:4px" id="mentor-home-name">AIメンター</div>
+            <div style="font-size:13px;line-height:1.5" id="mentor-home-text">参考書を登録してスケジュールを作成しましょう！右下の「＋」ボタンから始められます。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOOKS -->
+      <div class="section-title">📚 学習中の参考書</div>
+      <div class="books-list" id="home-books-list">
+        <div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">
+          <div style="font-size:40px;margin-bottom:10px">📖</div>
+          <div>まだ参考書が登録されていません</div>
+          <div style="margin-top:8px;font-size:12px">下の＋ボタンから追加しよう</div>
+        </div>
+      </div>
+
+      <!-- QUICK ACTIONS -->
+      <div class="section-title" style="margin-top:16px">⚡ クイックアクション</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button class="btn btn-primary" onclick="showPage('pomodoro')">⏱ 勉強開始</button>
+        <button class="btn btn-secondary" onclick="showPage('scan')">📷 採点する</button>
+        <button class="btn btn-gold" onclick="showSpeakModal()">😤 愚痴を聞く</button>
+        <button class="btn btn-secondary" onclick="showPage('schedule')">📅 計画確認</button>
+      </div>
+
+      <!-- WEEKLY -->
+      <div class="section-title" style="margin-top:16px">📊 今週の学習量</div>
+      <div class="card">
+        <div class="weekly-bars" id="weekly-bars">
+          <!-- rendered by JS -->
+        </div>
+        <div style="display:flex;gap:4px;margin-top:4px" id="weekly-labels"></div>
+      </div>
     </div>
 
-    <div class="app-container">
-        <!-- ヘッダー -->
-        <div class="header">
-            <div class="api-key-indicator" onclick="showApiKeyModal()">
-                🔑 <span id="apiKeyStatus">未設定</span>
-            </div>
-            <h1>📚 AI学習プランナー Pro</h1>
-            <div class="user-stats">
-                <div class="stat-item">Lv.<span id="userLevel">1</span></div>
-                <div class="stat-item">連続<span id="consecutiveDays">0</span>日</div>
-                <div class="stat-item">総勉強時間<span id="totalStudyTime">0</span>h</div>
-            </div>
+    <!-- SCHEDULE PAGE -->
+    <div class="page" id="page-schedule">
+      <div class="tabs">
+        <div class="tab active" onclick="switchSchedTab('calendar')">カレンダー</div>
+        <div class="tab" onclick="switchSchedTab('plan')">計画作成</div>
+        <div class="tab" onclick="switchSchedTab('routine')">ルーティン</div>
+      </div>
+
+      <!-- CALENDAR TAB -->
+      <div id="sched-tab-calendar">
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <button class="btn btn-secondary btn-sm" onclick="changeMonth(-1)">◀</button>
+            <div style="font-size:15px;font-weight:700" id="cal-month-label">2025年1月</div>
+            <button class="btn btn-secondary btn-sm" onclick="changeMonth(1)">▶</button>
+          </div>
+          <div class="calendar-grid" id="cal-headers"></div>
+          <div style="margin-top:4px" class="calendar-grid" id="cal-days"></div>
+        </div>
+        <div id="day-detail" style="display:none">
+          <div class="section-title" id="day-detail-title">📅 スケジュール詳細</div>
+          <div class="card">
+            <div class="schedule-timeline" id="day-timeline"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PLAN CREATION TAB -->
+      <div id="sched-tab-plan" style="display:none">
+        <div class="schedule-mode-tabs">
+          <div class="mode-card selected" id="mode-goal" onclick="selectMode('goal')">
+            <div class="mode-icon">🎯</div>
+            <div class="mode-name">目標逆算型</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:3px">試験日から計算</div>
+          </div>
+          <div class="mode-card" id="mode-pace" onclick="selectMode('pace')">
+            <div class="mode-icon">🏃</div>
+            <div class="mode-name">ペース維持型</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:3px">毎日の量から計算</div>
+          </div>
         </div>
 
-        <!-- ナビゲーション -->
-        <div class="nav-tabs">
-            <button class="nav-tab active" onclick="switchTab('schedule')">📅 計画</button>
-            <button class="nav-tab" onclick="switchTab('calendar')">📆 カレンダー</button>
-            <button class="nav-tab" onclick="switchTab('pomodoro')">⏱️ 集中</button>
-            <button class="nav-tab" onclick="switchTab('rpg')">🎮 RPG</button>
-            <button class="nav-tab" onclick="switchTab('mentor')">💬 メンター</button>
-            <button class="nav-tab" onclick="switchTab('settings')">⚙️ 設定</button>
+        <div id="mode-goal-form">
+          <div class="input-group">
+            <label class="input-label">参考書を選択</label>
+            <select class="input" id="plan-book-select"><option value="">-- 選択してください --</option></select>
+          </div>
+          <div class="input-group">
+            <label class="input-label">試験日・目標完了日</label>
+            <input type="date" class="input" id="plan-deadline">
+          </div>
+          <div class="input-group">
+            <label class="input-label">1ページあたりの目安時間（分）</label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="number" class="input" id="plan-page-time" placeholder="例: 5" style="flex:1">
+              <button class="btn btn-secondary btn-sm" onclick="estimatePageTime()">AIで推定</button>
+            </div>
+          </div>
         </div>
 
-        <!-- コンテンツ -->
-        <div class="content">
-            <!-- 計画タブ -->
-            <div id="scheduleTab" class="tab-content active">
-                <div class="card">
-                    <h2>📝 新しい学習計画を作成</h2>
-                    
-                    <!-- スケジュールタイプ選択 -->
-                    <div class="schedule-type-selector">
-                        <div class="schedule-type-card active" onclick="selectScheduleType('deadline')">
-                            <h3>🎯 目標逆算型</h3>
-                            <p>期限から逆算して計画を立てる</p>
-                        </div>
-                        <div class="schedule-type-card" onclick="selectScheduleType('pace')">
-                            <h3>🚶 ペース維持型</h3>
-                            <p>毎日のペースから終了日を計算</p>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>📖 教材名</label>
-                        <input type="text" id="bookTitle" placeholder="例: TOEIC文法問題集">
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>開始ページ</label>
-                            <input type="number" id="startPage" value="1">
-                        </div>
-                        <div class="form-group">
-                            <label>終了ページ</label>
-                            <input type="number" id="endPage" value="100">
-                        </div>
-                    </div>
-
-                    <!-- 目標逆算型 -->
-                    <div id="deadlineMode">
-                        <div class="form-group">
-                            <label>🎯 目標日（試験日・終了日）</label>
-                            <input type="date" id="targetDate">
-                        </div>
-                        <div class="form-group">
-                            <label>⏱️ 1ページあたりの所要時間（分）</label>
-                            <input type="number" id="timePerPage" placeholder="不明な場合は空欄でOK">
-                        </div>
-                    </div>
-
-                    <!-- ペース維持型 -->
-                    <div id="paceMode" style="display: none;">
-                        <div class="form-group">
-                            <label>📄 1日あたりのページ数</label>
-                            <input type="number" id="dailyPages" value="5">
-                        </div>
-                        <div class="form-group">
-                            <label>⏰ または、1日の勉強時間（分）</label>
-                            <input type="number" id="dailyMinutes" placeholder="上記のどちらかを入力">
-                        </div>
-                    </div>
-
-                    <button class="btn btn-primary" onclick="app.createSchedule()">
-                        🤖 AIで最適な計画を生成
-                    </button>
-                </div>
-
-                <div class="card">
-                    <h2>📊 進行中の計画</h2>
-                    <div id="activeSchedules"></div>
-                </div>
-
-                <div class="card">
-                    <h2>📈 全体の進捗状況</h2>
-                    <div id="overallProgress"></div>
-                </div>
-            </div>
-
-            <!-- カレンダータブ -->
-            <div id="calendarTab" class="tab-content">
-                <div class="card">
-                    <div id="calendar"></div>
-                </div>
-                <div class="card">
-                    <h2>📅 選択した日の詳細</h2>
-                    <div id="dayDetail"></div>
-                </div>
-            </div>
-
-            <!-- ポモドーロタブ -->
-            <div id="pomodoroTab" class="tab-content">
-                <div class="card">
-                    <div class="pomodoro-timer">
-                        <h2>⏱️ ポモドーロタイマー</h2>
-                        <div id="pomodoroMode">作業</div>
-                        <div class="timer-display" id="timerDisplay">25:00</div>
-                        <div class="timer-controls">
-                            <button class="timer-btn" onclick="app.startTimer()">▶ 開始</button>
-                            <button class="timer-btn" onclick="app.pauseTimer()">⏸ 一時停止</button>
-                            <button class="timer-btn" onclick="app.resetTimer()">🔄 リセット</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <h2>📊 今日の集中記録</h2>
-                    <div id="pomodoroStats">
-                        <div class="schedule-stats">
-                            <div class="stat-box">
-                                <div class="stat-value" id="todayPomodoros">0</div>
-                                <div class="stat-label">完了セッション</div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="stat-value" id="todayStudyTime">0</div>
-                                <div class="stat-label">集中時間(分)</div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="stat-value" id="todayPages">0</div>
-                                <div class="stat-label">進んだページ</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- RPGタブ -->
-            <div id="rpgTab" class="tab-content">
-                <div class="avatar-section">
-                    <div class="avatar-image" id="avatarImage">🧙‍♂️</div>
-                    <h2 id="avatarTitle">見習い魔法使い</h2>
-                    <div class="level-badge">Lv.<span id="rpgLevel">1</span></div>
-                    <div class="exp-bar">
-                        <div class="exp-fill" id="expFill" style="width: 0%"></div>
-                    </div>
-                    <p style="margin-top: 10px; font-size: 14px;">
-                        <span id="currentExp">0</span> / <span id="maxExp">100</span> EXP
-                    </p>
-                </div>
-
-                <div class="card">
-                    <h2>🏆 獲得バッジ</h2>
-                    <div class="badges-grid" id="badgesGrid"></div>
-                </div>
-
-                <div class="card">
-                    <h2>📊 能力値</h2>
-                    <div id="abilityStats"></div>
-                </div>
-            </div>
-
-            <!-- メンタータブ -->
-            <div id="mentorTab" class="tab-content">
-                <div class="card">
-                    <h2>💬 AIメンター</h2>
-                    <div id="mentorChat" class="chat-container"></div>
-                    <div class="chat-input-container">
-                        <input type="text" id="mentorInput" placeholder="今日の学習について話そう...">
-                        <button class="btn btn-primary" onclick="app.sendMentorMessage()">送信</button>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <h2>😭 もう無理・愚痴聞きボタン</h2>
-                    <div class="form-group">
-                        <textarea id="giveUpText" rows="4" placeholder="辛い気持ちを書いてください...&#10;&#10;例:&#10;・もう無理、受かる気がしない&#10;・今日も予定通りできなかった&#10;・だるい、やる気が出ない"></textarea>
-                    </div>
-                    <button class="btn btn-success" onclick="app.getEncouragement()">💪 励ましてもらう</button>
-                    <div id="encouragementResponse"></div>
-                </div>
-            </div>
-
-            <!-- 設定タブ -->
-            <div id="settingsTab" class="tab-content">
-                <div class="card">
-                    <h2>⚙️ 基本設定</h2>
-                    
-                    <div class="form-group">
-                        <label>🗣️ メンタータイプ</label>
-                        <select id="mentorType" onchange="app.changeMentorType()">
-                            <option value="praise">褒めちぎり型 - 優しく褒めて伸ばす</option>
-                            <option value="strict">鬼コーチ型 - 厳しく鼓舞する</option>
-                            <option value="gentle">共感・癒やし型 - 寄り添って支える</option>
-                        </select>
-                    </div>
-
-                    <button class="btn btn-secondary" onclick="app.showRoutineModal()">
-                        📅 週間ルーティン設定
-                    </button>
-                    <button class="btn btn-secondary" onclick="app.showSpecialDaysModal()">
-                        🎉 特別な予定を登録
-                    </button>
-                    <button class="btn btn-secondary" onclick="app.showReminderSettings()">
-                        🔔 リマインダー設定
-                    </button>
-                </div>
-
-                <div class="card">
-                    <h2>💾 データ管理</h2>
-                    <button class="btn btn-secondary" onclick="app.exportData()">
-                        📤 データをエクスポート
-                    </button>
-                    <button class="btn btn-secondary" onclick="app.importData()">
-                        📥 データをインポート
-                    </button>
-                    <button class="btn btn-danger" onclick="app.resetAllData()">
-                        🗑️ 全データをリセット
-                    </button>
-                </div>
-            </div>
+        <div id="mode-pace-form" style="display:none">
+          <div class="input-group">
+            <label class="input-label">参考書を選択</label>
+            <select class="input" id="plan-book-select2"><option value="">-- 選択してください --</option></select>
+          </div>
+          <div class="input-group">
+            <label class="input-label">1日にできるページ数</label>
+            <input type="number" class="input" id="plan-daily-pages" placeholder="例: 5">
+          </div>
+          <div class="input-group">
+            <label class="input-label">または、1日の勉強時間（分）</label>
+            <input type="number" class="input" id="plan-daily-minutes" placeholder="例: 30">
+          </div>
         </div>
+
+        <button class="btn btn-primary btn-full" onclick="generateScheduleWithAI()">🤖 AIが計画を生成する</button>
+        
+        <div id="plan-result" style="display:none;margin-top:16px">
+          <div class="section-title">📋 生成された計画</div>
+          <div class="card" id="plan-result-content"></div>
+        </div>
+      </div>
+
+      <!-- ROUTINE TAB -->
+      <div id="sched-tab-routine" style="display:none">
+        <div class="section-title">曜日ごとの空き時間設定</div>
+        <div id="routine-days"></div>
+        <button class="btn btn-primary btn-full" onclick="saveRoutine()" style="margin-top:8px">💾 保存する</button>
+
+        <div style="margin-top:20px">
+          <div class="section-title">🚫 スポット予定（特別な日）</div>
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <input type="date" class="input" id="spot-date" style="flex:1">
+            <input type="text" class="input" id="spot-reason" placeholder="理由（例：修学旅行）" style="flex:2">
+          </div>
+          <button class="btn btn-secondary btn-full btn-sm" onclick="addSpotBlock()">＋ 追加</button>
+          <div id="spot-list" style="margin-top:10px"></div>
+        </div>
+      </div>
     </div>
 
-    <!-- ローディング -->
-    <div id="loading" class="loading">
-        <div class="loading-content">
-            <div class="spinner"></div>
-            <p id="loadingText">AI処理中...</p>
+    <!-- POMODORO PAGE -->
+    <div class="page" id="page-pomodoro">
+      <div class="section-title">⏱ ポモドーロタイマー</div>
+      
+      <div class="card" style="text-align:center">
+        <div class="pomodoro-ring">
+          <svg viewBox="0 0 180 180" width="180" height="180">
+            <circle cx="90" cy="90" r="80" fill="none" stroke="var(--bg3)" stroke-width="8"/>
+            <circle cx="90" cy="90" r="80" fill="none" stroke="url(#pomoGrad)" stroke-width="8"
+              stroke-linecap="round" stroke-dasharray="502.6" id="pomo-circle" stroke-dashoffset="0"/>
+            <defs>
+              <linearGradient id="pomoGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:var(--accent)"/>
+                <stop offset="100%" style="stop-color:var(--cyan)"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div>
+            <div class="pomodoro-time" id="pomo-time">25:00</div>
+            <div class="pomodoro-label" id="pomo-phase">集中タイム</div>
+          </div>
         </div>
-    </div>
 
-    <!-- リマインダー通知 -->
-    <div id="reminderToast" class="reminder-toast">
-        <h3 style="margin-bottom: 10px;">📚 リマインダー</h3>
-        <p id="reminderText"></p>
-        <button class="btn btn-primary btn-small" style="margin-top: 10px;" onclick="closeReminder()">OK</button>
-    </div>
-
-    <!-- 週間ルーティンモーダル -->
-    <div id="routineModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>📅 週間ルーティン設定</h2>
-                <button class="modal-close" onclick="closeModal('routineModal')">&times;</button>
-            </div>
-            <div id="routineSettings"></div>
-            <button class="btn btn-primary" onclick="app.saveRoutine()">保存</button>
+        <div style="display:flex;justify-content:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+          <span class="stat-chip chip-purple" id="pomo-count">🍅 0回完了</span>
+          <span class="stat-chip chip-cyan" id="pomo-today-pages">📄 今日 0P</span>
         </div>
-    </div>
 
-    <!-- 特別な予定モーダル -->
-    <div id="specialDaysModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>🎉 特別な予定を登録</h2>
-                <button class="modal-close" onclick="closeModal('specialDaysModal')">&times;</button>
-            </div>
-            <div class="form-group">
-                <label>日付</label>
-                <input type="date" id="specialDate">
-            </div>
-            <div class="form-group">
-                <label>予定内容</label>
-                <input type="text" id="specialEvent" placeholder="例: 修学旅行、家族旅行">
-            </div>
-            <button class="btn btn-success" onclick="app.addSpecialDay()">追加</button>
-            <hr style="margin: 20px 0;">
-            <h3>登録済みの予定</h3>
-            <div id="specialDaysList"></div>
+        <div class="pomo-controls">
+          <button class="btn btn-secondary" onclick="resetPomo()">🔄</button>
+          <button class="btn btn-primary" id="pomo-btn" onclick="togglePomo()" style="padding:12px 32px;font-size:16px">▶ 開始</button>
+          <button class="btn btn-secondary" onclick="skipPomo()">⏭</button>
         </div>
-    </div>
+      </div>
 
-    <!-- 日詳細モーダル -->
-    <div id="dayDetailModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="dayDetailTitle">日詳細</h2>
-                <button class="modal-close" onclick="closeModal('dayDetailModal')">&times;</button>
-            </div>
-            <div id="dayDetailContent"></div>
+      <!-- WHAT TO STUDY -->
+      <div class="card" style="margin-top:12px">
+        <div class="section-title">今日の学習内容</div>
+        <div class="input-group">
+          <label class="input-label">参考書</label>
+          <select class="input" id="pomo-book-select"></select>
         </div>
-    </div>
-
-    <!-- リスケジュールモーダル -->
-    <div id="rescheduleModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>🔄 計画の調整が必要です</h2>
-                <button class="modal-close" onclick="closeModal('rescheduleModal')">&times;</button>
-            </div>
-            <div class="alert alert-info" id="rescheduleMessage"></div>
-            <h3>調整方法を選択してください：</h3>
-            <button class="btn btn-primary" onclick="app.reschedule('strict')">
-                ⏰ 期間死守モード<br>
-                <small>残り日数で遅れを取り戻す（少しずつ増やす）</small>
-            </button>
-            <button class="btn btn-success" onclick="app.reschedule('relax')">
-                😌 ストレスフリーモード<br>
-                <small>終了日を延ばす（1日の量は変えない）</small>
-            </button>
+        <div class="input-group">
+          <label class="input-label">目標ページ数</label>
+          <input type="number" class="input" id="pomo-target-pages" placeholder="例: 5">
         </div>
+      </div>
+
+      <!-- PAGE REPORT -->
+      <div class="card" style="margin-top:12px">
+        <div class="section-title">📊 進捗報告</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="number" class="input" id="progress-pages" placeholder="今日終わったページ数" style="flex:1">
+          <button class="btn btn-green" onclick="reportProgress()">報告</button>
+        </div>
+        <div id="reschedule-options" style="display:none;margin-top:12px">
+          <div style="font-size:13px;color:var(--text2);margin-bottom:10px" id="reschedule-msg"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <button class="btn btn-primary btn-sm" onclick="doReschedule('period')">⚡ 期間死守</button>
+            <button class="btn btn-secondary btn-sm" onclick="doReschedule('stress-free')">😌 ストレスフリー</button>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <script>
-        // ==================== データ管理 ====================
-        class DataManager {
-            constructor() {
-                this.STORAGE_KEY = 'studyPlannerProData';
-                this.API_KEY_STORAGE = 'anthropic_api_key';
-            }
+    <!-- SCAN / OCR PAGE -->
+    <div class="page" id="page-scan">
+      <div class="tabs">
+        <div class="tab active" onclick="switchScanTab('ocr')">📷 採点</div>
+        <div class="tab" onclick="switchScanTab('wrongnotes')">📝 弱点ノート</div>
+        <div class="tab" onclick="switchScanTab('test')">🎯 特訓テスト</div>
+      </div>
 
-            save(data) {
-                localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
-            }
+      <!-- OCR TAB -->
+      <div id="scan-tab-ocr">
+        <div class="card">
+          <div class="section-title">🔍 自動採点システム</div>
+          
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+            <div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:6px;font-weight:600">📝 解答ページ</div>
+              <div class="ocr-drop" id="answer-drop" onclick="triggerFileInput('answer-upload')">
+                <input type="file" id="answer-upload" accept="image/*" capture="environment" onchange="handleImageUpload('answer',this)">
+                <div class="ocr-icon" id="answer-icon">📄</div>
+                <div class="ocr-text" id="answer-text">タップして撮影</div>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:6px;font-weight:600">📖 解説ページ</div>
+              <div class="ocr-drop" id="solution-drop" onclick="triggerFileInput('solution-upload')">
+                <input type="file" id="solution-upload" accept="image/*" capture="environment" onchange="handleImageUpload('solution',this)">
+                <div class="ocr-icon" id="solution-icon">📖</div>
+                <div class="ocr-text" id="solution-text">タップして撮影</div>
+              </div>
+            </div>
+          </div>
 
-            load() {
-                const data = localStorage.getItem(this.STORAGE_KEY);
-                return data ? JSON.parse(data) : null;
-            }
+          <div class="input-group">
+            <label class="input-label">科目・単元</label>
+            <div style="display:flex;gap:8px">
+              <select class="input" id="scan-subject" style="flex:1">
+                <option>数学</option><option>英語</option><option>国語</option>
+                <option>物理</option><option>化学</option><option>生物</option>
+                <option>世界史</option><option>日本史</option><option>地理</option>
+              </select>
+              <input type="text" class="input" id="scan-unit" placeholder="単元名" style="flex:1">
+            </div>
+          </div>
 
-            saveApiKey(key) {
-                localStorage.setItem(this.API_KEY_STORAGE, key);
-            }
+          <button class="btn btn-primary btn-full" onclick="runOCR()">🤖 AI採点開始</button>
+        </div>
 
-            loadApiKey() {
-                return localStorage.getItem(this.API_KEY_STORAGE);
-            }
+        <div id="ocr-result" style="display:none;margin-top:12px">
+          <div class="section-title">採点結果</div>
+          <div class="card" id="ocr-result-content"></div>
+        </div>
+      </div>
 
-            hasApiKey() {
-                return !!this.loadApiKey();
-            }
+      <!-- WRONG NOTES TAB -->
+      <div id="scan-tab-wrongnotes" style="display:none">
+        <div class="section-title">📝 デジタル弱点ノート</div>
+        <div id="wrong-notes-list">
+          <div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">
+            <div style="font-size:40px;margin-bottom:10px">📓</div>
+            <div>まだ間違えた問題がありません</div>
+            <div style="margin-top:6px;font-size:12px">採点を実行すると自動登録されます</div>
+          </div>
+        </div>
+      </div>
 
-            clear() {
-                localStorage.removeItem(this.STORAGE_KEY);
-            }
+      <!-- TEST TAB -->
+      <div id="scan-tab-test" style="display:none">
+        <div class="section-title">🎯 ピンポイント特訓テスト</div>
+        <div class="card">
+          <div style="text-align:center;padding:16px">
+            <div style="font-size:36px;margin-bottom:10px">🤖</div>
+            <div style="font-size:14px;font-weight:700;margin-bottom:6px">AIが弱点テストを生成</div>
+            <div style="font-size:12px;color:var(--text2);margin-bottom:16px">過去の誤答データからあなた専用の問題を出題します</div>
+            <button class="btn btn-primary" onclick="generateWeakTest()">テスト生成</button>
+          </div>
+        </div>
+        <div id="test-content" style="margin-top:12px"></div>
+      </div>
+    </div>
 
-            export() {
-                const data = this.load();
-                const json = JSON.stringify(data, null, 2);
-                const blob = new Blob([json], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `study-planner-backup-${new Date().toISOString().split('T')[0]}.json`;
-                a.click();
-            }
+    <!-- PROFILE / RPG PAGE -->
+    <div class="page" id="page-profile">
+      <div class="card" style="text-align:center;background:linear-gradient(135deg,rgba(124,58,237,0.1),rgba(6,182,212,0.05));border-color:rgba(124,58,237,0.3)">
+        <div class="avatar-display" id="avatar-icon">🧙</div>
+        <div style="font-size:20px;font-weight:900;margin-bottom:4px" id="avatar-title">見習い魔法使い</div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:10px" id="avatar-subtitle">冒険者</div>
+        <div style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap" id="equipped-badges"></div>
+        <div style="margin-top:14px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+            <span style="color:var(--gold)">⭐ EXP</span>
+            <span id="exp-display">0 / 500</span>
+          </div>
+          <div class="exp-bar" style="height:10px"><div class="exp-fill" id="exp-fill-profile" style="width:0%"></div></div>
+        </div>
+      </div>
 
-            import(file) {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        try {
-                            const data = JSON.parse(e.target.result);
-                            this.save(data);
-                            resolve(data);
-                        } catch (error) {
-                            reject(error);
-                        }
-                    };
-                    reader.readAsText(file);
-                });
-            }
-        }
+      <!-- STATS RADAR -->
+      <div class="card" style="margin-top:12px">
+        <div class="section-title">⚔️ ステータス</div>
+        <canvas id="radar-canvas" width="280" height="220" style="display:block;margin:0 auto"></canvas>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px" id="stats-display"></div>
+      </div>
 
-        // ==================== API通信 ====================
-        class AnthropicAPI {
-            constructor() {
-                this.baseURL = 'https://api.anthropic.com/v1/messages';
-                this.model = 'claude-sonnet-4-20250514';
-                this.dataManager = new DataManager();
-            }
+      <!-- BADGES -->
+      <div class="card" style="margin-top:12px">
+        <div class="section-title">🏅 バッジ一覧</div>
+        <div class="badge-grid" id="badges-grid"></div>
+      </div>
+    </div>
 
-            async call(messages, maxTokens = 2000) {
-                const apiKey = this.dataManager.loadApiKey();
-                if (!apiKey) {
-                    throw new Error('APIキーが設定されていません');
-                }
+    <!-- MENTOR / AI CHAT PAGE -->
+    <div class="page" id="page-mentor">
+      <div class="card" style="background:linear-gradient(135deg,rgba(124,58,237,0.1),rgba(6,182,212,0.05));border-color:rgba(124,58,237,0.3);margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="font-size:36px" id="mentor-avatar-icon">🎓</div>
+          <div>
+            <div style="font-size:16px;font-weight:700" id="mentor-name-display">AIメンター</div>
+            <div style="font-size:12px;color:var(--text2)" id="mentor-type-display">共感・癒やし型</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="showMentorSettingsModal()" style="margin-left:auto">設定</button>
+        </div>
+      </div>
 
-                const response = await fetch(this.baseURL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-api-key': apiKey,
-                        'anthropic-version': '2023-06-01'
-                    },
-                    body: JSON.stringify({
-                        model: this.model,
-                        max_tokens: maxTokens,
-                        messages: messages
-                    })
-                });
+      <div class="card" style="margin-bottom:12px">
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-input-row">
+          <input type="text" class="input chat-input" id="chat-input" placeholder="メッセージを入力..." onkeydown="if(event.key==='Enter')sendChat()">
+          <button class="btn btn-primary btn-sm" onclick="sendChat()">送信</button>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn btn-danger btn-sm" onclick="sendQuickMessage('もう無理、だるい')">😤 もう無理</button>
+          <button class="btn btn-secondary btn-sm" onclick="sendQuickMessage('励ましてください')">💪 励まして</button>
+          <button class="btn btn-gold btn-sm" onclick="sendQuickMessage('今日の振り返りをしたい')">📊 振り返り</button>
+        </div>
+      </div>
+    </div>
 
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error?.message || 'APIエラーが発生しました');
-                }
+    <!-- SETTINGS PAGE -->
+    <div class="page" id="page-settings">
+      <div class="settings-section">
+        <div class="section-title">🔑 API設定</div>
+        <div class="card">
+          <div class="input-group">
+            <label class="input-label">Anthropic APIキー</label>
+            <div style="display:flex;gap:8px">
+              <input type="password" class="input api-key-input" id="api-key-input" placeholder="sk-ant-...">
+              <button class="btn btn-secondary btn-sm" onclick="toggleApiKeyVisible()">👁</button>
+            </div>
+            <div style="font-size:11px;color:var(--text3);margin-top:6px">キーはブラウザのLocalStorageに保存されます。</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="saveApiKey()">💾 保存</button>
+          <div id="api-status" style="margin-top:8px;font-size:12px"></div>
+        </div>
 
-                const data = await response.json();
-                return data.content[0].text;
-            }
+        <!-- CORS EXPLANATION -->
+        <div class="card" style="background:rgba(245,158,11,0.05);border-color:rgba(245,158,11,0.3);margin-top:10px">
+          <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:8px">⚠️ CORSエラーについて</div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.6">
+            ブラウザから直接Anthropic APIを呼び出すとCORSエラーが発生する場合があります。<br><br>
+            <strong style="color:var(--text)">解決方法：</strong><br>
+            1. <span style="color:var(--cyan)">Cloudflare Workersを使う（推奨）</span><br>
+            2. <span style="color:var(--green)">ローカルプロキシサーバーを使う</span><br>
+            3. <span style="color:var(--accent2)">ブラウザ拡張でCORSを無効化（開発時のみ）</span><br><br>
+            下記でプロキシURLを設定できます。
+          </div>
+        </div>
 
-            async generateSchedule(params) {
-                const { type, bookTitle, startPage, endPage, targetDate, dailyPages, dailyMinutes, timePerPage, weeklyRoutine, specialDays } = params;
+        <div class="card" style="margin-top:10px">
+          <div class="input-group">
+            <label class="input-label">プロキシURL（省略可）</label>
+            <input type="text" class="input" id="proxy-url-input" placeholder="https://your-worker.workers.dev">
+            <div style="font-size:11px;color:var(--text3);margin-top:6px">Cloudflare WorkersなどのプロキシURLを入力してください。</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="saveProxyUrl()">保存</button>
+        </div>
+      </div>
 
-                let prompt = '';
-                if (type === 'deadline') {
-                    prompt = `あなたは学習計画の専門家です。以下の情報から実現可能な学習計画を作成してください。
+      <div class="settings-section">
+        <div class="section-title">👤 プロフィール</div>
+        <div class="card">
+          <div class="input-group">
+            <label class="input-label">ニックネーム</label>
+            <input type="text" class="input" id="settings-name" placeholder="名前を入力">
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="saveProfile()">保存</button>
+        </div>
+      </div>
 
-【教材情報】
-- 教材名: ${bookTitle}
-- 開始ページ: ${startPage}
-- 終了ページ: ${endPage}
-- 総ページ数: ${endPage - startPage + 1}ページ
+      <div class="settings-section">
+        <div class="section-title">🤖 AIメンター設定</div>
+        <div class="mentor-options">
+          <div class="mentor-card" id="mentor-opt-praise" onclick="selectMentor('praise')">
+            <div class="mentor-emoji">🌟</div>
+            <div class="mentor-name">褒めちぎり型</div>
+            <div class="mentor-desc">どんな小さな進歩も称賛</div>
+          </div>
+          <div class="mentor-card" id="mentor-opt-strict" onclick="selectMentor('strict')">
+            <div class="mentor-emoji">💪</div>
+            <div class="mentor-name">鬼コーチ型</div>
+            <div class="mentor-desc">厳しく叱咤激励</div>
+          </div>
+          <div class="mentor-card selected" id="mentor-opt-empathy" onclick="selectMentor('empathy')">
+            <div class="mentor-emoji">🫂</div>
+            <div class="mentor-name">共感・癒やし型</div>
+            <div class="mentor-desc">優しく寄り添う</div>
+          </div>
+          <div class="mentor-card" id="mentor-opt-cool" onclick="selectMentor('cool')">
+            <div class="mentor-emoji">🧊</div>
+            <div class="mentor-name">クール分析型</div>
+            <div class="mentor-desc">データで冷静にアドバイス</div>
+          </div>
+        </div>
+      </div>
 
-【目標】
-- 完了目標日: ${targetDate}
-${timePerPage ? `- 1ページあたりの所要時間: ${timePerPage}分` : '- 1ページあたりの所要時間: 不明（難易度から推測してください）'}
+      <div class="settings-section">
+        <div class="section-title">📚 参考書管理</div>
+        <div id="books-settings-list" style="margin-bottom:12px"></div>
+        <button class="btn btn-primary btn-full" onclick="showAddBookModal()">📖 参考書を追加</button>
+      </div>
 
-【生活パターン】
-週間ルーティン: ${JSON.stringify(weeklyRoutine)}
-特別な予定（勉強不可日）: ${JSON.stringify(specialDays)}
+      <div style="height:20px"></div>
+    </div>
+  </div>
 
-【要求事項】
-1. 今日から目標日までの日数を計算
-2. 週間ルーティンと特別な予定を考慮し、実際に勉強可能な日数と時間を算出
-3. 無理のないペース配分を提案（週末に多めなど）
-4. 難易度評価（簡単/普通/厳しい）を判定
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav">
+    <div class="nav-item active" onclick="showPage('home')" id="nav-home">
+      <div class="nav-icon">🏠</div>
+      <div class="nav-label">ホーム</div>
+    </div>
+    <div class="nav-item" onclick="showPage('schedule')" id="nav-schedule">
+      <div class="nav-icon">📅</div>
+      <div class="nav-label">計画</div>
+    </div>
+    <div class="nav-item" onclick="showPage('pomodoro')" id="nav-pomodoro">
+      <div class="nav-icon">⏱</div>
+      <div class="nav-label">集中</div>
+    </div>
+    <div class="nav-item" onclick="showPage('scan')" id="nav-scan">
+      <div class="nav-icon">📷</div>
+      <div class="nav-label">採点</div>
+    </div>
+    <div class="nav-item" onclick="showPage('profile')" id="nav-profile">
+      <div class="nav-icon">⚔️</div>
+      <div class="nav-label">ステータス</div>
+    </div>
+    <div class="nav-item" onclick="showPage('mentor')" id="nav-mentor">
+      <div class="nav-icon">🤖</div>
+      <div class="nav-label">メンター</div>
+    </div>
+    <div class="nav-item" onclick="showPage('settings')" id="nav-settings">
+      <div class="nav-icon">⚙️</div>
+      <div class="nav-label">設定</div>
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="modal-add-book">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📖 参考書を追加</div>
+    <div class="input-group">
+      <label class="input-label">参考書名</label>
+      <input type="text" class="input" id="book-title-input" placeholder="例：チャート式数学II+B">
+    </div>
+    <div class="input-group">
+      <label class="input-label">科目</label>
+      <select class="input" id="book-subject-input">
+        <option>数学</option><option>英語</option><option>国語</option>
+        <option>物理</option><option>化学</option><option>生物</option>
+        <option>世界史</option><option>日本史</option><option>地理</option>
+        <option>その他</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="input-group">
+        <label class="input-label">開始ページ</label>
+        <input type="number" class="input" id="book-start-input" placeholder="1">
+      </div>
+      <div class="input-group">
+        <label class="input-label">終了ページ</label>
+        <input type="number" class="input" id="book-end-input" placeholder="300">
+      </div>
+    </div>
+    <div class="input-group">
+      <label class="input-label">現在のページ</label>
+      <input type="number" class="input" id="book-current-input" placeholder="1">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-secondary" onclick="closeModal('modal-add-book')" style="flex:1">キャンセル</button>
+      <button class="btn btn-primary" onclick="addBook()" style="flex:2">追加する</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-speak">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">😤 AIに愚痴を聞いてもらおう</div>
+    <div style="text-align:center;font-size:36px;margin-bottom:12px" id="speak-mentor-emoji">🫂</div>
+    <textarea class="input" id="speak-input" placeholder="だるい、もう無理、何でも書いていいよ。AIが全力で受け止めます。" rows="4" style="margin-bottom:12px"></textarea>
+    <button class="btn btn-primary btn-full" onclick="sendSpeak()">送信する</button>
+    <div id="speak-response" style="display:none;margin-top:12px" class="card">
+      <div id="speak-response-text" style="font-size:13px;line-height:1.7;color:var(--text)"></div>
+    </div>
+    <button class="btn btn-secondary btn-full" onclick="closeModal('modal-speak')" style="margin-top:8px">閉じる</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-day-detail">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modal-day-title">📅 2025年1月1日のスケジュール</div>
+    <div class="schedule-timeline" id="modal-day-timeline" style="max-height:60vh;overflow-y:auto"></div>
+    <button class="btn btn-secondary btn-full" onclick="closeModal('modal-day-detail')" style="margin-top:12px">閉じる</button>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div id="toast-container"></div>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner"></div>
+  <div style="font-size:13px;color:var(--text2)" id="loading-text">AIが考え中...</div>
+</div>
+
+<script>
+// ===========================
+// STATE
+// ===========================
+const STATE = {
+  apiKey: '',
+  proxyUrl: '',
+  userName: '冒険者',
+  mentorType: 'empathy',
+  level: 1,
+  exp: 0,
+  streak: 0,
+  todayPages: 0,
+  todayExp: 0,
+  books: [],
+  schedules: {},
+  wrongNotes: [],
+  routine: { 月:{start:'21:00',end:'22:00',enabled:true}, 火:{start:'21:00',end:'22:00',enabled:true}, 水:{start:'21:00',end:'22:00',enabled:true}, 木:{start:'21:00',end:'22:00',enabled:true}, 金:{start:'21:00',end:'22:00',enabled:true}, 土:{start:'10:00',end:'15:00',enabled:true}, 日:{start:'10:00',end:'15:00',enabled:true} },
+  spotBlocks: [],
+  weeklyData: [0,0,0,0,0,0,0],
+  stats: { calc:10, memory:10, focus:10, stamina:10, reading:10 },
+  badges: [],
+  chatHistory: [],
+  pomoCycle: 0,
+  currentPage: 'home',
+  calendarYear: new Date().getFullYear(),
+  calendarMonth: new Date().getMonth(),
+  uploadedImages: { answer: null, solution: null },
+  rescheduleData: null,
+  planMode: 'goal',
+  scanTab: 'ocr',
+  schedTab: 'calendar',
+};
+
+// ===========================
+// INIT
+// ===========================
+function init() {
+  loadFromStorage();
+  renderAll();
+  checkDailyReset();
+  showWelcomeMentor();
+  initRadar();
+}
+
+function loadFromStorage() {
+  try {
+    const saved = localStorage.getItem('studyquest_data');
+    if (saved) {
+      const data = JSON.parse(saved);
+      Object.assign(STATE, data);
+    }
+    const apiKey = localStorage.getItem('studyquest_apikey');
+    if (apiKey) STATE.apiKey = apiKey;
+    const proxyUrl = localStorage.getItem('studyquest_proxy');
+    if (proxyUrl) STATE.proxyUrl = proxyUrl;
+  } catch(e) { console.error(e); }
+}
+
+function saveToStorage() {
+  try {
+    const toSave = { ...STATE };
+    delete toSave.apiKey;
+    delete toSave.proxyUrl;
+    localStorage.setItem('studyquest_data', JSON.stringify(toSave));
+  } catch(e) { console.error(e); }
+}
+
+function renderAll() {
+  document.getElementById('user-name-display').textContent = STATE.userName;
+  document.getElementById('header-level').textContent = STATE.level;
+  document.getElementById('today-pages').textContent = STATE.todayPages;
+  document.getElementById('today-streak').textContent = '🔥' + STATE.streak;
+  document.getElementById('today-exp').textContent = STATE.todayExp;
+  
+  const expNeeded = getExpNeeded(STATE.level);
+  document.getElementById('exp-today-ratio').textContent = STATE.todayExp + ' / 100';
+  document.getElementById('exp-bar-fill').style.width = Math.min(100, STATE.todayExp) + '%';
+  document.getElementById('exp-display').textContent = STATE.exp + ' / ' + expNeeded;
+  document.getElementById('exp-fill-profile').style.width = Math.min(100, (STATE.exp / expNeeded) * 100) + '%';
+  document.getElementById('avatar-title').textContent = getAvatarTitle();
+  document.getElementById('avatar-icon').textContent = getAvatarIcon();
+  document.getElementById('settings-name').value = STATE.userName;
+  document.getElementById('api-key-input').value = STATE.apiKey;
+  document.getElementById('proxy-url-input').value = STATE.proxyUrl;
+  
+  renderBooks();
+  renderWeeklyBars();
+  renderBadges();
+  renderBookSelects();
+  renderCalendar();
+  renderRoutineForm();
+  renderSpotList();
+  renderWrongNotes();
+  renderStatsDisplay();
+  updateMentorDisplay();
+}
+
+function checkDailyReset() {
+  const today = new Date().toDateString();
+  const lastReset = localStorage.getItem('studyquest_last_reset');
+  if (lastReset !== today) {
+    STATE.todayPages = 0;
+    STATE.todayExp = 0;
+    localStorage.setItem('studyquest_last_reset', today);
+    saveToStorage();
+    checkStreak();
+  }
+}
+
+function checkStreak() {
+  const lastStudy = localStorage.getItem('studyquest_last_study');
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (lastStudy === yesterday.toDateString()) {
+    STATE.streak++;
+  } else if (lastStudy !== new Date().toDateString()) {
+    STATE.streak = 0;
+  }
+  saveToStorage();
+}
+
+// ===========================
+// NAVIGATION
+// ===========================
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name)?.classList.add('active');
+  document.getElementById('nav-' + name)?.classList.add('active');
+  document.getElementById('main-content').scrollTop = 0;
+  STATE.currentPage = name;
+}
+
+// ===========================
+// BOOKS
+// ===========================
+const SUBJECT_COLORS = {
+  '数学':'#7c3aed','英語':'#0284c7','国語':'#dc2626','物理':'#059669',
+  '化学':'#0891b2','生物':'#65a30d','世界史':'#b45309','日本史':'#9a3412','地理':'#7c3aed','その他':'#64748b'
+};
+const SUBJECT_ICONS = {
+  '数学':'➗','英語':'🇺🇸','国語':'📜','物理':'⚛️','化学':'🧪','生物':'🌿','世界史':'🌍','日本史':'⛩️','地理':'🗺️','その他':'📚'
+};
+
+function renderBooks() {
+  const list = document.getElementById('home-books-list');
+  const settingsList = document.getElementById('books-settings-list');
+  if (STATE.books.length === 0) {
+    list.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px"><div style="font-size:40px;margin-bottom:10px">📖</div><div>まだ参考書が登録されていません</div><div style="margin-top:8px;font-size:12px">設定から追加しよう</div></div>`;
+    settingsList.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:16px">なし</div>';
+    return;
+  }
+  list.innerHTML = STATE.books.map((b,i) => {
+    const pct = Math.round(((b.current - b.start) / (b.end - b.start)) * 100);
+    const color = SUBJECT_COLORS[b.subject] || '#7c3aed';
+    return `<div class="book-item" onclick="showBookDetail(${i})">
+      <div class="book-spine" style="background:linear-gradient(135deg,${color}40,${color}20);border:1px solid ${color}40">
+        <span>${SUBJECT_ICONS[b.subject]||'📚'}</span>
+      </div>
+      <div class="book-info">
+        <div class="book-title">${b.title}</div>
+        <div class="book-subject">${b.subject}</div>
+        <div class="book-progress-wrap">
+          <div class="book-progress-bar"><div class="book-progress-fill" style="width:${pct}%;background:linear-gradient(90deg,${color},${color}99)"></div></div>
+          <div class="book-meta"><span>P${b.current}/${b.end}</span><span>${pct}%</span></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  settingsList.innerHTML = STATE.books.map((b,i) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:13px;font-weight:600">${b.title}</div>
+        <div style="font-size:11px;color:var(--text3)">${b.subject} / ${b.start}〜${b.end}ページ</div>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="removeBook(${i})">削除</button>
+    </div>`).join('');
+}
+
+function renderBookSelects() {
+  const options = STATE.books.map((b,i) => `<option value="${i}">${b.title}</option>`).join('');
+  ['plan-book-select','plan-book-select2','pomo-book-select'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<option value="">-- 選択 --</option>' + options;
+  });
+}
+
+function showAddBookModal() { openModal('modal-add-book'); }
+
+function addBook() {
+  const title = document.getElementById('book-title-input').value.trim();
+  const subject = document.getElementById('book-subject-input').value;
+  const start = parseInt(document.getElementById('book-start-input').value) || 1;
+  const end = parseInt(document.getElementById('book-end-input').value) || 300;
+  const current = parseInt(document.getElementById('book-current-input').value) || start;
+  if (!title) { showToast('参考書名を入力してください', 'error'); return; }
+  STATE.books.push({ title, subject, start, end, current, id: Date.now() });
+  closeModal('modal-add-book');
+  saveToStorage();
+  renderAll();
+  showToast('📚 参考書を追加しました！', 'success');
+  gainExp(20, '参考書追加');
+}
+
+function removeBook(i) {
+  if (confirm('削除しますか？')) {
+    STATE.books.splice(i, 1);
+    saveToStorage();
+    renderAll();
+    showToast('削除しました', 'info');
+  }
+}
+
+function showBookDetail(i) {
+  showToast(`📖 ${STATE.books[i].title}`, 'info');
+}
+
+// ===========================
+// WEEKLY BARS
+// ===========================
+function renderWeeklyBars() {
+  const bars = document.getElementById('weekly-bars');
+  const labels = document.getElementById('weekly-labels');
+  const days = ['月','火','水','木','金','土','日'];
+  const max = Math.max(...STATE.weeklyData, 1);
+  bars.innerHTML = STATE.weeklyData.map((v,i) => {
+    const h = Math.round((v / max) * 52) + 4;
+    const colors = ['#7c3aed','#0284c7','#059669','#b45309','#dc2626','#f59e0b','#06b6d4'];
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div class="wbar" style="height:${h}px;width:100%;background:${colors[i]}80;"></div>
+      <div class="wbar-label">${v}</div>
+    </div>`;
+  }).join('');
+  labels.innerHTML = days.map(d => `<div style="flex:1;text-align:center;font-size:9px;color:var(--text3)">${d}</div>`).join('');
+}
+
+// ===========================
+// CALENDAR
+// ===========================
+function renderCalendar() {
+  const y = STATE.calendarYear, m = STATE.calendarMonth;
+  document.getElementById('cal-month-label').textContent = `${y}年${m+1}月`;
+  const headers = ['日','月','火','水','木','金','土'];
+  document.getElementById('cal-headers').innerHTML = headers.map(h => `<div class="cal-header">${h}</div>`).join('');
+  
+  const firstDay = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const today = new Date();
+  
+  let html = '';
+  for (let i = 0; i < firstDay; i++) {
+    html += `<div class="cal-day other-month"></div>`;
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = today.getFullYear()===y && today.getMonth()===m && today.getDate()===d;
+    const hasStudy = STATE.schedules[dateStr]?.pages > 0;
+    const isBlocked = STATE.spotBlocks.some(s => s.date === dateStr);
+    let cls = 'cal-day';
+    if (isToday) cls += ' today';
+    if (hasStudy) cls += ' has-study';
+    if (isBlocked) cls += ' blocked';
+    html += `<div class="${cls}" onclick="showDayDetail('${dateStr}',${d})">${d}</div>`;
+  }
+  document.getElementById('cal-days').innerHTML = html;
+}
+
+function changeMonth(dir) {
+  STATE.calendarMonth += dir;
+  if (STATE.calendarMonth > 11) { STATE.calendarMonth = 0; STATE.calendarYear++; }
+  if (STATE.calendarMonth < 0) { STATE.calendarMonth = 11; STATE.calendarYear--; }
+  renderCalendar();
+}
+
+function showDayDetail(dateStr, day) {
+  const y = STATE.calendarYear, m = STATE.calendarMonth;
+  document.getElementById('modal-day-title').textContent = `📅 ${y}年${m+1}月${day}日`;
+  
+  const schedule = STATE.schedules[dateStr];
+  const isBlocked = STATE.spotBlocks.find(s => s.date === dateStr);
+  
+  let html = '';
+  const blocks = getDayBlocks(dateStr);
+  blocks.forEach(b => {
+    const colors = { '睡眠':'#0284c7','学校':'#059669','部活':'#f59e0b','勉強':'#7c3aed','休憩':'#64748b','移動':'#0891b2','自由':'#65a30d' };
+    const c = colors[b.type] || '#64748b';
+    html += `<div class="time-block">
+      <div class="time-label">${b.start}</div>
+      <div class="time-bar" style="background:${c}"></div>
+      <div class="time-content">
+        <div class="time-title">${b.type}</div>
+        <div class="time-sub" style="color:${c}">${b.detail}</div>
+      </div>
+    </div>`;
+  });
+  
+  if (isBlocked) {
+    html = `<div style="text-align:center;padding:20px;color:var(--text3)"><div style="font-size:36px">🚫</div><div style="margin-top:8px">この日は予定ブロック済み</div><div style="font-size:12px;margin-top:4px">${isBlocked.reason}</div></div>`;
+  }
+  if (!html) html = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">スケジュールなし</div>';
+  
+  document.getElementById('modal-day-timeline').innerHTML = html;
+  openModal('modal-day-detail');
+}
+
+function getDayBlocks(dateStr) {
+  const dow = new Date(dateStr).getDay();
+  const dowNames = ['日','月','火','水','木','金','土'];
+  const routineDay = STATE.routine[dowNames[dow]];
+  const studyData = STATE.schedules[dateStr];
+  
+  const blocks = [
+    {start:'00:00',type:'睡眠',detail:'就寝中'},
+    {start:'06:30',type:'睡眠',detail:'起床'},
+    {start:'07:00',type:'移動',detail:'通学'},
+    {start:'08:30',type:'学校',detail:'授業'},
+    {start:'15:30',type:'移動',detail:'帰宅'},
+    {start:'16:00',type:'自由',detail:'休息・部活など'},
+  ];
+  
+  if (routineDay?.enabled) {
+    blocks.push({start:routineDay.start, type:'勉強', detail:studyData ? `${studyData.pages || 0}ページ予定` : '学習時間'});
+    blocks.push({start:routineDay.end, type:'休憩', detail:'就寝準備'});
+  }
+  
+  return blocks.sort((a,b) => a.start.localeCompare(b.start));
+}
+
+// ===========================
+// SCHEDULE GENERATION
+// ===========================
+function switchSchedTab(tab) {
+  STATE.schedTab = tab;
+  ['calendar','plan','routine'].forEach(t => {
+    document.getElementById('sched-tab-' + t).style.display = t === tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('#page-schedule .tab').forEach((el,i) => {
+    el.classList.toggle('active', ['calendar','plan','routine'][i] === tab);
+  });
+}
+
+function selectMode(mode) {
+  STATE.planMode = mode;
+  document.getElementById('mode-goal').classList.toggle('selected', mode === 'goal');
+  document.getElementById('mode-pace').classList.toggle('selected', mode === 'pace');
+  document.getElementById('mode-goal-form').style.display = mode === 'goal' ? 'block' : 'none';
+  document.getElementById('mode-pace-form').style.display = mode === 'pace' ? 'block' : 'none';
+}
+
+async function estimatePageTime() {
+  const bookIdx = document.getElementById('plan-book-select').value;
+  if (!bookIdx) { showToast('参考書を選択してください', 'error'); return; }
+  const book = STATE.books[parseInt(bookIdx)];
+  
+  showLoading('AIが難易度を推定中...');
+  try {
+    const response = await callAI(`以下の参考書の難易度から1ページあたりの学習目安時間（分）を推定してください。
+参考書：${book.title}
+科目：${book.subject}
+総ページ数：${book.end - book.start}ページ
+
+JSON形式で {"minutes": 数値, "reasoning": "理由"} のみを返してください。`);
+    
+    const data = parseJSON(response);
+    if (data?.minutes) {
+      document.getElementById('plan-page-time').value = data.minutes;
+      showToast(`⏱ 推定: ${data.minutes}分/ページ`, 'success');
+    }
+  } catch(e) {
+    showError(e);
+  } finally {
+    hideLoading();
+  }
+}
+
+async function generateScheduleWithAI() {
+  const isGoal = STATE.planMode === 'goal';
+  const bookIdx = parseInt(isGoal ? document.getElementById('plan-book-select').value : document.getElementById('plan-book-select2').value);
+  
+  if (isNaN(bookIdx) || bookIdx < 0) { showToast('参考書を選択してください', 'error'); return; }
+  const book = STATE.books[bookIdx];
+  
+  let prompt = '';
+  if (isGoal) {
+    const deadline = document.getElementById('plan-deadline').value;
+    const pageTime = document.getElementById('plan-page-time').value;
+    if (!deadline) { showToast('試験日を入力してください', 'error'); return; }
+    
+    const today = new Date();
+    const deadlineDate = new Date(deadline);
+    const days = Math.ceil((deadlineDate - today) / (1000*60*60*24));
+    const remaining = book.end - book.current;
+    
+    prompt = `学習計画を作成してください。
+参考書：${book.title}（${book.subject}）
+残りページ：${remaining}ページ（P${book.current}〜P${book.end}）
+期限まで：${days}日
+1ページあたり：${pageTime || '5'}分
+ルーティン空き時間：${JSON.stringify(STATE.routine)}
+
+制約:
+- スポットブロック日(勉強不可)：${JSON.stringify(STATE.spotBlocks)}
+- 週末は多め、平日は少なめに配分
+- 急激な負荷増加なし
 
 JSON形式で以下を返してください:
 {
-    "dailyPages": 平日の1日あたりのページ数（小数可）,
-    "weekendPages": 週末の1日あたりのページ数（小数可）,
-    "totalDays": 必要日数,
-    "availableDays": 実際に勉強可能な日数,
-    "difficulty": "簡単" | "普通" | "厳しい",
-    "estimatedTime": 1日あたりの推定勉強時間（分）,
-    "advice": "具体的なアドバイス（100文字程度）",
-    "warning": "難易度が厳しい場合の警告メッセージ（なければ空文字）"
+  "plan": {
+    "daily_pages": 数値,
+    "total_days": 数値,
+    "end_date": "YYYY-MM-DD",
+    "weekly_distribution": {"月":ページ数,"火":...,"水":...,"木":...,"金":...,"土":...,"日":...}
+  },
+  "message": "AIからのメッセージ",
+  "warnings": ["注意点があれば"]
 }`;
-                } else {
-                    prompt = `あなたは学習計画の専門家です。以下の情報から終了予定日を計算してください。
+  } else {
+    const dailyPages = document.getElementById('plan-daily-pages').value;
+    const dailyMins = document.getElementById('plan-daily-minutes').value;
+    const remaining = book.end - book.current;
+    
+    prompt = `ペース維持型学習計画を作成してください。
+参考書：${book.title}（${book.subject}）
+残りページ：${remaining}ページ
+1日のページ数：${dailyPages || '未設定'}ページ
+1日の勉強時間：${dailyMins || '未設定'}分
 
-【教材情報】
-- 教材名: ${bookTitle}
-- 開始ページ: ${startPage}
-- 終了ページ: ${endPage}
-- 総ページ数: ${endPage - startPage + 1}ページ
-
-【学習ペース】
-${dailyPages ? `- 1日あたりのページ数: ${dailyPages}ページ` : ''}
-${dailyMinutes ? `- 1日の勉強時間: ${dailyMinutes}分` : ''}
-
-【生活パターン】
-週間ルーティン: ${JSON.stringify(weeklyRoutine)}
-特別な予定: ${JSON.stringify(specialDays)}
-
-このペースで進めた場合の終了予定日を計算し、JSON形式で返してください:
+JSON形式で以下を返してください:
 {
-    "estimatedEndDate": "YYYY-MM-DD形式",
-    "totalDays": 必要日数,
-    "advice": "アドバイス（50文字程度）"
+  "plan": {
+    "daily_pages": 数値,
+    "end_date": "YYYY-MM-DD",
+    "total_days": 数値
+  },
+  "message": "AIからのメッセージ",
+  "encouragement": "励ましの言葉"
 }`;
-                }
-
-                const response = await this.call([{ role: 'user', content: prompt }]);
-                return JSON.parse(response.replace(/```json|```/g, '').trim());
-            }
-
-            async getMentorResponse(message, mentorType, userContext) {
-                const personalities = {
-                    praise: '褒めちぎり型：ユーザーのどんな小さな努力も見逃さず、具体的に褒めて励ます。「すごい！」「よく頑張ったね！」などポジティブな言葉を多用。',
-                    strict: '鬼コーチ型：厳しくも愛のある言葉で鼓舞する。「甘えるな！」「お前ならできる！」など強い口調だが、決して見捨てない。',
-                    gentle: '共感・癒やし型：ユーザーの気持ちに寄り添い、優しく受け止める。「大丈夫だよ」「無理しないでね」など癒やしの言葉を使う。'
-                };
-
-                const prompt = `あなたは学習を応援するAIメンターです。
-
-【性格】
-${personalities[mentorType]}
-
-【ユーザー情報】
-- レベル: ${userContext.level}
-- 連続学習日数: ${userContext.consecutiveDays}日
-- 今日の学習時間: ${userContext.todayStudyTime}分
-- 今日達成したページ数: ${userContext.todayPages}ページ
-
-【ユーザーのメッセージ】
-${message}
-
-上記の性格で、ユーザーのメッセージに対して短く（2-3文）応答してください。ユーザーの努力を具体的に認めながら、励ましの言葉をかけてください。`;
-
-                return await this.call([{ role: 'user', content: prompt }]);
-            }
-
-            async getEncouragement(userText, stats) {
-                const prompt = `あなたは優しく寄り添うAIメンターです。
-
-【ユーザーの悩み・愚痴】
-${userText}
-
-【これまでの努力の記録】
-- レベル: ${stats.level}
-- 連続学習日数: ${stats.consecutiveDays}日
-- 総勉強時間: ${stats.totalStudyTime}時間
-- 達成ページ数: ${stats.totalPages}ページ
-- 完了したポモドーロ: ${stats.totalPomodoros}回
-
-【指示】
-1. ユーザーの悩みを否定せず、まず受け止める
-2. 上記の努力データを具体的に示しながら、「これだけ頑張ってきた」ことを認める
-3. 完璧である必要はなく、今できることを続ければいいという励ましを送る
-4. 200文字程度で、温かく力強いメッセージを作成
-
-感動的な励ましのメッセージを書いてください。`;
-
-                return await this.call([{ role: 'user', content: prompt }], 1500);
-            }
-
-            async analyzeReschedule(schedule, missedDays) {
-                const prompt = `学習計画の調整が必要です。
-
-【現在の計画】
-- 教材: ${schedule.title}
-- 残りページ数: ${schedule.endPage - schedule.currentPage}ページ
-- 当初の1日あたり: ${schedule.dailyPages}ページ
-- 目標日まで: ${this.getDaysUntil(schedule.targetDate)}日
-
-【状況】
-- 遅れ日数: ${missedDays}日
-- 遅れページ数: 約${Math.round(schedule.dailyPages * missedDays)}ページ
-
-2つの調整方法を提案してください:
-1. 期間死守モード: 残り日数で遅れを取り戻す（1日+何ページ必要か）
-2. ストレスフリーモード: 終了日を何日延ばすべきか
-
-JSON形式で返してください:
-{
-    "strictMode": {
-        "additionalPages": 1日あたりの追加ページ数,
-        "newDailyPages": 新しい1日あたりのページ数,
-        "message": "励ましのメッセージ"
-    },
-    "relaxMode": {
-        "extendDays": 延ばす日数,
-        "newEndDate": "新しい終了日（YYYY-MM-DD）",
-        "message": "励ましのメッセージ"
+  }
+  
+  showLoading('AIが計画を生成中...');
+  try {
+    const response = await callAI(prompt);
+    const data = parseJSON(response);
+    
+    if (data?.plan) {
+      // Save to schedules
+      generateScheduleData(data.plan, book, bookIdx);
+      
+      document.getElementById('plan-result').style.display = 'block';
+      document.getElementById('plan-result-content').innerHTML = `
+        <div style="text-align:center;margin-bottom:12px">
+          <div style="font-size:28px">✅</div>
+          <div style="font-size:16px;font-weight:700;margin:4px 0">計画が完成しました！</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+          <div style="background:var(--bg3);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-size:20px;font-weight:900;color:var(--accent2)">${data.plan.daily_pages}</div>
+            <div style="font-size:11px;color:var(--text3)">1日あたりのページ数</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-size:20px;font-weight:900;color:var(--green)">${data.plan.total_days}</div>
+            <div style="font-size:11px;color:var(--text3)">完成まで（日）</div>
+          </div>
+        </div>
+        <div style="font-size:13px;color:var(--text2);padding:10px;background:rgba(124,58,237,0.1);border-radius:8px;border:1px solid rgba(124,58,237,0.2)">
+          🤖 ${data.message || 'スケジュールを登録しました！'}
+        </div>
+        ${data.plan.weekly_distribution ? `<div style="margin-top:12px"><div style="font-size:12px;color:var(--text2);margin-bottom:8px">週間配分</div>
+        <div style="display:flex;gap:4px">${Object.entries(data.plan.weekly_distribution).map(([d,p])=>`<div style="flex:1;text-align:center"><div style="font-size:16px;font-weight:700;color:var(--accent2)">${p}</div><div style="font-size:10px;color:var(--text3)">${d}</div></div>`).join('')}</div></div>` : ''}
+      `;
+      gainExp(50, '計画作成');
+      saveToStorage();
+      showToast('🎉 スケジュールを作成しました！', 'success');
     }
-}`;
-
-                const response = await this.call([{ role: 'user', content: prompt }]);
-                return JSON.parse(response.replace(/```json|```/g, '').trim());
-            }
-
-            getDaysUntil(dateString) {
-                const target = new Date(dateString);
-                const today = new Date();
-                const diffTime = target - today;
-                return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            }
-        }
-
-        // ==================== アプリケーション ====================
-        class StudyPlannerApp {
-            constructor() {
-                this.dataManager = new DataManager();
-                this.api = new AnthropicAPI();
-                
-                // データ
-                this.schedules = [];
-                this.userStats = {
-                    level: 1,
-                    exp: 0,
-                    expMax: 100,
-                    consecutiveDays: 0,
-                    totalStudyTime: 0,
-                    totalPages: 0,
-                    totalPomodoros: 0,
-                    lastStudyDate: null,
-                    badges: [],
-                    abilities: {
-                        calculation: 0,
-                        memory: 0,
-                        concentration: 0,
-                        persistence: 0
-                    }
-                };
-                this.weeklyRoutine = this.getDefaultRoutine();
-                this.specialDays = [];
-                this.mentorType = 'praise';
-                this.currentDate = new Date();
-                this.scheduleType = 'deadline';
-                
-                // ポモドーロ
-                this.pomodoro = {
-                    timeLeft: 25 * 60,
-                    isRunning: false,
-                    isBreak: false,
-                    timer: null,
-                    todayPomodoros: 0,
-                    todayStudyTime: 0,
-                    todayPages: 0
-                };
-
-                this.init();
-            }
-
-            getDefaultRoutine() {
-                return {
-                    '月': { start: '18:00', end: '22:00', studyHours: 2 },
-                    '火': { start: '18:00', end: '22:00', studyHours: 2 },
-                    '水': { start: '18:00', end: '22:00', studyHours: 2 },
-                    '木': { start: '18:00', end: '22:00', studyHours: 2 },
-                    '金': { start: '18:00', end: '22:00', studyHours: 2 },
-                    '土': { start: '10:00', end: '18:00', studyHours: 5 },
-                    '日': { start: '10:00', end: '18:00', studyHours: 5 }
-                };
-            }
-
-            init() {
-                this.loadData();
-                this.checkApiKey();
-                this.updateUI();
-                this.setupEventListeners();
-                this.checkDailyReset();
-                this.initializeBadges();
-            }
-
-            checkApiKey() {
-                if (!this.dataManager.hasApiKey()) {
-                    document.getElementById('apiKeyModal').classList.remove('hidden');
-                } else {
-                    document.getElementById('apiKeyModal').classList.add('hidden');
-                    document.getElementById('apiKeyStatus').textContent = '設定済み';
-                    document.querySelector('.api-key-indicator').classList.add('active');
-                }
-            }
-
-            loadData() {
-                const data = this.dataManager.load();
-                if (data) {
-                    this.schedules = data.schedules || [];
-                    this.userStats = { ...this.userStats, ...data.userStats };
-                    this.weeklyRoutine = data.weeklyRoutine || this.getDefaultRoutine();
-                    this.specialDays = data.specialDays || [];
-                    this.mentorType = data.mentorType || 'praise';
-                    this.pomodoro.todayPomodoros = data.todayPomodoros || 0;
-                    this.pomodoro.todayStudyTime = data.todayStudyTime || 0;
-                    this.pomodoro.todayPages = data.todayPages || 0;
-                }
-            }
-
-            saveData() {
-                this.dataManager.save({
-                    schedules: this.schedules,
-                    userStats: this.userStats,
-                    weeklyRoutine: this.weeklyRoutine,
-                    specialDays: this.specialDays,
-                    mentorType: this.mentorType,
-                    todayPomodoros: this.pomodoro.todayPomodoros,
-                    todayStudyTime: this.pomodoro.todayStudyTime,
-                    todayPages: this.pomodoro.todayPages
-                });
-            }
-
-            updateUI() {
-                this.updateUserStats();
-                this.updateActiveSchedules();
-                this.updateCalendar();
-                this.updateRPG();
-                this.updatePomodoroStats();
-            }
-
-            updateUserStats() {
-                document.getElementById('userLevel').textContent = this.userStats.level;
-                document.getElementById('consecutiveDays').textContent = this.userStats.consecutiveDays;
-                document.getElementById('totalStudyTime').textContent = Math.round(this.userStats.totalStudyTime / 60);
-            }
-
-            updateActiveSchedules() {
-                const container = document.getElementById('activeSchedules');
-                const active = this.schedules.filter(s => !s.completed);
-
-                if (active.length === 0) {
-                    container.innerHTML = '<p style="color: #999; text-align: center;">進行中の計画はありません<br>新しい計画を作成しましょう！</p>';
-                    document.getElementById('overallProgress').innerHTML = '';
-                    return;
-                }
-
-                let html = '';
-                active.forEach((schedule, index) => {
-                    const progress = ((schedule.currentPage - schedule.startPage) / (schedule.endPage - schedule.startPage)) * 100;
-                    const daysLeft = this.getDaysUntil(schedule.targetDate);
-                    const isOnTrack = progress >= ((new Date() - new Date(schedule.createdDate)) / (new Date(schedule.targetDate) - new Date(schedule.createdDate))) * 100;
-
-                    html += `
-                        <div class="schedule-card">
-                            <div class="schedule-header">
-                                <div class="schedule-title">${schedule.title}</div>
-                                <div class="schedule-badge badge-${schedule.difficulty === '簡単' ? 'easy' : schedule.difficulty === '普通' ? 'normal' : 'hard'}">
-                                    ${schedule.difficulty}
-                                </div>
-                            </div>
-                            <div class="schedule-stats">
-                                <div class="stat-box">
-                                    <div class="stat-value">${schedule.currentPage}</div>
-                                    <div class="stat-label">現在ページ</div>
-                                </div>
-                                <div class="stat-box">
-                                    <div class="stat-value">${schedule.endPage}</div>
-                                    <div class="stat-label">目標ページ</div>
-                                </div>
-                                <div class="stat-box">
-                                    <div class="stat-value">${daysLeft}</div>
-                                    <div class="stat-label">残り日数</div>
-                                </div>
-                            </div>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: ${Math.min(progress, 100)}%">
-                                    ${Math.round(progress)}%
-                                </div>
-                            </div>
-                            <p style="margin: 10px 0; font-size: 14px; color: #666;">
-                                1日あたり: ${schedule.dailyPages}ページ | 
-                                目標日: ${schedule.targetDate}
-                            </p>
-                            ${!isOnTrack ? '<div class="alert alert-warning">⚠️ 計画より遅れています</div>' : ''}
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                <button class="btn btn-success" onclick="app.updateProgress(${index})">
-                                    ✅ 進捗を記録
-                                </button>
-                                <button class="btn btn-secondary" onclick="app.completeSchedule(${index})">
-                                    🎉 完了
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                });
-
-                container.innerHTML = html;
-
-                // 全体の進捗
-                const totalPages = active.reduce((sum, s) => sum + (s.endPage - s.startPage), 0);
-                const completedPages = active.reduce((sum, s) => sum + (s.currentPage - s.startPage), 0);
-                const overallProgress = (completedPages / totalPages) * 100;
-
-                document.getElementById('overallProgress').innerHTML = `
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${Math.min(overallProgress, 100)}%">
-                            ${Math.round(overallProgress)}%
-                        </div>
-                    </div>
-                    <p style="text-align: center; color: #666; margin-top: 10px;">
-                        全計画合計: ${completedPages} / ${totalPages} ページ完了
-                    </p>
-                `;
-            }
-
-            updateCalendar() {
-                const calendar = document.getElementById('calendar');
-                const year = this.currentDate.getFullYear();
-                const month = this.currentDate.getMonth();
-
-                let html = `
-                    <div class="calendar-header">
-                        <button onclick="app.prevMonth()">◀</button>
-                        <h3>${year}年 ${month + 1}月</h3>
-                        <button onclick="app.nextMonth()">▶</button>
-                    </div>
-                    <div class="calendar-grid">
-                        <div class="calendar-day-header">日</div>
-                        <div class="calendar-day-header">月</div>
-                        <div class="calendar-day-header">火</div>
-                        <div class="calendar-day-header">水</div>
-                        <div class="calendar-day-header">木</div>
-                        <div class="calendar-day-header">金</div>
-                        <div class="calendar-day-header">土</div>
-                `;
-
-                const firstDay = new Date(year, month, 1).getDay();
-                const lastDate = new Date(year, month + 1, 0).getDate();
-
-                for (let i = 0; i < firstDay; i++) {
-                    html += '<div class="calendar-day"></div>';
-                }
-
-                for (let day = 1; day <= lastDate; day++) {
-                    const date = new Date(year, month, day);
-                    const dateString = this.formatDate(date);
-                    const isToday = this.isToday(date);
-                    const isBlocked = this.isSpecialDay(dateString);
-                    const tasks = this.getTasksForDate(dateString);
-                    
-                    const classes = ['calendar-day'];
-                    if (isToday) classes.push('today');
-                    if (isBlocked) classes.push('blocked');
-                    if (tasks.length > 0) classes.push('has-schedule');
-
-                    html += `
-                        <div class="${classes.join(' ')}" onclick="app.showDayDetail('${dateString}')">
-                            <div class="calendar-day-number">${day}</div>
-                            ${tasks.length > 0 ? `<div class="calendar-day-tasks">${tasks.length}件</div>` : ''}
-                        </div>
-                    `;
-                }
-
-                html += '</div>';
-                calendar.innerHTML = html;
-            }
-
-            updateRPG() {
-                // レベルとEXP
-                document.getElementById('rpgLevel').textContent = this.userStats.level;
-                document.getElementById('currentExp').textContent = this.userStats.exp;
-                document.getElementById('maxExp').textContent = this.userStats.expMax;
-                
-                const expPercent = (this.userStats.exp / this.userStats.expMax) * 100;
-                document.getElementById('expFill').style.width = `${expPercent}%`;
-
-                // アバター進化
-                const avatars = [
-                    { level: 1, emoji: '🧙‍♂️', title: '見習い魔法使い' },
-                    { level: 5, emoji: '🧙', title: '魔法使い' },
-                    { level: 10, emoji: '🧙‍♂️✨', title: '上級魔法使い' },
-                    { level: 20, emoji: '👑', title: '賢者' },
-                    { level: 30, emoji: '⭐', title: '大賢者' }
-                ];
-
-                const currentAvatar = [...avatars].reverse().find(a => this.userStats.level >= a.level) || avatars[0];
-                document.getElementById('avatarImage').textContent = currentAvatar.emoji;
-                document.getElementById('avatarTitle').textContent = currentAvatar.title;
-
-                // バッジ
-                this.updateBadges();
-
-                // 能力値
-                const abilities = this.userStats.abilities;
-                document.getElementById('abilityStats').innerHTML = `
-                    <div style="margin-bottom: 15px;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                            <span>💪 計算力</span>
-                            <span>${abilities.calculation}</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${Math.min(abilities.calculation, 100)}%"></div>
-                        </div>
-                    </div>
-                    <div style="margin-bottom: 15px;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                            <span>🧠 暗記力</span>
-                            <span>${abilities.memory}</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${Math.min(abilities.memory, 100)}%"></div>
-                        </div>
-                    </div>
-                    <div style="margin-bottom: 15px;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                            <span>🎯 集中力</span>
-                            <span>${abilities.concentration}</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${Math.min(abilities.concentration, 100)}%"></div>
-                        </div>
-                    </div>
-                    <div style="margin-bottom: 15px;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                            <span>⏰ 持続力</span>
-                            <span>${abilities.persistence}</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${Math.min(abilities.persistence, 100)}%"></div>
-                        </div>
-                    </div>
-                `;
-            }
-
-            initializeBadges() {
-                this.allBadges = [
-                    { id: 'first_study', icon: '📚', name: '初めの一歩', condition: () => this.userStats.totalPages > 0 },
-                    { id: 'streak_5', icon: '🔥', name: '5日連続', condition: () => this.userStats.consecutiveDays >= 5 },
-                    { id: 'streak_10', icon: '🔥🔥', name: '10日連続', condition: () => this.userStats.consecutiveDays >= 10 },
-                    { id: 'level_5', icon: '⭐', name: 'Lv.5達成', condition: () => this.userStats.level >= 5 },
-                    { id: 'level_10', icon: '⭐⭐', name: 'Lv.10達成', condition: () => this.userStats.level >= 10 },
-                    { id: 'pomodoro_10', icon: '⏱️', name: 'ポモドーロマスター', condition: () => this.userStats.totalPomodoros >= 10 },
-                    { id: 'night_owl', icon: '🌙', name: '深夜の勉強家', condition: () => false }, // 特殊条件
-                    { id: 'comeback', icon: '💪', name: '完全復活', condition: () => false } // リスケから復活
-                ];
-            }
-
-            updateBadges() {
-                this.allBadges.forEach(badge => {
-                    if (badge.condition() && !this.userStats.badges.includes(badge.id)) {
-                        this.userStats.badges.push(badge.id);
-                        this.showBadgeNotification(badge);
-                    }
-                });
-
-                const grid = document.getElementById('badgesGrid');
-                grid.innerHTML = this.allBadges.map(badge => {
-                    const unlocked = this.userStats.badges.includes(badge.id);
-                    return `
-                        <div class="badge-item ${unlocked ? '' : 'badge-locked'}">
-                            <div class="badge-icon">${badge.icon}</div>
-                            <div class="badge-name">${badge.name}</div>
-                        </div>
-                    `;
-                }).join('');
-            }
-
-            showBadgeNotification(badge) {
-                alert(`🎉 新しいバッジを獲得！\n\n${badge.icon} ${badge.name}`);
-                this.gainExp(50, `バッジ「${badge.name}」獲得`);
-            }
-
-            updatePomodoroStats() {
-                document.getElementById('todayPomodoros').textContent = this.pomodoro.todayPomodoros;
-                document.getElementById('todayStudyTime').textContent = this.pomodoro.todayStudyTime;
-                document.getElementById('todayPages').textContent = this.pomodoro.todayPages;
-            }
-
-            async createSchedule() {
-                const title = document.getElementById('bookTitle').value;
-                const startPage = parseInt(document.getElementById('startPage').value);
-                const endPage = parseInt(document.getElementById('endPage').value);
-
-                if (!title) {
-                    alert('教材名を入力してください');
-                    return;
-                }
-
-                if (!this.dataManager.hasApiKey()) {
-                    alert('APIキーを設定してください');
-                    this.checkApiKey();
-                    return;
-                }
-
-                const params = {
-                    type: this.scheduleType,
-                    bookTitle: title,
-                    startPage,
-                    endPage,
-                    weeklyRoutine: this.weeklyRoutine,
-                    specialDays: this.specialDays
-                };
-
-                if (this.scheduleType === 'deadline') {
-                    params.targetDate = document.getElementById('targetDate').value;
-                    params.timePerPage = document.getElementById('timePerPage').value;
-                    if (!params.targetDate) {
-                        alert('目標日を入力してください');
-                        return;
-                    }
-                } else {
-                    params.dailyPages = parseInt(document.getElementById('dailyPages').value);
-                    params.dailyMinutes = parseInt(document.getElementById('dailyMinutes').value);
-                }
-
-                this.showLoading('AIが最適な計画を作成中...');
-
-                try {
-                    const result = await this.api.generateSchedule(params);
-
-                    const newSchedule = {
-                        title,
-                        startPage,
-                        endPage,
-                        currentPage: startPage,
-                        targetDate: this.scheduleType === 'deadline' ? params.targetDate : result.estimatedEndDate,
-                        dailyPages: result.dailyPages || params.dailyPages,
-                        weekendPages: result.weekendPages || result.dailyPages || params.dailyPages,
-                        difficulty: result.difficulty || '普通',
-                        completed: false,
-                        createdDate: this.formatDate(new Date())
-                    };
-
-                    this.schedules.push(newSchedule);
-                    this.saveData();
-                    this.updateUI();
-
-                    let message = `✅ 計画を作成しました！\n\n${result.advice}`;
-                    if (result.warning) {
-                        message += `\n\n⚠️ ${result.warning}`;
-                    }
-
-                    alert(message);
-                    this.gainExp(30, '新しい計画を作成');
-
-                    // フォームをリセット
-                    document.getElementById('bookTitle').value = '';
-                    document.getElementById('startPage').value = '1';
-                    document.getElementById('endPage').value = '100';
-
-                } catch (error) {
-                    console.error('Error:', error);
-                    alert('エラー: ' + error.message);
-                } finally {
-                    this.hideLoading();
-                }
-            }
-
-            updateProgress(index) {
-                const schedule = this.schedules[index];
-                const pages = prompt(`今日の進捗ページ数を入力してください:\n（現在: ${schedule.currentPage}ページ）`);
-                
-                if (pages && !isNaN(pages) && parseInt(pages) > 0) {
-                    const pagesNum = parseInt(pages);
-                    schedule.currentPage += pagesNum;
-                    
-                    // EXPと能力値を獲得
-                    this.gainExp(pagesNum * 2, `${pagesNum}ページ達成`);
-                    this.userStats.totalPages += pagesNum;
-                    this.userStats.abilities.persistence += pagesNum * 0.5;
-                    this.pomodoro.todayPages += pagesNum;
-                    
-                    // 連続日数更新
-                    this.updateConsecutiveDays();
-                    
-                    this.saveData();
-                    this.updateUI();
-                    
-                    alert(`✅ ${pagesNum}ページの進捗を記録しました！\n+${pagesNum * 2} EXP獲得！`);
-                }
-            }
-
-            completeSchedule(index) {
-                if (confirm('この計画を完了としてよろしいですか？')) {
-                    this.schedules[index].completed = true;
-                    this.gainExp(100, '計画完了');
-                    this.saveData();
-                    this.updateUI();
-                    alert('🎉 おめでとうございます！計画を完了しました！\n+100 EXP獲得！');
-                }
-            }
-
-            // ポモドーロタイマー
-            startTimer() {
-                if (this.pomodoro.isRunning) return;
-                
-                this.pomodoro.isRunning = true;
-                this.pomodoro.timer = setInterval(() => {
-                    this.pomodoro.timeLeft--;
-                    this.updateTimerDisplay();
-                    
-                    if (this.pomodoro.timeLeft <= 0) {
-                        this.timerComplete();
-                    }
-                }, 1000);
-            }
-
-            pauseTimer() {
-                this.pomodoro.isRunning = false;
-                if (this.pomodoro.timer) {
-                    clearInterval(this.pomodoro.timer);
-                }
-            }
-
-            resetTimer() {
-                this.pauseTimer();
-                this.pomodoro.timeLeft = this.pomodoro.isBreak ? 5 * 60 : 25 * 60;
-                this.updateTimerDisplay();
-            }
-
-            updateTimerDisplay() {
-                const minutes = Math.floor(this.pomodoro.timeLeft / 60);
-                const seconds = this.pomodoro.timeLeft % 60;
-                document.getElementById('timerDisplay').textContent = 
-                    `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            }
-
-            timerComplete() {
-                this.pauseTimer();
-                
-                if (this.pomodoro.isBreak) {
-                    // 休憩終了
-                    this.pomodoro.isBreak = false;
-                    this.pomodoro.timeLeft = 25 * 60;
-                    document.getElementById('pomodoroMode').textContent = '作業';
-                    alert('休憩終了！さあ、次のセッションを始めましょう！');
-                } else {
-                    // 作業終了
-                    this.pomodoro.todayPomodoros++;
-                    this.pomodoro.todayStudyTime += 25;
-                    this.userStats.totalPomodoros++;
-                    this.userStats.totalStudyTime += 25;
-                    this.userStats.abilities.concentration += 5;
-                    
-                    this.gainExp(15, 'ポモドーロ完了');
-                    
-                    this.pomodoro.isBreak = true;
-                    this.pomodoro.timeLeft = 5 * 60;
-                    document.getElementById('pomodoroMode').textContent = '休憩';
-                    
-                    this.saveData();
-                    this.updateUI();
-                    
-                    alert('🎉 ポモドーロ完了！お疲れ様です！\n5分間休憩しましょう。');
-                }
-                
-                this.updateTimerDisplay();
-            }
-
-            // メンター
-            async sendMentorMessage() {
-                const input = document.getElementById('mentorInput');
-                const message = input.value.trim();
-
-                if (!message) return;
-
-                if (!this.dataManager.hasApiKey()) {
-                    alert('APIキーを設定してください');
-                    return;
-                }
-
-                this.addChatMessage(message, 'user');
-                input.value = '';
-
-                try {
-                    const userContext = {
-                        level: this.userStats.level,
-                        consecutiveDays: this.userStats.consecutiveDays,
-                        todayStudyTime: this.pomodoro.todayStudyTime,
-                        todayPages: this.pomodoro.todayPages
-                    };
-
-                    const response = await this.api.getMentorResponse(message, this.mentorType, userContext);
-                    this.addChatMessage(response, 'ai');
-                } catch (error) {
-                    console.error('Error:', error);
-                    this.addChatMessage('ごめん、今ちょっと調子が悪いみたい...💦', 'ai');
-                }
-            }
-
-            addChatMessage(text, sender) {
-                const chat = document.getElementById('mentorChat');
-                const message = document.createElement('div');
-                message.className = `chat-message ${sender}`;
-                message.textContent = text;
-                chat.appendChild(message);
-                chat.scrollTop = chat.scrollHeight;
-            }
-
-            async getEncouragement() {
-                const text = document.getElementById('giveUpText').value;
-
-                if (!text) {
-                    alert('気持ちを入力してください');
-                    return;
-                }
-
-                if (!this.dataManager.hasApiKey()) {
-                    alert('APIキーを設定してください');
-                    return;
-                }
-
-                this.showLoading('あなたの頑張りを振り返っています...');
-
-                try {
-                    const stats = {
-                        level: this.userStats.level,
-                        consecutiveDays: this.userStats.consecutiveDays,
-                        totalStudyTime: Math.round(this.userStats.totalStudyTime / 60),
-                        totalPages: this.userStats.totalPages,
-                        totalPomodoros: this.userStats.totalPomodoros
-                    };
-
-                    const response = await this.api.getEncouragement(text, stats);
-
-                    document.getElementById('encouragementResponse').innerHTML = `
-                        <div class="alert alert-success">
-                            ${response.replace(/\n/g, '<br>')}
-                        </div>
-                    `;
-
-                    this.gainExp(10, '弱音を吐く勇気');
-                    this.saveData();
-
-                } catch (error) {
-                    console.error('Error:', error);
-                    alert('エラー: ' + error.message);
-                } finally {
-                    this.hideLoading();
-                }
-            }
-
-            changeMentorType() {
-                this.mentorType = document.getElementById('mentorType').value;
-                this.saveData();
-                
-                const messages = {
-                    praise: '褒めちぎり型に設定したよ！一緒に頑張ろう！✨',
-                    strict: '鬼コーチ型に設定した。甘えは許さんぞ！💪',
-                    gentle: '共感・癒やし型に設定したよ。無理しないでね💕'
-                };
-                
-                this.addChatMessage(messages[this.mentorType], 'ai');
-            }
-
-            // 週間ルーティン
-            showRoutineModal() {
-                const modal = document.getElementById('routineModal');
-                modal.classList.add('active');
-                this.generateRoutineSettings();
-            }
-
-            generateRoutineSettings() {
-                const days = ['月', '火', '水', '木', '金', '土', '日'];
-                const container = document.getElementById('routineSettings');
-                
-                let html = '';
-                days.forEach(day => {
-                    const routine = this.weeklyRoutine[day];
-                    html += `
-                        <div class="card">
-                            <h3>${day}曜日</h3>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>開始時刻</label>
-                                    <input type="time" id="start-${day}" value="${routine.start}">
-                                </div>
-                                <div class="form-group">
-                                    <label>終了時刻</label>
-                                    <input type="time" id="end-${day}" value="${routine.end}">
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label>確保できる勉強時間（時間）</label>
-                                <input type="number" id="hours-${day}" value="${routine.studyHours}" min="0" max="12" step="0.5">
-                            </div>
-                        </div>
-                    `;
-                });
-                
-                container.innerHTML = html;
-            }
-
-            saveRoutine() {
-                const days = ['月', '火', '水', '木', '金', '土', '日'];
-                
-                days.forEach(day => {
-                    this.weeklyRoutine[day] = {
-                        start: document.getElementById(`start-${day}`).value,
-                        end: document.getElementById(`end-${day}`).value,
-                        studyHours: parseFloat(document.getElementById(`hours-${day}`).value)
-                    };
-                });
-                
-                this.saveData();
-                closeModal('routineModal');
-                alert('✅ 週間ルーティンを保存しました');
-            }
-
-            // 特別な予定
-            showSpecialDaysModal() {
-                const modal = document.getElementById('specialDaysModal');
-                modal.classList.add('active');
-                this.updateSpecialDaysList();
-            }
-
-            addSpecialDay() {
-                const date = document.getElementById('specialDate').value;
-                const event = document.getElementById('specialEvent').value;
-                
-                if (!date || !event) {
-                    alert('日付と予定を入力してください');
-                    return;
-                }
-                
-                this.specialDays.push({ date, event });
-                this.saveData();
-                this.updateSpecialDaysList();
-                this.updateCalendar();
-                
-                document.getElementById('specialDate').value = '';
-                document.getElementById('specialEvent').value = '';
-            }
-
-            updateSpecialDaysList() {
-                const container = document.getElementById('specialDaysList');
-                
-                if (this.specialDays.length === 0) {
-                    container.innerHTML = '<p style="color: #999;">特別な予定はありません</p>';
-                    return;
-                }
-                
-                let html = '';
-                this.specialDays.forEach((sd, index) => {
-                    html += `
-                        <div class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 15px; margin-bottom: 10px;">
-                            <div>
-                                <strong>${sd.date}</strong><br>
-                                <small>${sd.event}</small>
-                            </div>
-                            <button class="btn btn-danger btn-small" onclick="app.removeSpecialDay(${index})">削除</button>
-                        </div>
-                    `;
-                });
-                
-                container.innerHTML = html;
-            }
-
-            removeSpecialDay(index) {
-                this.specialDays.splice(index, 1);
-                this.saveData();
-                this.updateSpecialDaysList();
-                this.updateCalendar();
-            }
-
-            // リマインダー設定
-            showReminderSettings() {
-                alert('リマインダー機能は準備中です。\n将来的にスキマ時間での学習提案機能を実装予定です！');
-            }
-
-            // ユーティリティ
-            gainExp(amount, reason) {
-                this.userStats.exp += amount;
-                
-                while (this.userStats.exp >= this.userStats.expMax) {
-                    this.levelUp();
-                }
-                
-                this.saveData();
-                this.updateUI();
-            }
-
-            levelUp() {
-                this.userStats.level++;
-                this.userStats.exp -= this.userStats.expMax;
-                this.userStats.expMax = Math.floor(this.userStats.expMax * 1.5);
-                alert(`🎉 レベルアップ！\nLv.${this.userStats.level}になりました！`);
-            }
-
-            updateConsecutiveDays() {
-                const today = this.formatDate(new Date());
-                if (this.userStats.lastStudyDate !== today) {
-                    const yesterday = this.formatDate(new Date(Date.now() - 86400000));
-                    if (this.userStats.lastStudyDate === yesterday) {
-                        this.userStats.consecutiveDays++;
-                    } else {
-                        this.userStats.consecutiveDays = 1;
-                    }
-                    this.userStats.lastStudyDate = today;
-                }
-            }
-
-            checkDailyReset() {
-                const today = this.formatDate(new Date());
-                const savedDate = localStorage.getItem('lastResetDate');
-                
-                if (savedDate !== today) {
-                    this.pomodoro.todayPomodoros = 0;
-                    this.pomodoro.todayStudyTime = 0;
-                    this.pomodoro.todayPages = 0;
-                    localStorage.setItem('lastResetDate', today);
-                    this.saveData();
-                }
-            }
-
-            showDayDetail(dateString) {
-                const tasks = this.getTasksForDate(dateString);
-                const special = this.specialDays.find(sd => sd.date === dateString);
-                
-                let html = `<h3>${dateString}</h3>`;
-                
-                if (special) {
-                    html += `<div class="alert alert-info">🎉 ${special.event}</div>`;
-                }
-                
-                if (tasks.length > 0) {
-                    html += '<h4>予定されている学習:</h4>';
-                    tasks.forEach(task => {
-                        html += `<div class="card"><strong>${task.title}</strong><br>${task.pages}ページ</div>`;
-                    });
-                } else {
-                    html += '<p style="color: #999;">この日の予定はありません</p>';
-                }
-                
-                document.getElementById('dayDetail').innerHTML = html;
-            }
-
-            getTasksForDate(dateString) {
-                // 簡易実装: 実際は各スケジュールの日付を計算
-                return [];
-            }
-
-            isSpecialDay(dateString) {
-                return this.specialDays.some(sd => sd.date === dateString);
-            }
-
-            getDaysUntil(dateString) {
-                const target = new Date(dateString);
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                target.setHours(0, 0, 0, 0);
-                const diffTime = target - today;
-                return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            }
-
-            formatDate(date) {
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                return `${year}-${month}-${day}`;
-            }
-
-            isToday(date) {
-                const today = new Date();
-                return date.getDate() === today.getDate() &&
-                       date.getMonth() === today.getMonth() &&
-                       date.getFullYear() === today.getFullYear();
-            }
-
-            prevMonth() {
-                this.currentDate.setMonth(this.currentDate.getMonth() - 1);
-                this.updateCalendar();
-            }
-
-            nextMonth() {
-                this.currentDate.setMonth(this.currentDate.getMonth() + 1);
-                this.updateCalendar();
-            }
-
-            showLoading(text = 'AI処理中...') {
-                document.getElementById('loadingText').textContent = text;
-                document.getElementById('loading').classList.add('active');
-            }
-
-            hideLoading() {
-                document.getElementById('loading').classList.remove('active');
-            }
-
-            exportData() {
-                this.dataManager.export();
-                alert('✅ データをエクスポートしました');
-            }
-
-            async importData() {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = '.json';
-                input.onchange = async (e) => {
-                    try {
-                        await this.dataManager.import(e.target.files[0]);
-                        alert('✅ データをインポートしました');
-                        location.reload();
-                    } catch (error) {
-                        alert('エラー: ' + error.message);
-                    }
-                };
-                input.click();
-            }
-
-            resetAllData() {
-                if (confirm('本当に全データをリセットしますか？\nこの操作は取り消せません。')) {
-                    if (confirm('最終確認：すべての学習記録が削除されます。よろしいですか？')) {
-                        this.dataManager.clear();
-                        alert('✅ データをリセットしました');
-                        location.reload();
-                    }
-                }
-            }
-
-            setupEventListeners() {
-                document.getElementById('mentorInput').addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') {
-                        this.sendMentorMessage();
-                    }
-                });
-
-                // 今日の目標設定時刻をデフォルトで明日以降に
-                const tomorrow = new Date();
-                tomorrow.setDate(tomorrow.getDate() + 1);
-                document.getElementById('targetDate').min = this.formatDate(tomorrow);
-            }
-        }
-
-        // ==================== グローバル関数 ====================
-        let app;
-
-        function switchTab(tab) {
-            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-
-            event.target.classList.add('active');
-            document.getElementById(tab + 'Tab').classList.add('active');
-        }
-
-        function selectScheduleType(type) {
-            app.scheduleType = type;
-            document.querySelectorAll('.schedule-type-card').forEach(card => {
-                card.classList.remove('active');
-            });
-            event.target.closest('.schedule-type-card').classList.add('active');
-
-            if (type === 'deadline') {
-                document.getElementById('deadlineMode').style.display = 'block';
-                document.getElementById('paceMode').style.display = 'none';
-            } else {
-                document.getElementById('deadlineMode').style.display = 'none';
-                document.getElementById('paceMode').style.display = 'block';
-            }
-        }
-
-        function saveApiKey() {
-            const key = document.getElementById('apiKeyInput').value.trim();
-            if (!key) {
-                alert('APIキーを入力してください');
-                return;
-            }
-
-            if (!key.startsWith('sk-ant-')) {
-                alert('正しいAPIキー形式ではありません\n（sk-ant-で始まる必要があります）');
-                return;
-            }
-
-            app.dataManager.saveApiKey(key);
-            app.checkApiKey();
-            alert('✅ APIキーを保存しました！');
-        }
-
-        function showApiKeyModal() {
-            document.getElementById('apiKeyModal').classList.remove('hidden');
-        }
-
-        function closeModal(modalId) {
-            document.getElementById(modalId).classList.remove('active');
-        }
-
-        function closeReminder() {
-            document.getElementById('reminderToast').classList.remove('active');
-        }
-
-        // ==================== 初期化 ====================
-        window.addEventListener('DOMContentLoaded', () => {
-            app = new StudyPlannerApp();
-            console.log('📚 AI学習プランナー Pro が起動しました！');
+  } catch(e) {
+    showError(e);
+  } finally {
+    hideLoading();
+  }
+}
+
+function generateScheduleData(plan, book, bookIdx) {
+  const today = new Date();
+  for (let i = 0; i < plan.total_days && i < 365; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    const dateStr = d.toISOString().split('T')[0];
+    const dow = ['日','月','火','水','木','金','土'][d.getDay()];
+    const pages = plan.weekly_distribution?.[dow] || plan.daily_pages;
+    if (!STATE.spotBlocks.some(s => s.date === dateStr) && pages > 0) {
+      STATE.schedules[dateStr] = { bookIdx, pages, done: false };
+    }
+  }
+}
+
+// ===========================
+// ROUTINE
+// ===========================
+function renderRoutineForm() {
+  const days = ['月','火','水','木','金','土','日'];
+  document.getElementById('routine-days').innerHTML = days.map(d => {
+    const r = STATE.routine[d];
+    return `<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="width:20px;font-weight:700;color:var(--text2)">${d}</div>
+      <div class="toggle ${r.enabled?'on':''}" onclick="toggleRoutineDay('${d}')"></div>
+      <input type="time" class="input" value="${r.start}" id="routine-${d}-start" style="flex:1;padding:6px" ${r.enabled?'':'disabled'}>
+      <span style="color:var(--text3);font-size:12px">〜</span>
+      <input type="time" class="input" value="${r.end}" id="routine-${d}-end" style="flex:1;padding:6px" ${r.enabled?'':'disabled'}>
+    </div>`;
+  }).join('');
+}
+
+function toggleRoutineDay(day) {
+  STATE.routine[day].enabled = !STATE.routine[day].enabled;
+  renderRoutineForm();
+}
+
+function saveRoutine() {
+  const days = ['月','火','水','木','金','土','日'];
+  days.forEach(d => {
+    STATE.routine[d].start = document.getElementById(`routine-${d}-start`).value;
+    STATE.routine[d].end = document.getElementById(`routine-${d}-end`).value;
+  });
+  saveToStorage();
+  showToast('💾 ルーティンを保存しました', 'success');
+}
+
+function addSpotBlock() {
+  const date = document.getElementById('spot-date').value;
+  const reason = document.getElementById('spot-reason').value.trim();
+  if (!date || !reason) { showToast('日付と理由を入力してください', 'error'); return; }
+  STATE.spotBlocks.push({ date, reason });
+  saveToStorage();
+  renderSpotList();
+  showToast('🚫 予定をブロックしました', 'info');
+}
+
+function renderSpotList() {
+  const list = document.getElementById('spot-list');
+  if (!list) return;
+  list.innerHTML = STATE.spotBlocks.map((s,i) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--card2);border-radius:8px;margin-bottom:6px">
+      <div>
+        <span style="font-size:12px;font-weight:600">${s.date}</span>
+        <span style="font-size:12px;color:var(--text2);margin-left:8px">${s.reason}</span>
+      </div>
+      <button class="btn btn-danger btn-sm" style="padding:3px 8px;font-size:11px" onclick="removeSpotBlock(${i})">✕</button>
+    </div>`).join('') || '<div style="color:var(--text3);font-size:12px;text-align:center">なし</div>';
+}
+
+function removeSpotBlock(i) {
+  STATE.spotBlocks.splice(i, 1);
+  saveToStorage();
+  renderSpotList();
+}
+
+// ===========================
+// POMODORO
+// ===========================
+let pomoState = { running:false, mode:'work', seconds:25*60, interval:null, sessions:0, totalSeconds:25*60 };
+
+function togglePomo() {
+  if (pomoState.running) {
+    clearInterval(pomoState.interval);
+    pomoState.running = false;
+    document.getElementById('pomo-btn').textContent = '▶ 再開';
+  } else {
+    pomoState.running = true;
+    document.getElementById('pomo-btn').textContent = '⏸ 一時停止';
+    pomoState.interval = setInterval(tickPomo, 1000);
+  }
+}
+
+function tickPomo() {
+  pomoState.seconds--;
+  updatePomoDisplay();
+  if (pomoState.seconds <= 0) {
+    clearInterval(pomoState.interval);
+    pomoState.running = false;
+    if (pomoState.mode === 'work') {
+      pomoState.sessions++;
+      pomoState.mode = 'break';
+      pomoState.seconds = 5 * 60;
+      pomoState.totalSeconds = 5 * 60;
+      gainExp(30, 'ポモドーロ完了');
+      document.getElementById('pomo-btn').textContent = '▶ 休憩開始';
+      document.getElementById('pomo-phase').textContent = '☕ 休憩タイム！';
+      showToast('🍅 ポモドーロ完了！5分休憩しよう', 'success');
+      checkBadge('pomodoro');
+    } else {
+      pomoState.mode = 'work';
+      pomoState.seconds = 25 * 60;
+      pomoState.totalSeconds = 25 * 60;
+      document.getElementById('pomo-btn').textContent = '▶ 集中開始';
+      document.getElementById('pomo-phase').textContent = '📚 集中タイム';
+      showToast('✅ 休憩終了！集中しよう', 'info');
+    }
+    document.getElementById('pomo-count').textContent = `🍅 ${pomoState.sessions}回完了`;
+    updatePomoDisplay();
+  }
+}
+
+function updatePomoDisplay() {
+  const m = Math.floor(pomoState.seconds / 60);
+  const s = pomoState.seconds % 60;
+  document.getElementById('pomo-time').textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  const pct = pomoState.seconds / pomoState.totalSeconds;
+  const circumference = 502.6;
+  document.getElementById('pomo-circle').style.strokeDashoffset = circumference * pct;
+}
+
+function resetPomo() {
+  clearInterval(pomoState.interval);
+  pomoState = { running:false, mode:'work', seconds:25*60, interval:null, sessions:pomoState.sessions, totalSeconds:25*60 };
+  document.getElementById('pomo-btn').textContent = '▶ 開始';
+  document.getElementById('pomo-phase').textContent = '📚 集中タイム';
+  updatePomoDisplay();
+}
+
+function skipPomo() {
+  clearInterval(pomoState.interval);
+  pomoState.running = false;
+  if (pomoState.mode === 'work') {
+    pomoState.mode = 'break';
+    pomoState.seconds = 5 * 60;
+    pomoState.totalSeconds = 5 * 60;
+    document.getElementById('pomo-phase').textContent = '☕ 休憩タイム';
+  } else {
+    pomoState.mode = 'work';
+    pomoState.seconds = 25 * 60;
+    pomoState.totalSeconds = 25 * 60;
+    document.getElementById('pomo-phase').textContent = '📚 集中タイム';
+  }
+  document.getElementById('pomo-btn').textContent = '▶ 開始';
+  updatePomoDisplay();
+}
+
+async function reportProgress() {
+  const pages = parseInt(document.getElementById('progress-pages').value);
+  if (isNaN(pages) || pages < 0) { showToast('ページ数を入力してください', 'error'); return; }
+  
+  const bookIdx = parseInt(document.getElementById('pomo-book-select').value);
+  const today = new Date().toISOString().split('T')[0];
+  const scheduled = STATE.schedules[today]?.pages || 0;
+  
+  STATE.todayPages += pages;
+  STATE.weeklyData[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1] += pages;
+  
+  if (STATE.books[bookIdx]) {
+    STATE.books[bookIdx].current = Math.min(STATE.books[bookIdx].end, STATE.books[bookIdx].current + pages);
+  }
+  
+  gainExp(pages * 5, `${pages}ページ学習`);
+  localStorage.setItem('studyquest_last_study', new Date().toDateString());
+  
+  if (scheduled > 0 && pages < scheduled) {
+    const diff = scheduled - pages;
+    document.getElementById('reschedule-options').style.display = 'block';
+    
+    showLoading('AIがリスケジュールを提案中...');
+    try {
+      const msg = await callAI(`学習計画のリスケジュール提案をしてください。
+本日の予定ページ：${scheduled}ページ
+実際の達成ページ：${pages}ページ
+未達成ページ：${diff}ページ
+
+${getMentorPersonality()}
+
+優しくユーザーを励ましながら、以下を日本語で返してください（JSON形式）:
+{"message": "メンターからのメッセージ（2文以内）", "period_mode": "期間死守モードの説明", "stress_free_mode": "ストレスフリーモードの説明"}`);
+      
+      const data = parseJSON(msg);
+      document.getElementById('reschedule-msg').textContent = data?.message || '昨日はお疲れ様でした！計画を調整しましょう。';
+    } catch(e) { 
+      document.getElementById('reschedule-msg').textContent = '無理しなくて大丈夫！計画を調整しましょう。';
+    } finally {
+      hideLoading();
+    }
+  } else if (pages >= scheduled && scheduled > 0) {
+    showToast('🎉 今日の目標達成！素晴らしい！', 'success');
+    checkBadge('goal_complete');
+  }
+  
+  saveToStorage();
+  renderAll();
+  document.getElementById('progress-pages').value = '';
+  showToast(`✅ ${pages}ページ記録しました！`, 'success');
+  document.getElementById('pomo-today-pages').textContent = `📄 今日 ${STATE.todayPages}P`;
+}
+
+async function doReschedule(mode) {
+  const today = new Date().toISOString().split('T')[0];
+  const scheduled = STATE.schedules[today]?.pages || 0;
+  const done = STATE.todayPages;
+  const diff = Math.max(0, scheduled - done);
+  
+  if (mode === 'period') {
+    // Distribute remaining pages to future days gradually
+    const futureDates = Object.keys(STATE.schedules).filter(d => d > today).sort();
+    if (futureDates.length > 0) {
+      const addPerDay = Math.ceil(diff / futureDates.length);
+      futureDates.slice(0, Math.ceil(diff / addPerDay)).forEach((d, i) => {
+        STATE.schedules[d].pages = (STATE.schedules[d].pages || 0) + addPerDay;
+      });
+      showToast('⚡ 期間死守！少しずつ上乗せします', 'success');
+    }
+  } else {
+    // Push end date by 1 day
+    const lastDate = Object.keys(STATE.schedules).sort().pop();
+    if (lastDate) {
+      const newDate = new Date(lastDate);
+      newDate.setDate(newDate.getDate() + 1);
+      const newDateStr = newDate.toISOString().split('T')[0];
+      STATE.schedules[newDateStr] = { pages: diff, done: false };
+      showToast('😌 終了日を1日ずらしました', 'info');
+    }
+  }
+  
+  document.getElementById('reschedule-options').style.display = 'none';
+  saveToStorage();
+  gainExp(10, 'リスケジュール');
+}
+
+// ===========================
+// OCR / GRADING
+// ===========================
+function triggerFileInput(id) {
+  document.getElementById(id).click();
+}
+
+function handleImageUpload(type, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    STATE.uploadedImages[type] = e.target.result;
+    document.getElementById(type + '-icon').textContent = type === 'answer' ? '✅' : '📗';
+    document.getElementById(type + '-text').textContent = '画像を選択済み';
+    document.getElementById(type + '-drop').style.background = 'rgba(124,58,237,0.1)';
+    document.getElementById(type + '-drop').style.borderColor = 'var(--accent2)';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function runOCR() {
+  if (!STATE.uploadedImages.answer || !STATE.uploadedImages.solution) {
+    showToast('解答ページと解説ページの両方を撮影してください', 'error');
+    return;
+  }
+  
+  const subject = document.getElementById('scan-subject').value;
+  const unit = document.getElementById('scan-unit').value;
+  
+  showLoading('AIが採点中...（少々お待ちください）');
+  try {
+    const response = await callAIWithImages(
+      `あなたは${subject}の採点AIです。
+科目：${subject}、単元：${unit || '不明'}
+
+1枚目の画像が「生徒の解答」、2枚目の画像が「正解・解説」です。
+
+以下のJSON形式で採点結果を返してください:
+{
+  "questions": [
+    {
+      "number": "問題番号",
+      "student_answer": "生徒の解答（画像から読み取り）",
+      "correct_answer": "正解（解説から読み取り）",
+      "result": "correct/incorrect/partial",
+      "score": 点数（0-100）,
+      "feedback": "個別アドバイス（間違えた場合は詳しく）",
+      "mistake_type": "ケアレスミス/概念誤解/計算ミス/知識不足/その他"
+    }
+  ],
+  "total_score": 合計点,
+  "overall_feedback": "全体的なフィードバック",
+  "weak_points": ["弱点1", "弱点2"]
+}`,
+      [STATE.uploadedImages.answer, STATE.uploadedImages.solution]
+    );
+    
+    const data = parseJSON(response);
+    if (data) {
+      displayOCRResult(data, subject, unit);
+      // Save wrong notes
+      if (data.questions) {
+        data.questions.filter(q => q.result !== 'correct').forEach(q => {
+          STATE.wrongNotes.push({
+            id: Date.now() + Math.random(),
+            subject, unit,
+            question: q.number,
+            studentAnswer: q.student_answer,
+            correctAnswer: q.correct_answer,
+            feedback: q.feedback,
+            mistakeType: q.mistake_type,
+            date: new Date().toLocaleDateString('ja-JP')
+          });
         });
-    </script>
+        saveToStorage();
+        renderWrongNotes();
+        gainExp(20 + data.total_score / 5, '採点完了');
+      }
+    }
+  } catch(e) {
+    showError(e);
+  } finally {
+    hideLoading();
+  }
+}
+
+function displayOCRResult(data, subject, unit) {
+  const resultDiv = document.getElementById('ocr-result');
+  const contentDiv = document.getElementById('ocr-result-content');
+  resultDiv.style.display = 'block';
+  
+  const scoreColor = data.total_score >= 80 ? 'var(--green)' : data.total_score >= 60 ? 'var(--gold)' : 'var(--red)';
+  
+  let html = `<div style="text-align:center;margin-bottom:16px">
+    <div style="font-size:48px;font-weight:900;font-family:'Orbitron';color:${scoreColor}">${data.total_score}点</div>
+    <div style="font-size:13px;color:var(--text2)">${subject} ${unit ? `・${unit}` : ''}</div>
+  </div>
+  <div style="font-size:13px;color:var(--text2);padding:10px;background:rgba(124,58,237,0.1);border-radius:8px;margin-bottom:12px;border:1px solid rgba(124,58,237,0.2)">
+    🤖 ${data.overall_feedback}
+  </div>`;
+  
+  if (data.questions?.length) {
+    html += '<div style="display:flex;flex-direction:column;gap:8px">';
+    data.questions.forEach(q => {
+      const icon = q.result === 'correct' ? '⭕' : q.result === 'partial' ? '△' : '❌';
+      const bg = q.result === 'correct' ? 'rgba(16,185,129,0.05)' : q.result === 'partial' ? 'rgba(245,158,11,0.05)' : 'rgba(239,68,68,0.05)';
+      const border = q.result === 'correct' ? 'rgba(16,185,129,0.2)' : q.result === 'partial' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)';
+      html += `<div style="background:${bg};border:1px solid ${border};border-radius:10px;padding:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="font-weight:700">${icon} ${q.number}</div>
+          <div style="font-size:12px;color:var(--text2)">${q.score}点</div>
+        </div>
+        ${q.result !== 'correct' ? `<div style="font-size:12px;margin-bottom:4px"><span style="color:var(--text3)">あなたの答え：</span>${q.student_answer}</div>
+        <div style="font-size:12px;margin-bottom:8px"><span style="color:var(--text3)">正解：</span>${q.correct_answer}</div>
+        <div style="font-size:12px;color:var(--red);background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.2);border-radius:6px;padding:6px 8px">
+          ✏️ ${q.feedback}
+        </div>
+        <div style="margin-top:4px"><span class="stat-chip chip-red" style="font-size:10px">${q.mistake_type}</span></div>` : '<div style="font-size:12px;color:var(--green)">✨ 正解！</div>'}
+      </div>`;
+    });
+    html += '</div>';
+  }
+  
+  contentDiv.innerHTML = html;
+}
+
+function renderWrongNotes() {
+  const list = document.getElementById('wrong-notes-list');
+  if (!list) return;
+  if (!STATE.wrongNotes.length) {
+    list.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">
+      <div style="font-size:40px;margin-bottom:10px">📓</div>
+      <div>まだ間違えた問題がありません</div>
+    </div>`;
+    return;
+  }
+  list.innerHTML = STATE.wrongNotes.slice().reverse().slice(0, 20).map(n => `
+    <div class="wrong-item">
+      <div class="wrong-subject">${n.subject} ${n.unit ? `・${n.unit}` : ''} ／ ${n.date}</div>
+      <div class="wrong-q">📌 ${n.question}</div>
+      <div style="font-size:12px;margin-bottom:6px">
+        <span style="color:var(--text3)">あなた：</span>${n.studentAnswer} → <span style="color:var(--green)">正解：</span>${n.correctAnswer}
+      </div>
+      <div class="wrong-analysis">🤖 ${n.feedback}</div>
+      <div style="margin-top:6px"><span class="stat-chip chip-red" style="font-size:10px">${n.mistakeType}</span></div>
+    </div>`).join('');
+}
+
+async function generateWeakTest() {
+  if (!STATE.wrongNotes.length) { showToast('まず採点を行ってください', 'info'); return; }
+  
+  const recent = STATE.wrongNotes.slice(-10);
+  const weakPoints = [...new Set(recent.map(n => n.subject + (n.unit ? ':' + n.unit : '')))];
+  
+  showLoading('AIが特訓テストを生成中...');
+  try {
+    const response = await callAI(`以下の弱点データから特訓テストを生成してください:
+弱点データ：${JSON.stringify(recent.slice(0,5))}
+
+3問の復習問題を生成し、以下のJSON形式で返してください:
+{
+  "questions": [
+    {
+      "number": "Q1",
+      "subject": "科目",
+      "question": "問題文",
+      "choices": ["選択肢A","選択肢B","選択肢C","選択肢D"],
+      "answer": "正解の選択肢",
+      "explanation": "解説"
+    }
+  ],
+  "message": "出題者（AI）からのメッセージ"
+}`);
+    
+    const data = parseJSON(response);
+    if (data?.questions) {
+      renderTest(data);
+    }
+  } catch(e) {
+    showError(e);
+  } finally {
+    hideLoading();
+  }
+}
+
+function renderTest(data) {
+  const container = document.getElementById('test-content');
+  let answers = {};
+  
+  container.innerHTML = `
+    <div class="card" style="margin-bottom:12px;background:rgba(124,58,237,0.1);border-color:rgba(124,58,237,0.3)">
+      <div style="font-size:13px;color:var(--text2)">🤖 ${data.message || '頑張れ！'}</div>
+    </div>
+    ${data.questions.map((q, qi) => `
+      <div class="card" style="margin-bottom:10px" id="test-q-${qi}">
+        <div style="font-size:12px;color:var(--accent2);font-weight:700;margin-bottom:6px">${q.number} ／ ${q.subject}</div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:10px">${q.question}</div>
+        ${q.choices ? q.choices.map((c, ci) => `
+          <div onclick="selectTestAnswer(${qi},${ci},'${c}',this)" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13px;transition:all 0.2s" class="test-choice">
+            ${['A','B','C','D'][ci]}. ${c}
+          </div>`).join('') : ''}
+        <div id="test-explanation-${qi}" style="display:none;margin-top:8px;padding:8px;background:rgba(124,58,237,0.1);border-radius:8px;font-size:12px;color:var(--text2)">
+          💡 ${q.explanation}
+        </div>
+      </div>`).join('')}
+    <button class="btn btn-primary btn-full" onclick="submitTest(${JSON.stringify(data.questions).replace(/"/g,'&quot;')})">採点する</button>
+  `;
+}
+
+function selectTestAnswer(qi, ci, val, el) {
+  const container = document.getElementById('test-q-' + qi);
+  container.querySelectorAll('.test-choice').forEach(c => {
+    c.style.background = '';
+    c.style.borderColor = 'var(--border)';
+  });
+  el.style.background = 'rgba(124,58,237,0.2)';
+  el.style.borderColor = 'var(--accent2)';
+  el.dataset.selected = val;
+  el.dataset.qi = qi;
+}
+
+function submitTest(questions) {
+  let correct = 0;
+  questions.forEach((q, qi) => {
+    const container = document.getElementById('test-q-' + qi);
+    const selected = container.querySelector('[data-selected]');
+    const expDiv = document.getElementById('test-explanation-' + qi);
+    expDiv.style.display = 'block';
+    
+    if (selected?.dataset.selected === q.answer) {
+      correct++;
+      selected.style.background = 'rgba(16,185,129,0.2)';
+      selected.style.borderColor = 'var(--green)';
+    } else if (selected) {
+      selected.style.background = 'rgba(239,68,68,0.2)';
+      selected.style.borderColor = 'var(--red)';
+    }
+  });
+  
+  gainExp(correct * 15, '特訓テスト');
+  showToast(`🎯 ${correct}/${questions.length}問正解！`, correct === questions.length ? 'success' : 'info');
+}
+
+function switchScanTab(tab) {
+  STATE.scanTab = tab;
+  ['ocr','wrongnotes','test'].forEach(t => {
+    document.getElementById('scan-tab-' + t).style.display = t === tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('#page-scan .tab').forEach((el,i) => {
+    el.classList.toggle('active', ['ocr','wrongnotes','test'][i] === tab);
+  });
+}
+
+// ===========================
+// AI MENTOR CHAT
+// ===========================
+function getMentorPersonality() {
+  const types = {
+    praise: 'あなたは超ポジティブで褒めちぎる教育メンターです。どんな小さな成果も大げさに称賛してください。',
+    strict: 'あなたは厳しい鬼コーチメンターです。叱咤激励しながら、妥協を許さない熱血指導をしてください。',
+    empathy: 'あなたは共感力が高く癒やし系の教育メンターです。ユーザーの気持ちに寄り添い、優しく励ましてください。',
+    cool: 'あなたはデータ重視のクール分析型メンターです。感情を排してデータと論理で的確なアドバイスをしてください。'
+  };
+  return types[STATE.mentorType] || types.empathy;
+}
+
+function getMentorIcon() {
+  return { praise:'🌟', strict:'💪', empathy:'🫂', cool:'🧊' }[STATE.mentorType] || '🎓';
+}
+
+function updateMentorDisplay() {
+  const names = { praise:'ほめほめメンター', strict:'鬼コーチ', empathy:'なごみメンター', cool:'クール分析AI' };
+  const emojis = { praise:'🌟', strict:'💪', empathy:'🫂', cool:'🧊' };
+  document.getElementById('mentor-avatar-icon').textContent = emojis[STATE.mentorType] || '🎓';
+  document.getElementById('mentor-name-display').textContent = names[STATE.mentorType] || 'AIメンター';
+  document.getElementById('mentor-home-emoji').textContent = emojis[STATE.mentorType] || '🎓';
+  document.getElementById('mentor-home-name').textContent = names[STATE.mentorType] || 'AIメンター';
+}
+
+function selectMentor(type) {
+  STATE.mentorType = type;
+  document.querySelectorAll('.mentor-card').forEach(el => el.classList.remove('selected'));
+  document.getElementById('mentor-opt-' + type)?.classList.add('selected');
+  updateMentorDisplay();
+  saveToStorage();
+  showToast('🤖 メンターを変更しました', 'success');
+}
+
+function addChatMsg(role, text) {
+  const container = document.getElementById('chat-messages');
+  const isAI = role === 'ai';
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  div.innerHTML = `
+    <div class="msg-avatar ${isAI ? 'msg-ai-avatar' : 'msg-user-avatar'}">${isAI ? getMentorIcon() : '👤'}</div>
+    <div class="msg-bubble">${text}</div>`;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  
+  if (role === 'user') {
+    STATE.chatHistory.push({ role: 'user', content: text });
+  } else {
+    STATE.chatHistory.push({ role: 'assistant', content: text });
+  }
+  if (STATE.chatHistory.length > 20) STATE.chatHistory = STATE.chatHistory.slice(-20);
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  addChatMsg('user', text);
+  
+  const systemPrompt = `${getMentorPersonality()}
+ユーザーのデータ：
+- レベル：${STATE.level}
+- 連続学習日数：${STATE.streak}日
+- 今日の学習ページ：${STATE.todayPages}ページ
+- 登録参考書：${STATE.books.map(b=>b.title).join('、') || 'なし'}
+- 間違えた問題数：${STATE.wrongNotes.length}問
+
+ユーザーの気持ちや質問に日本語で自然に応答してください。150文字以内で。`;
+
+  try {
+    const response = await callAIWithHistory(systemPrompt, STATE.chatHistory.slice(-10));
+    addChatMsg('ai', response);
+  } catch(e) {
+    addChatMsg('ai', `⚠️ エラーが発生しました: ${e.message}`);
+  }
+}
+
+async function sendQuickMessage(msg) {
+  document.getElementById('chat-input').value = msg;
+  await sendChat();
+}
+
+async function showWelcomeMentor() {
+  if (!STATE.apiKey) {
+    document.getElementById('mentor-home-text').textContent = 'APIキーを設定すると、AIメンターが活動を開始します！設定ページからAPIキーを入力してください。';
+    return;
+  }
+  try {
+    const context = STATE.books.length > 0 ? `登録中の参考書：${STATE.books.map(b=>b.title).join('、')}` : '参考書未登録';
+    const greeting = await callAI(`${getMentorPersonality()}
+ユーザーへの今日の挨拶メッセージを1文で生成してください。
+- 連続${STATE.streak}日学習中
+- 今日のページ：${STATE.todayPages}ページ
+- ${context}
+テキストのみ返してください。`);
+    document.getElementById('mentor-home-text').textContent = greeting;
+  } catch(e) {}
+}
+
+// ===========================
+// SPEAK MODAL
+// ===========================
+function showSpeakModal() {
+  document.getElementById('speak-mentor-emoji').textContent = getMentorIcon();
+  document.getElementById('speak-response').style.display = 'none';
+  openModal('modal-speak');
+}
+
+async function sendSpeak() {
+  const input = document.getElementById('speak-input').value.trim();
+  if (!input) { showToast('気持ちを書いてください', 'error'); return; }
+  
+  showLoading('AIが全力で受け止め中...');
+  try {
+    const progressSummary = `
+これまでの努力：
+- レベル ${STATE.level}（EXP: ${STATE.exp}）
+- 連続学習 ${STATE.streak}日
+- 今日学習 ${STATE.todayPages}ページ
+- 間違いを克服した問題数: ${STATE.wrongNotes.length}問`;
+
+    const response = await callAI(`${getMentorPersonality()}
+ユーザーが「${input}」と愚痴・弱音を言っています。
+
+${progressSummary}
+
+このデータを参考に、ユーザーのこれまでの努力を具体的に褒めながら、徹底的に肯定し、精神的に立ち直れるようなメッセージを300文字以内で送ってください。テキストのみ返してください。`);
+    
+    document.getElementById('speak-response-text').textContent = response;
+    document.getElementById('speak-response').style.display = 'block';
+    gainExp(5, '愚痴吐き出し');
+  } catch(e) {
+    document.getElementById('speak-response-text').textContent = `エラー: ${e.message}`;
+    document.getElementById('speak-response').style.display = 'block';
+  } finally {
+    hideLoading();
+  }
+}
+
+// ===========================
+// GAMIFICATION
+// ===========================
+function getExpNeeded(level) { return level * 500; }
+
+function getAvatarTitle() {
+  const titles = ['見習い魔法使い','魔法使い','上級魔法使い','魔道士','大魔道士','賢者','伝説の賢者'];
+  return titles[Math.min(STATE.level - 1, titles.length - 1)];
+}
+
+function getAvatarIcon() {
+  const icons = ['🧙','🧙‍♂️','🔮','⚗️','📜','🏆','👑'];
+  return icons[Math.min(STATE.level - 1, icons.length - 1)];
+}
+
+function gainExp(amount, reason) {
+  STATE.exp += amount;
+  STATE.todayExp += amount;
+  
+  showExpPopup('+' + amount + ' EXP');
+  
+  const needed = getExpNeeded(STATE.level);
+  if (STATE.exp >= needed) {
+    STATE.exp -= needed;
+    STATE.level++;
+    showToast(`🎉 レベルアップ！ Lv.${STATE.level} 「${getAvatarTitle()}」になった！`, 'success');
+    checkBadge('level_up');
+  }
+  
+  updateStats(reason);
+  document.getElementById('header-level').textContent = STATE.level;
+  document.getElementById('today-exp').textContent = STATE.todayExp;
+  document.getElementById('exp-today-ratio').textContent = STATE.todayExp + ' / 100';
+  document.getElementById('exp-bar-fill').style.width = Math.min(100, STATE.todayExp) + '%';
+  saveToStorage();
+}
+
+function showExpPopup(text) {
+  const el = document.createElement('div');
+  el.className = 'exp-popup';
+  el.textContent = text;
+  el.style.bottom = '80px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2000);
+}
+
+function updateStats(reason) {
+  if (reason.includes('ページ') || reason.includes('採点')) {
+    const sub = reason.includes('数学') ? 'calc' : reason.includes('英語') ? 'memory' : 'reading';
+    STATE.stats.calc = Math.min(100, STATE.stats.calc + 1);
+    STATE.stats.reading = Math.min(100, STATE.stats.reading + 1);
+  }
+  if (reason.includes('ポモドーロ')) STATE.stats.focus = Math.min(100, STATE.stats.focus + 2);
+  if (reason.includes('連続') || reason.includes('streak')) STATE.stats.stamina = Math.min(100, STATE.stats.stamina + 2);
+  STATE.stats.memory = Math.min(100, STATE.stats.memory + 1);
+  renderStatsDisplay();
+  initRadar();
+}
+
+function renderStatsDisplay() {
+  const display = document.getElementById('stats-display');
+  if (!display) return;
+  const statDefs = [
+    {key:'calc',label:'計算力',icon:'🧮',color:'#7c3aed'},
+    {key:'memory',label:'暗記力',icon:'📝',color:'#0284c7'},
+    {key:'focus',label:'集中力',icon:'🎯',color:'#059669'},
+    {key:'stamina',label:'持続力',icon:'💪',color:'#f59e0b'},
+    {key:'reading',label:'読解力',icon:'📖',color:'#dc2626'},
+  ];
+  display.innerHTML = statDefs.map(s => `
+    <div style="background:var(--bg3);border-radius:10px;padding:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:12px">${s.icon} ${s.label}</span>
+        <span style="font-size:12px;font-weight:700;color:${s.color}">${STATE.stats[s.key]}</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${STATE.stats[s.key]}%;background:${s.color}"></div></div>
+    </div>`).join('');
+}
+
+function initRadar() {
+  const canvas = document.getElementById('radar-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const cx = 140, cy = 110, r = 80;
+  const labels = ['計算力','暗記力','集中力','持続力','読解力'];
+  const values = [STATE.stats.calc, STATE.stats.memory, STATE.stats.focus, STATE.stats.stamina, STATE.stats.reading];
+  const n = labels.length;
+  
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Background webs
+  [20, 40, 60, 80, 100].forEach(level => {
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const angle = (Math.PI * 2 * i / n) - Math.PI / 2;
+      const x = cx + (r * level / 100) * Math.cos(angle);
+      const y = cy + (r * level / 100) * Math.sin(angle);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = 'rgba(42,42,74,0.8)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+  
+  // Axes
+  for (let i = 0; i < n; i++) {
+    const angle = (Math.PI * 2 * i / n) - Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+    ctx.strokeStyle = 'rgba(42,42,74,0.8)';
+    ctx.stroke();
+  }
+  
+  // Data polygon
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const angle = (Math.PI * 2 * i / n) - Math.PI / 2;
+    const val = values[i] / 100;
+    const x = cx + r * val * Math.cos(angle);
+    const y = cy + r * val * Math.sin(angle);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(124,58,237,0.3)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(168,85,247,0.8)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  
+  // Labels
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '11px Zen Kaku Gothic New, sans-serif';
+  ctx.textAlign = 'center';
+  for (let i = 0; i < n; i++) {
+    const angle = (Math.PI * 2 * i / n) - Math.PI / 2;
+    const x = cx + (r + 20) * Math.cos(angle);
+    const y = cy + (r + 16) * Math.sin(angle) + 4;
+    ctx.fillText(labels[i], x, y);
+  }
+  
+  // Values
+  ctx.fillStyle = '#c084fc';
+  ctx.font = 'bold 10px Orbitron, sans-serif';
+  for (let i = 0; i < n; i++) {
+    const angle = (Math.PI * 2 * i / n) - Math.PI / 2;
+    const val = values[i] / 100;
+    const x = cx + r * val * Math.cos(angle);
+    const y = cy + r * val * Math.sin(angle);
+    ctx.fillText(values[i], x, y - 4);
+  }
+}
+
+// ===========================
+// BADGES
+// ===========================
+const BADGE_DEFS = [
+  { id:'first_study', icon:'🌱', name:'初めての一歩', desc:'初めて学習を記録', condition: () => STATE.exp > 0 },
+  { id:'streak3', icon:'🔥', name:'3日連続', desc:'3日連続で学習', condition: () => STATE.streak >= 3 },
+  { id:'streak7', icon:'⚡', name:'一週間の戦士', desc:'7日連続で学習', condition: () => STATE.streak >= 7 },
+  { id:'pomodoro', icon:'🍅', name:'ポモドーロ達成', desc:'ポモドーロを完了', condition: () => pomoState.sessions >= 1 },
+  { id:'level5', icon:'🏆', name:'上位冒険者', desc:'レベル5に到達', condition: () => STATE.level >= 5 },
+  { id:'goal_complete', icon:'🎯', name:'目標達成！', desc:'1日の目標を達成', condition: () => false },
+  { id:'notes100', icon:'📓', name:'復習マスター', desc:'弱点ノート100問', condition: () => STATE.wrongNotes.length >= 100 },
+  { id:'comeback', icon:'💫', name:'不屈の精神', desc:'遅れを取り戻した', condition: () => false },
+  { id:'books3', icon:'📚', name:'読書家', desc:'3冊の参考書を登録', condition: () => STATE.books.length >= 3 },
+];
+
+function checkBadge(id) {
+  if (!STATE.badges.includes(id)) {
+    STATE.badges.push(id);
+    const badge = BADGE_DEFS.find(b => b.id === id);
+    if (badge) showToast(`🏅 バッジ獲得！「${badge.name}」`, 'success');
+    saveToStorage();
+    renderBadges();
+  }
+}
+
+function renderBadges() {
+  // Auto check conditions
+  BADGE_DEFS.forEach(b => { if (b.condition && b.condition() && !STATE.badges.includes(b.id)) checkBadge(b.id); });
+  
+  const grid = document.getElementById('badges-grid');
+  if (!grid) return;
+  grid.innerHTML = BADGE_DEFS.map(b => {
+    const earned = STATE.badges.includes(b.id);
+    return `<div class="badge-item ${earned ? 'earned' : ''}">
+      <span class="badge-icon">${b.icon}</span>
+      <div class="badge-name">${b.name}</div>
+      <div class="badge-desc">${b.desc}</div>
+    </div>`;
+  }).join('');
+  
+  const equipped = document.getElementById('equipped-badges');
+  if (equipped) {
+    equipped.innerHTML = STATE.badges.slice(0, 3).map(id => {
+      const b = BADGE_DEFS.find(bd => bd.id === id);
+      return b ? `<span title="${b.name}" style="font-size:20px">${b.icon}</span>` : '';
+    }).join('');
+  }
+}
+
+// ===========================
+// API CALLS
+// ===========================
+async function callAI(prompt) {
+  if (!STATE.apiKey) {
+    throw new Error('APIキーが設定されていません。設定ページでAPIキーを入力してください。');
+  }
+  
+  const url = STATE.proxyUrl ? 
+    `${STATE.proxyUrl}/v1/messages` : 
+    'https://api.anthropic.com/v1/messages';
+  
+  const headers = {
+    'Content-Type': 'application/json',
+    'anthropic-version': '2023-06-01',
+  };
+  
+  if (!STATE.proxyUrl) {
+    headers['x-api-key'] = STATE.apiKey;
+    headers['anthropic-dangerous-direct-browser-access'] = 'true';
+  } else {
+    headers['Authorization'] = 'Bearer ' + STATE.apiKey;
+  }
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1500,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    const status = response.status;
+    if (status === 401) throw new Error('APIキーが無効です。正しいキーを設定してください。');
+    if (status === 429) throw new Error('APIリクエスト制限に達しました。少し待ってから再試行してください。');
+    if (status === 400) throw new Error(`リクエストエラー: ${err.error?.message || 'Bad Request'}`);
+    throw new Error(`APIエラー ${status}: ${err.error?.message || response.statusText}`);
+  }
+  
+  const data = await response.json();
+  return data.content?.[0]?.text || '';
+}
+
+async function callAIWithImages(prompt, imageDataUrls) {
+  if (!STATE.apiKey) throw new Error('APIキーが設定されていません。');
+  
+  const content = [];
+  imageDataUrls.forEach(dataUrl => {
+    const [meta, b64] = dataUrl.split(',');
+    const mediaType = meta.match(/:(.*?);/)[1];
+    content.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } });
+  });
+  content.push({ type: 'text', text: prompt });
+  
+  const url = STATE.proxyUrl ? `${STATE.proxyUrl}/v1/messages` : 'https://api.anthropic.com/v1/messages';
+  const headers = {
+    'Content-Type': 'application/json',
+    'anthropic-version': '2023-06-01',
+  };
+  if (!STATE.proxyUrl) {
+    headers['x-api-key'] = STATE.apiKey;
+    headers['anthropic-dangerous-direct-browser-access'] = 'true';
+  } else {
+    headers['Authorization'] = 'Bearer ' + STATE.apiKey;
+  }
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      messages: [{ role: 'user', content }]
+    })
+  });
+  
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(`APIエラー ${response.status}: ${err.error?.message || response.statusText}`);
+  }
+  
+  const data = await response.json();
+  return data.content?.[0]?.text || '';
+}
+
+async function callAIWithHistory(systemPrompt, history) {
+  if (!STATE.apiKey) throw new Error('APIキーが設定されていません。');
+  
+  const url = STATE.proxyUrl ? `${STATE.proxyUrl}/v1/messages` : 'https://api.anthropic.com/v1/messages';
+  const headers = {
+    'Content-Type': 'application/json',
+    'anthropic-version': '2023-06-01',
+  };
+  if (!STATE.proxyUrl) {
+    headers['x-api-key'] = STATE.apiKey;
+    headers['anthropic-dangerous-direct-browser-access'] = 'true';
+  } else {
+    headers['Authorization'] = 'Bearer ' + STATE.apiKey;
+  }
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 500,
+      system: systemPrompt,
+      messages: history
+    })
+  });
+  
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(`APIエラー ${response.status}: ${err.error?.message || response.statusText}`);
+  }
+  
+  const data = await response.json();
+  return data.content?.[0]?.text || '';
+}
+
+function parseJSON(text) {
+  try {
+    const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    return JSON.parse(clean);
+  } catch(e) {
+    // Try to extract JSON from text
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) {
+      try { return JSON.parse(match[0]); } catch(e2) {}
+    }
+    return null;
+  }
+}
+
+// ===========================
+// SETTINGS
+// ===========================
+function saveApiKey() {
+  const key = document.getElementById('api-key-input').value.trim();
+  if (!key) { showToast('APIキーを入力してください', 'error'); return; }
+  STATE.apiKey = key;
+  localStorage.setItem('studyquest_apikey', key);
+  document.getElementById('api-status').innerHTML = '<span style="color:var(--green)">✅ 保存しました</span>';
+  showToast('🔑 APIキーを保存しました', 'success');
+  showWelcomeMentor();
+}
+
+function saveProxyUrl() {
+  const url = document.getElementById('proxy-url-input').value.trim();
+  STATE.proxyUrl = url;
+  localStorage.setItem('studyquest_proxy', url);
+  showToast(url ? '🔗 プロキシURLを保存しました' : '✅ プロキシをクリアしました', 'success');
+}
+
+function toggleApiKeyVisible() {
+  const input = document.getElementById('api-key-input');
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+function saveProfile() {
+  const name = document.getElementById('settings-name').value.trim();
+  if (name) {
+    STATE.userName = name;
+    document.getElementById('user-name-display').textContent = name;
+    saveToStorage();
+    showToast('✅ プロフィールを保存しました', 'success');
+  }
+}
+
+function showMentorSettingsModal() { showPage('settings'); }
+
+// ===========================
+// MODALS
+// ===========================
+function openModal(id) {
+  document.getElementById(id)?.classList.add('active');
+}
+function closeModal(id) {
+  document.getElementById(id)?.classList.remove('active');
+}
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', (e) => {
+    if (e.target === el) closeModal(el.id);
+  });
+});
+
+// ===========================
+// TOAST
+// ===========================
+function showToast(msg, type='info') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'toast ' + type;
+  const icons = { success:'✅', error:'❌', info:'ℹ️', warning:'⚠️' };
+  toast.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.animation = 'slideOut 0.3s ease forwards';
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
+}
+
+function showError(e) {
+  const msg = e.message || 'Unknown error';
+  showToast(`❌ ${msg}`, 'error');
+  console.error('StudyQuest Error:', e);
+}
+
+// ===========================
+// LOADING
+// ===========================
+function showLoading(text='AIが考え中...') {
+  document.getElementById('loading-text').textContent = text;
+  document.getElementById('loading-overlay').classList.add('active');
+}
+function hideLoading() {
+  document.getElementById('loading-overlay').classList.remove('active');
+}
+
+// ===========================
+// INIT CHAT
+// ===========================
+function initChat() {
+  const container = document.getElementById('chat-messages');
+  if (container && container.children.length === 0) {
+    const greetings = {
+      praise: 'こんにちは！今日も勉強しにきてくれたんですね！それだけで本当にすごいと思います！🌟',
+      strict: 'よし来た！座ってる暇があったら単語の一つでも覚えろ！さぁ何から始める？💪',
+      empathy: 'こんにちは。今日も来てくれてありがとう。どんな小さなことでも話しかけてね。🫂',
+      cool: 'セッション開始。現在の学習状況を把握しています。何をサポートしましょうか。🧊'
+    };
+    addChatMsg('ai', greetings[STATE.mentorType] || greetings.empathy);
+  }
+}
+
+// ===========================
+// START
+// ===========================
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+  initChat();
+  updatePomoDisplay();
+});
+</script>
 </body>
 </html>
