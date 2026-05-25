@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>StudyQuest AI - 学習専用AIアプリ</title>
+<title>Study AI - 学習専用AIアプリ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
@@ -2289,12 +2289,13 @@ function renderBadges() {
 
 // Geminiはプロキシ不要（ブラウザから直接叩けます）
 // APIキーは Google AI Studio で取得したものを使用してください
-const GEMINI_MODEL = "gemini-1.5-flash"; 
+const GEMINI_MODEL = "models/gemini-1.5-flash"; 
 
 async function callAI(prompt) {
   if (!STATE.apiKey) throw new Error('APIキーが設定されていません。');
   
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${STATE.apiKey}`;
+  // URLをこのように修正（models/ を含める）
+const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${STATE.apiKey}`;
   
   const response = await fetch(url, {
     method: 'POST',
@@ -2319,7 +2320,8 @@ async function callAIWithImages(prompt, imageDataUrls) {
   });
   parts.push({ text: prompt });
   
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${STATE.apiKey}`;
+  // URLをこのように修正（models/ を含める）
+const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${STATE.apiKey}`;
   
   const response = await fetch(url, {
     method: 'POST',
@@ -2341,7 +2343,8 @@ async function callAIWithHistory(systemPrompt, history) {
     parts: [{ text: msg.content }]
   }));
   
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${STATE.apiKey}`;
+  // URLをこのように修正（models/ を含める）
+const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${STATE.apiKey}`;
   
   const response = await fetch(url, {
     method: 'POST',
