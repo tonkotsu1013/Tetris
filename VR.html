@@ -1,208 +1,1257 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI VR Avatar Prototype - Expression Version</title>
-    <style>
-        body { margin: 0; overflow: hidden; background-color: #2a2a3a; font-family: sans-serif; }
-        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; }
-        #webcam { position: absolute; bottom: 10px; right: 10px; width: 160px; height: 120px; transform: scaleX(-1); border: 2px solid #fff; border-radius: 8px; opacity: 0.7; }
-        #ui { position: absolute; top: 20px; left: 20px; color: white; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 8px; pointer-events: none; max-width: 300px; }
-        h1 { margin: 0 0 10px 0; font-size: 16px; }
-        p { margin: 5px 0; font-size: 12px; color: #ccc; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Avatar Studio</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;700&display=swap');
 
-    <!-- three-vrm v1 は ES Module なので importmap + type="module" で読み込む -->
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://cdn.jsdelivr.net/npm/three@0.150.0/build/three.module.js",
-            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.150.0/examples/jsm/",
-            "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@1/lib/three-vrm.module.js"
-        }
-    }
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  :root {
+    --bg: #080c14;
+    --panel: #0d1526;
+    --panel2: #111d35;
+    --border: #1e3a5f;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --accent3: #00ff9d;
+    --text: #e0f0ff;
+    --text2: #7aa8cc;
+    --danger: #ff4466;
+    --glow: 0 0 20px rgba(0,212,255,0.4);
+    --glow2: 0 0 20px rgba(124,58,237,0.4);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 320px 1fr 320px;
+    grid-template-rows: 60px 1fr 180px;
+  }
+
+  /* HEADER */
+  header {
+    grid-column: 1 / -1;
+    background: linear-gradient(90deg, var(--bg) 0%, var(--panel) 50%, var(--bg) 100%);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+  }
+  header .logo {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 18px;
+    font-weight: 900;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 4px;
+  }
+  header .status-bar {
+    display: flex;
+    gap: 20px;
+    font-size: 11px;
+    color: var(--text2);
+    font-family: 'Orbitron', sans-serif;
+  }
+  .status-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text2);
+    margin-right: 5px;
+    animation: pulse 2s infinite;
+  }
+  .status-dot.active { background: var(--accent3); box-shadow: 0 0 8px var(--accent3); }
+  .status-dot.warn { background: #ffaa00; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* LEFT PANEL */
+  .left-panel {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    padding: 14px 16px 8px;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+  }
+  .panel-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  /* AVATAR SETUP */
+  .setup-section { margin-bottom: 20px; }
+  .setup-label {
+    font-size: 11px;
+    color: var(--text2);
+    margin-bottom: 8px;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  textarea, input[type="text"], select {
+    width: 100%;
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 10px 12px;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 12px;
+    resize: none;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  textarea:focus, input:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(0,212,255,0.1);
+  }
+  textarea { min-height: 80px; }
+
+  .image-upload-area {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 12px;
+    color: var(--text2);
+    position: relative;
+  }
+  .image-upload-area:hover { border-color: var(--accent); color: var(--accent); }
+  .image-upload-area input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .image-upload-area img { max-width: 100%; max-height: 80px; object-fit: contain; margin-top: 8px; }
+
+  .btn {
+    width: 100%;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: white;
+    box-shadow: var(--glow);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 0 30px rgba(0,212,255,0.6); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text2);
+    margin-top: 8px;
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* RIGHT PANEL */
+  .right-panel {
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Avatar info card */
+  .avatar-info-card {
+    margin: 12px;
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 12px;
+  }
+  .avatar-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  .avatar-trait {
+    display: flex;
+    justify-content: space-between;
+    margin: 4px 0;
+    color: var(--text2);
+  }
+  .avatar-trait span:last-child { color: var(--text); }
+
+  /* Voice settings */
+  .voice-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    align-items: center;
+  }
+  .voice-row label { font-size: 11px; color: var(--text2); min-width: 50px; }
+  .voice-row input[type="range"] {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+  .voice-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: var(--glow);
+  }
+  .voice-row .val { font-size: 11px; color: var(--accent); min-width: 30px; text-align: right; }
+
+  /* CENTER - 3D Canvas */
+  .center-area {
+    position: relative;
+    overflow: hidden;
+    background: radial-gradient(ellipse at 50% 30%, #0a1a2e 0%, var(--bg) 70%);
+  }
+  #three-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100% !important;
+    height: 100% !important;
+  }
+  #webcam-preview {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    width: 120px;
+    height: 90px;
+    transform: scaleX(-1);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    opacity: 0.6;
+    object-fit: cover;
+  }
+  .tracking-overlay {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    display: flex;
+    gap: 8px;
+  }
+  .track-chip {
+    background: rgba(0,0,0,0.6);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 10px;
+    font-family: 'Orbitron', sans-serif;
+    color: var(--text2);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .track-chip.active { border-color: var(--accent3); color: var(--accent3); }
+
+  /* Loading overlay */
+  #loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .loader-ring {
+    width: 60px; height: 60px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading-text { font-family: 'Orbitron', sans-serif; font-size: 12px; color: var(--text2); letter-spacing: 2px; }
+
+  /* BOTTOM - Chat */
+  .bottom-bar {
+    grid-column: 1 / -1;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0;
+    overflow: hidden;
+  }
+  .chat-messages {
+    padding: 10px 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 180px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .msg {
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 6px 12px;
+    border-radius: 8px;
+    max-width: 80%;
+  }
+  .msg.user {
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.2);
+    align-self: flex-end;
+    color: var(--text);
+  }
+  .msg.avatar {
+    background: rgba(124,58,237,0.1);
+    border: 1px solid rgba(124,58,237,0.2);
+    align-self: flex-start;
+    color: var(--text);
+  }
+  .msg .name {
+    font-size: 10px;
+    font-family: 'Orbitron', sans-serif;
+    margin-bottom: 3px;
+    opacity: 0.6;
+  }
+  .chat-input-area {
+    border-left: 1px solid var(--border);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 300px;
+    justify-content: center;
+  }
+  .chat-input-row {
+    display: flex;
+    gap: 8px;
+  }
+  .chat-input-row input {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  .chat-btns {
+    display: flex;
+    gap: 8px;
+  }
+  .btn-icon {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    border-radius: 6px;
+    color: var(--text2);
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+  }
+  .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-icon.recording { border-color: var(--danger); color: var(--danger); animation: pulse 1s infinite; }
+  .btn-icon.speaking { border-color: var(--accent3); color: var(--accent3); }
+
+  /* API key input */
+  .api-key-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .api-key-row input { flex: 1; font-size: 11px; }
+
+  /* Personality presets */
+  .preset-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .preset-btn {
+    padding: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel2);
+    border-radius: 6px;
+    color: var(--text2);
+    cursor: pointer;
+    font-size: 11px;
+    text-align: center;
+    transition: all 0.2s;
+    font-family: 'Noto Sans JP', sans-serif;
+  }
+  .preset-btn:hover, .preset-btn.active {
+    border-color: var(--accent2);
+    color: var(--accent2);
+    background: rgba(124,58,237,0.1);
+  }
+
+  .grid-scan-line {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,0.01) 2px, rgba(0,212,255,0.01) 4px);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Gemini thinking indicator */
+  .thinking {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: 6px 12px;
+    background: rgba(124,58,237,0.1);
+    border: 1px solid rgba(124,58,237,0.2);
+    border-radius: 8px;
+    align-self: flex-start;
+    font-size: 11px;
+    color: var(--accent2);
+    font-family: 'Orbitron', sans-serif;
+  }
+  .thinking span {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent2);
+    animation: bounce 1.2s infinite;
+  }
+  .thinking span:nth-child(2) { animation-delay: 0.2s; }
+  .thinking span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+</style>
+
+<!-- Import maps for Three.js modules -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.150.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.150.0/examples/jsm/",
+    "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@1/lib/three-vrm.module.js"
+  }
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 </head>
 <body>
 
-    <div id="canvas-container"></div>
-    <video id="webcam" autoplay playsinline></video>
-    
-    <div id="ui">
-        <h1>AIアバター試作機 (Ver.0.5)</h1>
-        <p>● 首の動きを連動</p>
-        <p>★ まばたきを検知（目を閉じるとアバターも閉じます）</p>
-        <p>★ 口の動きを検知（口を開けるとアバターも「あ」の口になります）</p>
-        <p id="status">アバター読み込み中...</p>
+<!-- HEADER -->
+<header>
+  <div class="logo">AI AVATAR STUDIO</div>
+  <div class="status-bar">
+    <span><span class="status-dot" id="dot-cam"></span>カメラ</span>
+    <span><span class="status-dot" id="dot-track"></span>トラッキング</span>
+    <span><span class="status-dot" id="dot-vrm"></span>アバター</span>
+    <span><span class="status-dot" id="dot-ai"></span>Gemini AI</span>
+  </div>
+</header>
+
+<!-- LEFT PANEL -->
+<div class="left-panel">
+  <div class="panel-title">アバター設定</div>
+  <div class="panel-scroll">
+
+    <div class="setup-section">
+      <div class="setup-label">Gemini API キー</div>
+      <div class="api-key-row">
+        <input type="password" id="api-key" placeholder="AIzaSy..." />
+        <button class="btn btn-secondary" style="width:auto;padding:8px 12px;margin:0" onclick="saveApiKey()">保存</button>
+      </div>
+      <p style="font-size:10px;color:var(--text2);margin-top:5px">
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent)">Google AI Studioで無料取得 →</a>
+      </p>
     </div>
 
-    <script type="module">
-        import * as THREE from 'three';
-        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-        import { VRM, VRMLoaderPlugin, VRMUtils, VRMExpressionPresetName, VRMHumanBoneName } from '@pixiv/three-vrm';
+    <div class="setup-section">
+      <div class="setup-label">アバターの外見説明</div>
+      <textarea id="avatar-description" placeholder="例: 銀髪ショートの女の子、青い瞳、優しそうな笑顔、ロボット感のある近未来ファッション"></textarea>
+    </div>
 
-        let currentVrm = undefined;
+    <div class="setup-section">
+      <div class="setup-label">または画像をアップロード</div>
+      <div class="image-upload-area" id="upload-area">
+        <input type="file" id="image-input" accept="image/*" onchange="handleImageUpload(event)" />
+        <div id="upload-hint">📷 クリックまたはドロップ</div>
+        <img id="preview-img" style="display:none" />
+      </div>
+    </div>
 
-        // --- 1. Three.js セットアップ ---
-        const container = document.getElementById('canvas-container');
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 20);
-        camera.position.set(0.0, 1.4, 1.2);
+    <div class="setup-section">
+      <div class="setup-label">性格・口調</div>
+      <div class="preset-grid">
+        <div class="preset-btn" onclick="setPersonality('明るく元気、敬語なし、「だよ！」「ね！」で話す', this)">元気系</div>
+        <div class="preset-btn" onclick="setPersonality('落ち着いて知性的、丁寧語で話す、論理的', this)">知性派</div>
+        <div class="preset-btn" onclick="setPersonality('ツンデレ、素直じゃないが本当は優しい、「べ、別に」とよく言う', this)">ツンデレ</div>
+        <div class="preset-btn" onclick="setPersonality('癒し系お姉さん、ゆっくり話す、よく「ふふ」と笑う', this)">癒し系</div>
+      </div>
+      <textarea id="personality-text" placeholder="例: 明るく元気なキャラクター。友達みたいにタメ語で話す。よく「ね！」「だよ！」と言う。"></textarea>
+    </div>
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.outputColorSpace = THREE.SRGBColorSpace;
-        container.appendChild(renderer.domElement);
+    <button class="btn btn-primary" id="create-btn" onclick="createAvatar()">
+      ✦ アバターを作成
+    </button>
+    <button class="btn btn-secondary" onclick="resetAvatar()">リセット</button>
+  </div>
+</div>
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-        scene.add(ambientLight);
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
-        dirLight.position.set(1.0, 2.0, 1.0).normalize();
-        scene.add(dirLight);
+<!-- CENTER - 3D View -->
+<div class="center-area">
+  <div class="grid-scan-line"></div>
+  <canvas id="three-canvas"></canvas>
+  <video id="webcam-preview" autoplay playsinline muted></video>
 
-        // --- 2. VRMアバターの読み込み (v1 API) ---
-        // 修正: three-vrm v1 の正しい API を使用
-        //   - VRMLoaderPlugin を GLTFLoader に登録
-        //   - VRM インスタンスは gltf.userData.vrm から取得
-        //   - VRMモデルURL: raw.githubusercontent.com から動作確認済みのモデルを使用
-        const loader = new GLTFLoader();
-        loader.register((parser) => new VRMLoaderPlugin(parser));
+  <div class="tracking-overlay">
+    <div class="track-chip" id="chip-face">👁 顔検出</div>
+    <div class="track-chip" id="chip-mouth">👄 口</div>
+    <div class="track-chip" id="chip-blink">😑 瞬き</div>
+  </div>
 
-        const vrmUrl = 'https://raw.githubusercontent.com/pixiv/three-vrm/dev/packages/three-vrm/examples/models/VRM1_Constraint_Twist_Sample.vrm';
+  <div id="loading-overlay">
+    <div class="loader-ring"></div>
+    <div id="loading-text">INITIALIZING...</div>
+  </div>
+</div>
 
-        loader.load(
-            vrmUrl,
-            (gltf) => {
-                const vrm = gltf.userData.vrm;
-                if (!vrm) {
-                    document.getElementById('status').innerText = "VRMデータが見つかりません";
-                    document.getElementById('status').style.color = "#ff4444";
-                    return;
-                }
+<!-- RIGHT PANEL -->
+<div class="right-panel">
+  <div class="panel-title">アバター情報</div>
 
-                // パフォーマンス最適化
-                VRMUtils.removeUnnecessaryVertices(gltf.scene);
+  <div class="avatar-info-card" id="avatar-card">
+    <div class="avatar-name" id="av-name">— 未設定 —</div>
+    <div class="avatar-trait"><span>性格</span><span id="av-personality">—</span></div>
+    <div class="avatar-trait"><span>声のタイプ</span><span id="av-voice-type">—</span></div>
+    <div class="avatar-trait"><span>口調</span><span id="av-speech-style">—</span></div>
+  </div>
 
-                currentVrm = vrm;
-                scene.add(vrm.scene);
-                vrm.scene.rotation.y = Math.PI;
+  <div class="panel-title">声の設定</div>
+  <div class="panel-scroll">
+    <div class="voice-row">
+      <label>ピッチ</label>
+      <input type="range" id="voice-pitch" min="0.5" max="2" step="0.05" value="1.2" oninput="updateVoiceParam('pitch', this.value)">
+      <span class="val" id="val-pitch">1.2</span>
+    </div>
+    <div class="voice-row">
+      <label>速度</label>
+      <input type="range" id="voice-rate" min="0.5" max="2" step="0.05" value="1.0" oninput="updateVoiceParam('rate', this.value)">
+      <span class="val" id="val-rate">1.0</span>
+    </div>
+    <div class="voice-row">
+      <label>音量</label>
+      <input type="range" id="voice-volume" min="0" max="1" step="0.05" value="0.9" oninput="updateVoiceParam('volume', this.value)">
+      <span class="val" id="val-volume">0.9</span>
+    </div>
+    <div class="setup-section" style="margin-top:10px">
+      <div class="setup-label">音声</div>
+      <select id="voice-select" onchange="selectedVoiceName = this.value">
+        <option value="">読み込み中...</option>
+      </select>
+    </div>
 
-                document.getElementById('status').innerText = "準備完了！まばたき・口を動かしてね";
-                document.getElementById('status').style.color = "#00ff88";
-                console.log('VRM loaded:', vrm);
-            },
-            (progress) => {
-                if (progress.total > 0) {
-                    const pct = Math.round(progress.loaded / progress.total * 100);
-                    document.getElementById('status').innerText = `読み込み中... ${pct}%`;
-                }
-            },
-            (error) => {
-                console.error('VRM load error:', error);
-                document.getElementById('status').innerText = "読み込み失敗: " + error.message;
-                document.getElementById('status').style.color = "#ff4444";
-            }
-        );
+    <div class="setup-label" style="margin-top:16px">会話履歴</div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:8px" id="history-count">0 ターン</div>
+    <button class="btn btn-secondary" onclick="clearHistory()">履歴をリセット</button>
+  </div>
+</div>
 
-        const clock = new THREE.Clock();
+<!-- BOTTOM - Chat -->
+<div class="bottom-bar">
+  <div class="chat-messages" id="chat-messages">
+    <div class="msg avatar">
+      <div class="name">SYSTEM</div>
+      アバターを作成して、会話を始めましょう！
+    </div>
+  </div>
+  <div class="chat-input-area">
+    <div class="chat-input-row">
+      <input type="text" id="chat-input" placeholder="メッセージを入力..." onkeydown="if(event.key==='Enter')sendMessage()" />
+      <button class="btn-icon" onclick="sendMessage()" title="送信">➤</button>
+    </div>
+    <div class="chat-btns">
+      <button class="btn-icon" id="mic-btn" onclick="toggleVoiceInput()" title="音声入力">
+        🎤 <span>音声入力</span>
+      </button>
+      <button class="btn-icon" id="speak-btn" onclick="stopSpeaking()" title="停止" style="display:none">
+        ⏹ <span>停止</span>
+      </button>
+    </div>
+  </div>
+</div>
 
-        function animate() {
-            requestAnimationFrame(animate);
-            const delta = clock.getDelta();
-            if (currentVrm) {
-                currentVrm.update(delta);
-            }
-            renderer.render(scene, camera);
-        }
-        animate();
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRM, VRMLoaderPlugin, VRMUtils, VRMExpressionPresetName } from '@pixiv/three-vrm';
 
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+// ===== STATE =====
+window.appState = {
+  apiKey: localStorage.getItem('gemini_api_key') || '',
+  avatarData: null,
+  conversationHistory: [],
+  isRecording: false,
+  isSpeaking: false,
+  currentVrm: null,
+  voiceParams: { pitch: 1.2, rate: 1.0, volume: 0.9 },
+  selectedVoiceName: '',
+  uploadedImageBase64: null,
+  recognition: null,
+  currentUtterance: null,
+};
 
+if (window.appState.apiKey) {
+  document.getElementById('api-key').value = window.appState.apiKey;
+  setDot('dot-ai', 'active');
+}
 
-        // --- 3. MediaPipe で顔・目・口を追跡 ---
-        const videoElement = document.getElementById('webcam');
+// ===== THREE.JS SETUP =====
+const canvas = document.getElementById('three-canvas');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 20);
+// Front-facing: avatar looks at viewer
+camera.position.set(0, 1.45, 1.1);
+camera.lookAt(0, 1.45, 0);
 
-        // EAR（Eye Aspect Ratio）計算
-        function calcEAR(top, bottom, innerCorner, outerCorner) {
-            const vertical = Math.hypot(top.x - bottom.x, top.y - bottom.y);
-            const horizontal = Math.hypot(innerCorner.x - outerCorner.x, innerCorner.y - outerCorner.y);
-            if (horizontal === 0) return 0;
-            return vertical / horizontal;
-        }
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setClearColor(0x000000, 0);
 
-        function onResults(results) {
-            if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0 || !currentVrm) return;
-            const lm = results.multiFaceLandmarks[0];
+// Lighting
+const ambient = new THREE.AmbientLight(0x88aaff, 0.6);
+scene.add(ambient);
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
+keyLight.position.set(0, 3, 2);
+scene.add(keyLight);
+const fillLight = new THREE.DirectionalLight(0x4488ff, 0.5);
+fillLight.position.set(-2, 1, 1);
+scene.add(fillLight);
+const rimLight = new THREE.DirectionalLight(0x00d4ff, 0.4);
+rimLight.position.set(0, 2, -2);
+scene.add(rimLight);
 
-            // --- 首の回転 ---
-            const nose         = lm[4];
-            const leftEyeCorner  = lm[33];
-            const rightEyeCorner = lm[263];
+// Resize handler
+function resizeRenderer() {
+  const container = canvas.parentElement;
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resizeRenderer);
+resizeRenderer();
 
-            const roll  = Math.atan2(rightEyeCorner.y - leftEyeCorner.y, rightEyeCorner.x - leftEyeCorner.x);
-            const pitch = (nose.y - (leftEyeCorner.y + rightEyeCorner.y) / 2) * 3;
-            const yaw   = (nose.x - (leftEyeCorner.x + rightEyeCorner.x) / 2) * -3;
+// Load VRM
+const loader = new GLTFLoader();
+loader.register(p => new VRMLoaderPlugin(p));
 
-            // 修正: v1 API では getBoneNode → humanoid.getNormalizedBoneNode
-            const neck = currentVrm.humanoid.getNormalizedBoneNode('neck');
-            if (neck) {
-                neck.rotation.z = roll;
-                neck.rotation.x = pitch;
-                neck.rotation.y = yaw;
-            }
+const vrmUrl = 'https://raw.githubusercontent.com/pixiv/three-vrm/dev/packages/three-vrm/examples/models/VRM1_Constraint_Twist_Sample.vrm';
 
-            // --- まばたき (EAR方式で 0〜1 の滑らかな値) ---
-            const EAR_OPEN   = 0.25;
-            const EAR_CLOSED = 0.05;
+setLoadingText('VRMモデルを読み込み中...');
+loader.load(vrmUrl,
+  (gltf) => {
+    const vrm = gltf.userData.vrm;
+    if (!vrm) { setLoadingText('VRM読み込み失敗'); return; }
+    VRMUtils.removeUnnecessaryVertices(gltf.scene);
+    window.appState.currentVrm = vrm;
+    scene.add(vrm.scene);
+    // Face forward - no rotation needed as default faces away, rotate 180
+    vrm.scene.rotation.y = Math.PI;
+    hideLoading();
+    setDot('dot-vrm', 'active');
+    console.log('VRM loaded:', vrm);
+  },
+  (p) => {
+    if (p.total > 0) setLoadingText(`読み込み中... ${Math.round(p.loaded/p.total*100)}%`);
+  },
+  (e) => { setLoadingText('VRM読み込み失敗: ' + e.message); }
+);
 
-            const leftEAR  = calcEAR(lm[159], lm[145], lm[33],  lm[133]);
-            const rightEAR = calcEAR(lm[386], lm[374], lm[362], lm[263]);
+// Blink auto animation
+let blinkTimer = 0;
+let blinkState = 0; // 0=open, 1=closing, 2=opening
+let blinkValue = 0;
+let autoBlinkActive = false; // when face tracking is active, manual blink from tracking
+let lastFaceTime = 0;
 
-            const leftBlink  = 1.0 - Math.max(0, Math.min(1, (leftEAR  - EAR_CLOSED) / (EAR_OPEN - EAR_CLOSED)));
-            const rightBlink = 1.0 - Math.max(0, Math.min(1, (rightEAR - EAR_CLOSED) / (EAR_OPEN - EAR_CLOSED)));
+// Talking animation state
+let talkTarget = 0;
+let talkCurrent = 0;
 
-            // 修正: v1 VRM1.0モデルのExpressionPreset名は小文字始まり
-            //   例: BlinkLeft → 'blinkLeft', Aa → 'aa'
-            //   VRMExpressionPresetName.BlinkLeft = 'blinkLeft' となっている
-            currentVrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkLeft,  leftBlink);
-            currentVrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkRight, rightBlink);
+// Smooth head rotation
+let targetNeckRot = { x: 0, y: 0, z: 0 };
+let currentNeckRot = { x: 0, y: 0, z: 0 };
 
-            // --- 口の開閉 ---
-            const lipTop    = lm[13];
-            const lipBottom = lm[14];
-            const mouthDist = Math.hypot(lipTop.x - lipBottom.x, lipTop.y - lipBottom.y);
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = clock.getDelta();
+  const vrm = window.appState.currentVrm;
+  if (vrm) {
+    // Smooth neck
+    const lerpFactor = 1 - Math.pow(0.001, delta);
+    currentNeckRot.x += (targetNeckRot.x - currentNeckRot.x) * lerpFactor;
+    currentNeckRot.y += (targetNeckRot.y - currentNeckRot.y) * lerpFactor;
+    currentNeckRot.z += (targetNeckRot.z - currentNeckRot.z) * lerpFactor;
 
-            let mouthAa = (mouthDist - 0.015) * 15;
-            mouthAa = Math.max(0.0, Math.min(1.0, mouthAa));
-            currentVrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, mouthAa);
-        }
+    const neck = vrm.humanoid.getNormalizedBoneNode('neck');
+    if (neck) {
+      neck.rotation.x = currentNeckRot.x;
+      neck.rotation.y = currentNeckRot.y;
+      neck.rotation.z = currentNeckRot.z;
+    }
 
-        const faceMesh = new FaceMesh({
-            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-        });
-        faceMesh.setOptions({
-            maxNumFaces: 1,
-            refineLandmarks: true,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
-        });
-        faceMesh.onResults(onResults);
+    // Auto-blink when no face tracking
+    const noFace = (Date.now() - lastFaceTime) > 2000;
+    if (noFace) {
+      blinkTimer += delta;
+      const interval = 3 + Math.random() * 2;
+      if (blinkTimer > interval) { blinkTimer = 0; blinkState = 1; }
+      if (blinkState === 1) {
+        blinkValue = Math.min(1, blinkValue + delta * 8);
+        if (blinkValue >= 1) blinkState = 2;
+      } else if (blinkState === 2) {
+        blinkValue = Math.max(0, blinkValue - delta * 6);
+        if (blinkValue <= 0) blinkState = 0;
+      }
+      vrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkLeft, blinkValue);
+      vrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkRight, blinkValue);
+    }
 
-        const cameraUtils = new Camera(videoElement, {
-            onFrame: async () => {
-                await faceMesh.send({ image: videoElement });
-            },
-            width: 640,
-            height: 480
-        });
-        cameraUtils.start();
-    </script>
+    // Talking animation
+    if (window.appState.isSpeaking) {
+      talkTarget = 0.3 + Math.abs(Math.sin(Date.now() * 0.01)) * 0.6;
+    } else {
+      talkTarget = 0;
+    }
+    talkCurrent += (talkTarget - talkCurrent) * Math.min(1, delta * 12);
+    vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, talkCurrent);
+
+    vrm.update(delta);
+  }
+  renderer.render(scene, camera);
+}
+animate();
+
+// Expose target neck rotation for MediaPipe
+window.setNeckTarget = (x, y, z) => {
+  targetNeckRot.x = x;
+  targetNeckRot.y = y;
+  targetNeckRot.z = z;
+};
+window.setFaceTracked = (blink_l, blink_r, mouth) => {
+  lastFaceTime = Date.now();
+  const vrm = window.appState.currentVrm;
+  if (!vrm) return;
+  vrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkLeft, blink_l);
+  vrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkRight, blink_r);
+  // mouth handled by talking anim when speaking, else from face
+  if (!window.appState.isSpeaking) {
+    vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, mouth);
+  }
+};
+
+// Loading helpers
+function setLoadingText(t) { document.getElementById('loading-text').textContent = t; }
+function hideLoading() {
+  const el = document.getElementById('loading-overlay');
+  el.style.transition = 'opacity 0.5s';
+  el.style.opacity = '0';
+  setTimeout(() => el.style.display = 'none', 500);
+}
+
+function setDot(id, state) {
+  const el = document.getElementById(id);
+  el.className = 'status-dot ' + (state || '');
+}
+window.setDot = setDot;
+</script>
+
+<script>
+// ===== NON-MODULE SCRIPTS =====
+
+// API Key
+window.saveApiKey = function() {
+  const key = document.getElementById('api-key').value.trim();
+  window.appState.apiKey = key;
+  localStorage.setItem('gemini_api_key', key);
+  setDot('dot-ai', key ? 'active' : '');
+  addMessage('system', key ? '✓ APIキーを保存しました' : 'APIキーをクリアしました');
+};
+
+// Personality presets
+window.setPersonality = function(text, btn) {
+  document.getElementById('personality-text').value = text;
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+};
+
+// Image upload
+window.handleImageUpload = function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const b64 = ev.target.result.split(',')[1];
+    window.appState.uploadedImageBase64 = b64;
+    document.getElementById('preview-img').src = ev.target.result;
+    document.getElementById('preview-img').style.display = 'block';
+    document.getElementById('upload-hint').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+};
+
+// Voice params
+window.updateVoiceParam = function(param, val) {
+  window.appState.voiceParams[param] = parseFloat(val);
+  document.getElementById('val-' + param).textContent = parseFloat(val).toFixed(2);
+};
+
+// Load voices
+let voicesLoaded = false;
+function loadVoices() {
+  const voices = speechSynthesis.getVoices();
+  const sel = document.getElementById('voice-select');
+  const jpVoices = voices.filter(v => v.lang.startsWith('ja'));
+  const allVoices = [...jpVoices, ...voices.filter(v => !v.lang.startsWith('ja'))];
+  if (allVoices.length === 0) return;
+  sel.innerHTML = '';
+  allVoices.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.name;
+    opt.textContent = `${v.name} (${v.lang})`;
+    sel.appendChild(opt);
+  });
+  // Default to first Japanese voice
+  if (jpVoices.length > 0) {
+    sel.value = jpVoices[0].name;
+    window.appState.selectedVoiceName = jpVoices[0].name;
+  }
+  voicesLoaded = true;
+}
+speechSynthesis.onvoiceschanged = loadVoices;
+loadVoices();
+window.selectedVoiceName = '';
+
+// ===== GEMINI API =====
+async function callGemini(messages, systemPrompt, useVision = false) {
+  const apiKey = window.appState.apiKey;
+  if (!apiKey) {
+    addMessage('system', '⚠ APIキーを設定してください');
+    return null;
+  }
+
+  const model = 'gemini-2.0-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const contents = messages.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: m.parts || [{ text: m.content }]
+  }));
+
+  const body = {
+    contents,
+    systemInstruction: systemPrompt ? { parts: [{ text: systemPrompt }] } : undefined,
+    generationConfig: { temperature: 0.9, maxOutputTokens: 500 }
+  };
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (data.error) {
+      addMessage('system', '⚠ Gemini Error: ' + data.error.message);
+      return null;
+    }
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+  } catch (e) {
+    addMessage('system', '⚠ 通信エラー: ' + e.message);
+    return null;
+  }
+}
+
+// ===== CREATE AVATAR =====
+window.createAvatar = async function() {
+  const desc = document.getElementById('avatar-description').value.trim();
+  const personality = document.getElementById('personality-text').value.trim();
+  const imageB64 = window.appState.uploadedImageBase64;
+
+  if (!desc && !imageB64) {
+    addMessage('system', '⚠ 外見の説明または画像を入力してください');
+    return;
+  }
+
+  const btn = document.getElementById('create-btn');
+  btn.disabled = true;
+  btn.textContent = '生成中...';
+  addMessage('system', 'アバターを生成しています...');
+
+  // Build prompt for Gemini
+  let userParts = [];
+
+  if (imageB64) {
+    userParts.push({ inlineData: { mimeType: 'image/jpeg', data: imageB64 } });
+    userParts.push({ text: '上記の画像のキャラクターをベースにして、アバターの設定を作成してください。' + (desc ? '追加の説明: ' + desc : '') });
+  } else {
+    userParts.push({ text: `以下の説明からアバターの設定を作成してください: ${desc}` });
+  }
+
+  if (personality) {
+    userParts[userParts.length - 1].text += `\n性格・口調の指示: ${personality}`;
+  }
+
+  const systemPrompt = `あなたはAIアバター設定ジェネレーターです。
+与えられた外見・性格の説明から、アバターキャラクターの設定を作成してください。
+必ず以下のJSON形式のみで返答してください（マークダウン不要）:
+{
+  "name": "キャラクター名（日本語、2〜4文字）",
+  "personality": "性格の短い説明（20字以内）",
+  "speechStyle": "口調の特徴（例: タメ語、敬語、関西弁）",
+  "voiceType": "声のタイプ（例: 高め・元気、低め・落ち着き、中音域）",
+  "systemPrompt": "このキャラクターとして会話するためのシステムプロンプト（日本語、100字以内）",
+  "voicePitch": 数値（0.8〜1.8、声のピッチ）,
+  "voiceRate": 数値（0.8〜1.3、話速）
+}`;
+
+  const response = await callGemini(
+    [{ role: 'user', parts: userParts }],
+    systemPrompt
+  );
+
+  btn.disabled = false;
+  btn.textContent = '✦ アバターを作成';
+
+  if (!response) return;
+
+  try {
+    const clean = response.replace(/```json|```/g, '').trim();
+    const avatarData = JSON.parse(clean);
+    window.appState.avatarData = avatarData;
+    window.appState.conversationHistory = [];
+
+    // Update UI
+    document.getElementById('av-name').textContent = avatarData.name || '—';
+    document.getElementById('av-personality').textContent = avatarData.personality || '—';
+    document.getElementById('av-speech-style').textContent = avatarData.speechStyle || '—';
+    document.getElementById('av-voice-type').textContent = avatarData.voiceType || '—';
+
+    // Apply voice settings
+    if (avatarData.voicePitch) {
+      window.appState.voiceParams.pitch = avatarData.voicePitch;
+      document.getElementById('voice-pitch').value = avatarData.voicePitch;
+      document.getElementById('val-pitch').textContent = avatarData.voicePitch.toFixed(2);
+    }
+    if (avatarData.voiceRate) {
+      window.appState.voiceParams.rate = avatarData.voiceRate;
+      document.getElementById('voice-rate').value = avatarData.voiceRate;
+      document.getElementById('val-rate').textContent = avatarData.voiceRate.toFixed(2);
+    }
+
+    const greet = `はじめまして！私は${avatarData.name}です。よろしくね！`;
+    addMessage('avatar', greet, avatarData.name);
+    speak(greet);
+
+    addMessage('system', `✓ アバター「${avatarData.name}」を作成しました`);
+    setDot('dot-ai', 'active');
+  } catch (e) {
+    addMessage('system', '⚠ アバターデータの解析に失敗: ' + e.message);
+    console.error(response);
+  }
+};
+
+window.resetAvatar = function() {
+  window.appState.avatarData = null;
+  window.appState.conversationHistory = [];
+  document.getElementById('av-name').textContent = '— 未設定 —';
+  document.getElementById('av-personality').textContent = '—';
+  document.getElementById('av-speech-style').textContent = '—';
+  document.getElementById('av-voice-type').textContent = '—';
+  clearHistory();
+  addMessage('system', 'アバターをリセットしました');
+};
+
+window.clearHistory = function() {
+  window.appState.conversationHistory = [];
+  document.getElementById('history-count').textContent = '0 ターン';
+};
+
+// ===== CHAT =====
+window.sendMessage = async function() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  await processUserMessage(text);
+};
+
+async function processUserMessage(text) {
+  if (!window.appState.avatarData) {
+    addMessage('system', '⚠ まずアバターを作成してください');
+    return;
+  }
+
+  addMessage('user', text, 'あなた');
+
+  // Show thinking
+  const thinkEl = document.createElement('div');
+  thinkEl.className = 'thinking';
+  thinkEl.innerHTML = '<span></span><span></span><span></span> 考え中...';
+  thinkEl.id = 'thinking-indicator';
+  document.getElementById('chat-messages').appendChild(thinkEl);
+  scrollChat();
+
+  // Build history
+  const history = window.appState.conversationHistory.map(m => ({
+    role: m.role,
+    parts: [{ text: m.content }]
+  }));
+  history.push({ role: 'user', parts: [{ text }] });
+
+  const systemPrompt = window.appState.avatarData.systemPrompt +
+    '\n返答は必ず日本語で、短く（3文以内）、キャラクターらしく話してください。';
+
+  const response = await callGemini(history, systemPrompt);
+
+  // Remove thinking
+  document.getElementById('thinking-indicator')?.remove();
+
+  if (response) {
+    addMessage('avatar', response, window.appState.avatarData.name);
+    speak(response);
+
+    // Update history
+    window.appState.conversationHistory.push({ role: 'user', content: text });
+    window.appState.conversationHistory.push({ role: 'assistant', content: response });
+    // Keep last 10 turns
+    if (window.appState.conversationHistory.length > 20) {
+      window.appState.conversationHistory = window.appState.conversationHistory.slice(-20);
+    }
+    document.getElementById('history-count').textContent =
+      `${window.appState.conversationHistory.length / 2} ターン`;
+  }
+}
+
+// ===== VOICE SYNTHESIS =====
+window.speak = function(text) {
+  if (!text) return;
+  speechSynthesis.cancel();
+
+  const utter = new SpeechSynthesisUtterance(text);
+  const voices = speechSynthesis.getVoices();
+  const selName = document.getElementById('voice-select').value;
+  const voice = voices.find(v => v.name === selName) || voices.find(v => v.lang.startsWith('ja')) || voices[0];
+  if (voice) utter.voice = voice;
+
+  utter.pitch = window.appState.voiceParams.pitch;
+  utter.rate = window.appState.voiceParams.rate;
+  utter.volume = window.appState.voiceParams.volume;
+
+  utter.onstart = () => {
+    window.appState.isSpeaking = true;
+    document.getElementById('speak-btn').style.display = 'flex';
+  };
+  utter.onend = () => {
+    window.appState.isSpeaking = false;
+    document.getElementById('speak-btn').style.display = 'none';
+  };
+  utter.onerror = () => {
+    window.appState.isSpeaking = false;
+    document.getElementById('speak-btn').style.display = 'none';
+  };
+
+  window.appState.currentUtterance = utter;
+  speechSynthesis.speak(utter);
+};
+
+window.stopSpeaking = function() {
+  speechSynthesis.cancel();
+  window.appState.isSpeaking = false;
+  document.getElementById('speak-btn').style.display = 'none';
+};
+
+// ===== VOICE INPUT =====
+window.toggleVoiceInput = function() {
+  if (window.appState.isRecording) {
+    stopVoiceInput();
+  } else {
+    startVoiceInput();
+  }
+};
+
+function startVoiceInput() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    addMessage('system', '⚠ このブラウザは音声認識非対応です（Chromeを使用してください）');
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const rec = new SR();
+  rec.lang = 'ja-JP';
+  rec.continuous = false;
+  rec.interimResults = false;
+
+  rec.onstart = () => {
+    window.appState.isRecording = true;
+    document.getElementById('mic-btn').classList.add('recording');
+    document.getElementById('mic-btn').querySelector('span').textContent = '録音中...';
+  };
+  rec.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    document.getElementById('chat-input').value = transcript;
+    processUserMessage(transcript);
+  };
+  rec.onend = () => {
+    window.appState.isRecording = false;
+    document.getElementById('mic-btn').classList.remove('recording');
+    document.getElementById('mic-btn').querySelector('span').textContent = '音声入力';
+  };
+  rec.onerror = (e) => {
+    window.appState.isRecording = false;
+    document.getElementById('mic-btn').classList.remove('recording');
+    document.getElementById('mic-btn').querySelector('span').textContent = '音声入力';
+    addMessage('system', '⚠ 音声認識エラー: ' + e.error);
+  };
+
+  window.appState.recognition = rec;
+  rec.start();
+}
+
+function stopVoiceInput() {
+  window.appState.recognition?.stop();
+}
+
+// ===== CHAT MESSAGES =====
+window.addMessage = function(type, text, name) {
+  const container = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + (type === 'user' ? 'user' : type === 'system' ? 'avatar' : 'avatar');
+  if (type === 'system') div.style.borderColor = 'rgba(0,212,255,0.2)';
+  div.innerHTML = `<div class="name">${name || (type === 'system' ? 'SYSTEM' : type.toUpperCase())}</div>${text}`;
+  container.appendChild(div);
+  scrollChat();
+};
+
+function scrollChat() {
+  const el = document.getElementById('chat-messages');
+  el.scrollTop = el.scrollHeight;
+}
+
+// ===== MEDIAPIPE FACE TRACKING =====
+const videoEl = document.getElementById('webcam-preview');
+
+function calcEAR(top, bottom, inner, outer) {
+  const v = Math.hypot(top.x - bottom.x, top.y - bottom.y);
+  const h = Math.hypot(inner.x - outer.x, inner.y - outer.y);
+  return h === 0 ? 0 : v / h;
+}
+
+function onFaceResults(results) {
+  if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+    document.getElementById('chip-face').classList.remove('active');
+    return;
+  }
+  document.getElementById('chip-face').classList.add('active');
+
+  const lm = results.multiFaceLandmarks[0];
+
+  // Neck/head rotation
+  const nose = lm[4];
+  const leftEye = lm[33];
+  const rightEye = lm[263];
+  const roll = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x) * 0.8;
+  const pitch = (nose.y - (leftEye.y + rightEye.y) / 2) * 2.5;
+  const yaw = (nose.x - (leftEye.x + rightEye.x) / 2) * -3.0;
+  window.setNeckTarget && window.setNeckTarget(pitch, yaw, roll);
+
+  // Blink
+  const EAR_OPEN = 0.25, EAR_CLOSED = 0.05;
+  const leftEAR = calcEAR(lm[159], lm[145], lm[33], lm[133]);
+  const rightEAR = calcEAR(lm[386], lm[374], lm[362], lm[263]);
+  const lb = 1 - Math.max(0, Math.min(1, (leftEAR - EAR_CLOSED) / (EAR_OPEN - EAR_CLOSED)));
+  const rb = 1 - Math.max(0, Math.min(1, (rightEAR - EAR_CLOSED) / (EAR_OPEN - EAR_CLOSED)));
+
+  if (lb > 0.5 || rb > 0.5) {
+    document.getElementById('chip-blink').classList.add('active');
+  } else {
+    document.getElementById('chip-blink').classList.remove('active');
+  }
+
+  // Mouth
+  const lipTop = lm[13], lipBottom = lm[14];
+  const mouthDist = Math.hypot(lipTop.x - lipBottom.x, lipTop.y - lipBottom.y);
+  let mouth = Math.max(0, Math.min(1, (mouthDist - 0.015) * 15));
+
+  if (mouth > 0.2) {
+    document.getElementById('chip-mouth').classList.add('active');
+  } else {
+    document.getElementById('chip-mouth').classList.remove('active');
+  }
+
+  window.setFaceTracked && window.setFaceTracked(lb, rb, mouth);
+}
+
+// Initialize MediaPipe
+const faceMesh = new FaceMesh({
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`
+});
+faceMesh.setOptions({
+  maxNumFaces: 1,
+  refineLandmarks: true,
+  minDetectionConfidence: 0.5,
+  minTrackingConfidence: 0.5
+});
+faceMesh.onResults(onFaceResults);
+
+// Camera
+navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } })
+  .then(stream => {
+    videoEl.srcObject = stream;
+    setDot('dot-cam', 'active');
+    const cam = new Camera(videoEl, {
+      onFrame: async () => { await faceMesh.send({ image: videoEl }); },
+      width: 640, height: 480
+    });
+    cam.start();
+    setDot('dot-track', 'active');
+  })
+  .catch(e => {
+    setDot('dot-cam', 'warn');
+    addMessage('system', '⚠ カメラアクセスできません: ' + e.message);
+  });
+
+// setDot global
+window.setDot = function(id, state) {
+  const el = document.getElementById(id);
+  if (el) el.className = 'status-dot ' + (state || '');
+};
+</script>
 </body>
 </html>
