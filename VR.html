@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Avatar Prototype - Expression Version</title>
+    <title>AI VR Avatar Prototype - Expression Version</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #2a2a3a; font-family: sans-serif; }
         #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; }
@@ -85,7 +85,6 @@
 
                 // パフォーマンス最適化
                 VRMUtils.removeUnnecessaryVertices(gltf.scene);
-                VRMUtils.combineSkeletons(gltf.scene);
 
                 currentVrm = vrm;
                 scene.add(vrm.scene);
