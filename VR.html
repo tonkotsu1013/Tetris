@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Avatar Prototype - Expression Version</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #2a2a3a; font-family: sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; }
+        #webcam { position: absolute; bottom: 10px; right: 10px; width: 160px; height: 120px; transform: scaleX(-1); border: 2px solid #fff; border-radius: 8px; opacity: 0.7; }
+        #ui { position: absolute; top: 20px; left: 20px; color: white; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 8px; pointer-events: none; max-width: 300px; }
+        h1 { margin: 0 0 10px 0; font-size: 16px; }
+        p { margin: 5px 0; font-size: 12px; color: #ccc; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@1.0.0/lib/three-vrm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+    <video id="webcam" autoplay playsinline></video>
+    
+    <div id="ui">
+        <h1>AIアバター試作機 (Ver.0.3)</h1>
+        <p>● 首の動きを連動</p>
+        <p>★ まばたきを検知（目を閉じるとアバターも閉じます）</p>
+        <p>★ 口の動きを検知（口を開けるとアバターも「あ」の口になります）</p>
+        <p id="status">アバター読み込み中...</p>
+    </div>
+
+    <script>
+        let currentVrm = undefined;
+
+        // --- 1. Three.js セットアップ ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 20);
+        camera.position.set(0.0, 1.4, 1.2); // 少しだけ顔に近づけました
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        container.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        dirLight.position.set(1.0, 2.0, 1.0).normalize();
+        scene.add(dirLight);
+
+        // --- 2. VRMアバターの読み込み ---
+        const loader = new THREE.GLTFLoader();
+        const vrmUrl = 'https://pixiv.github.io/three-vrm/packages/three-vrm/examples/models/vrm/three-vrm-girl.vrm';
+
+        loader.load(
+            vrmUrl,
+            (gltf) => {
+                THREE.VRM.from(gltf).then((vrm) => {
+                    currentVrm = vrm;
+                    scene.add(vrm.scene);
+                    vrm.scene.rotation.y = Math.PI; 
+                    
+                    document.getElementById('status').innerText = "準備完了！まばたき・口を動かしてね";
+                    document.getElementById('status').style.color = "#00ff88";
+                });
+            }
+        );
+
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            if (currentVrm) {
+                currentVrm.update(delta);
+            }
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+
+        // --- 3. MediaPipe で顔・目・口を追跡 ---
+        const videoElement = document.getElementById('webcam');
+
+        function onResults(results) {
+            if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0 && currentVrm) {
+                const landmarks = results.multiFaceLandmarks[0];
+                
+                // --- 首の回転 ---
+                const nose = landmarks[4];
+                const leftEyeCorner = landmarks[33];
+                const rightEyeCorner = landmarks[263];
+
+                const roll = Math.atan2(rightEyeCorner.y - leftEyeCorner.y, rightEyeCorner.x - leftEyeCorner.x);
+                const pitch = (nose.y - (leftEyeCorner.y + rightEyeCorner.y)/2) * 3; 
+                const yaw = ((nose.x - (leftEyeCorner.x + rightEyeCorner.x)/2)) * -3;
+
+                const neck = currentVrm.humanoid.getBoneNode(THREE.VRMHumanoidBoneName.Neck);
+                if (neck) {
+                    neck.rotation.z = roll; 
+                    neck.rotation.x = pitch;
+                    neck.rotation.y = yaw;
+                }
+
+                // --- まばたきと口の連動 (Expression) ---
+                const expressionPreset = THREE.VRMExpressionPresetName;
+
+                // 左目の開閉度を計算 (上下のまぶたの距離)
+                const leftEyeTop = landmarks[159];
+                const leftEyeBottom = landmarks[145];
+                const leftEyeDist = Math.hypot(leftEyeTop.x - leftEyeBottom.x, leftEyeTop.y - leftEyeBottom.y);
+                
+                // 右目の開閉度を計算
+                const rightEyeTop = landmarks[386];
+                const rightEyeBottom = landmarks[374];
+                const rightEyeDist = Math.hypot(rightEyeTop.x - rightEyeBottom.x, rightEyeTop.y - rightEyeBottom.y);
+
+                // 基準値（通常時の目の開き）をもとに、一定以下になったら目を閉じる（1 = 完全に閉じる）
+                // カメラの距離によって変化するため、簡易的な判定にしています
+                const leftBlink = leftEyeDist < 0.018 ? 1.0 : 0.0;
+                const rightBlink = rightEyeDist < 0.018 ? 1.0 : 0.0;
+
+                // VRMの目に値を反映
+                currentVrm.expressionManager.setValue(expressionPreset.BlinkLeft, leftBlink);
+                currentVrm.expressionManager.setValue(expressionPreset.BlinkRight, rightBlink);
+
+                // 口の開閉度を計算 (上下の唇の距離)
+                const lipTop = landmarks[13];
+                const lipBottom = landmarks[14];
+                const mouthDist = Math.hypot(lipTop.x - lipBottom.x, lipTop.y - lipBottom.y);
+
+                // 口を大きく開けたら「あ(Aa)」の表情にする (0.0 から 1.0 の間で調整)
+                let mouthAa = (mouthDist - 0.015) * 15;
+                mouthAa = Math.max(0.0, Math.min(1.0, mouthAa)); // 0〜1の間に収める
+
+                currentVrm.expressionManager.setValue(expressionPreset.Aa, mouthAa);
+            }
+        }
+
+        const faceMesh = new FaceMesh({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+        });
+        faceMesh.setOptions({
+            maxNumFaces: 1,
+            refineLandmarks: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+        faceMesh.onResults(onResults);
+
+        const cameraUtils = new Camera(videoElement, {
+            onFrame: async () => {
+                await faceMesh.send({ image: videoElement });
+            },
+            width: 640,
+            height: 480
+        });
+        cameraUtils.start();
+    </script>
+</body>
+</html>
