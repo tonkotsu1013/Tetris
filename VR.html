@@ -35,7 +35,6 @@
     grid-template-rows: 60px 1fr 180px;
   }
 
-  /* HEADER */
   header {
     grid-column: 1 / -1;
     background: linear-gradient(90deg, var(--bg) 0%, var(--panel) 50%, var(--bg) 100%);
@@ -73,7 +72,6 @@
   .status-dot.warn { background: #ffaa00; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
-  /* LEFT PANEL */
   .left-panel {
     background: var(--panel);
     border-right: 1px solid var(--border);
@@ -89,6 +87,7 @@
     padding: 14px 16px 8px;
     border-bottom: 1px solid var(--border);
     text-transform: uppercase;
+    flex-shrink: 0;
   }
   .panel-scroll {
     flex: 1;
@@ -98,7 +97,6 @@
     scrollbar-color: var(--border) transparent;
   }
 
-  /* AVATAR SETUP */
   .setup-section { margin-bottom: 20px; }
   .setup-label {
     font-size: 11px;
@@ -169,7 +167,6 @@
   }
   .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
 
-  /* RIGHT PANEL */
   .right-panel {
     background: var(--panel);
     border-left: 1px solid var(--border);
@@ -178,7 +175,6 @@
     overflow: hidden;
   }
 
-  /* Avatar info card */
   .avatar-info-card {
     margin: 12px;
     background: var(--panel2);
@@ -201,7 +197,6 @@
   }
   .avatar-trait span:last-child { color: var(--text); }
 
-  /* Voice settings */
   .voice-row {
     display: flex;
     gap: 8px;
@@ -227,7 +222,6 @@
   }
   .voice-row .val { font-size: 11px; color: var(--accent); min-width: 30px; text-align: right; }
 
-  /* CENTER - 3D Canvas */
   .center-area {
     position: relative;
     overflow: hidden;
@@ -272,7 +266,6 @@
   }
   .track-chip.active { border-color: var(--accent3); color: var(--accent3); }
 
-  /* Loading overlay */
   #loading-overlay {
     position: absolute;
     inset: 0;
@@ -294,7 +287,6 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   #loading-text { font-family: 'Orbitron', sans-serif; font-size: 12px; color: var(--text2); letter-spacing: 2px; }
 
-  /* BOTTOM - Chat */
   .bottom-bar {
     grid-column: 1 / -1;
     background: var(--panel);
@@ -382,7 +374,6 @@
   .btn-icon.recording { border-color: var(--danger); color: var(--danger); animation: pulse 1s infinite; }
   .btn-icon.speaking { border-color: var(--accent3); color: var(--accent3); }
 
-  /* API key input */
   .api-key-row {
     display: flex;
     gap: 6px;
@@ -390,7 +381,6 @@
   }
   .api-key-row input { flex: 1; font-size: 11px; }
 
-  /* Personality presets */
   .preset-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -423,7 +413,6 @@
     z-index: 1;
   }
 
-  /* Gemini thinking indicator */
   .thinking {
     display: flex;
     gap: 4px;
@@ -446,9 +435,159 @@
   .thinking span:nth-child(2) { animation-delay: 0.2s; }
   .thinking span:nth-child(3) { animation-delay: 0.4s; }
   @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+
+  /* ===== AVATAR LIST MODAL ===== */
+  #avatar-list-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  #avatar-list-modal.open { display: flex; }
+  .modal-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: 680px;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .modal-header h2 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 3px;
+  }
+  .modal-close {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text2);
+    cursor: pointer;
+    width: 28px; height: 28px;
+    border-radius: 4px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-close:hover { border-color: var(--danger); color: var(--danger); }
+  .avatar-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .avatar-card {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .avatar-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .avatar-card.active-card { border-color: var(--accent3); box-shadow: 0 0 15px rgba(0,255,157,0.2); }
+  .avatar-card .card-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .avatar-card .card-detail {
+    font-size: 11px;
+    color: var(--text2);
+    margin: 3px 0;
+  }
+  .avatar-card .card-badge {
+    position: absolute;
+    top: 8px; right: 8px;
+    background: var(--accent3);
+    color: #000;
+    font-size: 9px;
+    font-family: 'Orbitron', sans-serif;
+    padding: 2px 6px;
+    border-radius: 10px;
+  }
+  .avatar-card .card-avatar-preview {
+    width: 100%;
+    height: 60px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    background: linear-gradient(135deg, rgba(0,212,255,0.1), rgba(124,58,237,0.1));
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+  .card-delete {
+    position: absolute;
+    bottom: 8px; right: 8px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text2);
+    cursor: pointer;
+    width: 22px; height: 22px;
+    border-radius: 4px;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .card-delete:hover { border-color: var(--danger); color: var(--danger); }
+  .empty-list {
+    grid-column: 1/-1;
+    text-align: center;
+    padding: 40px;
+    color: var(--text2);
+    font-size: 13px;
+  }
+
+  /* Voice naturalness indicator */
+  .voice-quality-bar {
+    display: flex;
+    gap: 3px;
+    margin-top: 6px;
+  }
+  .vq-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.3s;
+  }
+  .vq-dot.on { background: var(--accent3); box-shadow: 0 0 4px var(--accent3); }
+
+  /* body motion indicator */
+  .motion-chip {
+    background: rgba(0,0,0,0.6);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 10px;
+    font-family: 'Orbitron', sans-serif;
+    color: var(--text2);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .motion-chip.active { border-color: var(--accent2); color: var(--accent2); }
 </style>
 
-<!-- Import maps for Three.js modules -->
 <script type="importmap">
 {
   "imports": {
@@ -463,6 +602,19 @@
 </head>
 <body>
 
+<!-- AVATAR LIST MODAL -->
+<div id="avatar-list-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>AVATAR GALLERY</h2>
+      <button class="modal-close" onclick="closeAvatarList()">✕</button>
+    </div>
+    <div class="avatar-grid" id="avatar-gallery-grid">
+      <div class="empty-list">まだアバターが作成されていません</div>
+    </div>
+  </div>
+</div>
+
 <!-- HEADER -->
 <header>
   <div class="logo">AI AVATAR STUDIO</div>
@@ -471,6 +623,7 @@
     <span><span class="status-dot" id="dot-track"></span>トラッキング</span>
     <span><span class="status-dot" id="dot-vrm"></span>アバター</span>
     <span><span class="status-dot" id="dot-ai"></span>Gemini AI</span>
+    <button onclick="openAvatarList()" style="background:transparent;border:1px solid var(--border);color:var(--text2);padding:4px 12px;border-radius:4px;cursor:pointer;font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">一覧 ▤</button>
   </div>
 </header>
 
@@ -532,6 +685,7 @@
     <div class="track-chip" id="chip-face">👁 顔検出</div>
     <div class="track-chip" id="chip-mouth">👄 口</div>
     <div class="track-chip" id="chip-blink">😑 瞬き</div>
+    <div class="motion-chip" id="chip-body">🤸 身体動作</div>
   </div>
 
   <div id="loading-overlay">
@@ -553,6 +707,25 @@
 
   <div class="panel-title">声の設定</div>
   <div class="panel-scroll">
+    <div class="setup-section">
+      <div class="setup-label">音声エンジン</div>
+      <select id="voice-engine" onchange="updateVoiceEngine()">
+        <option value="webspeech">ブラウザ内蔵 (WebSpeech)</option>
+        <option value="human">人間らしい合成 (推奨)</option>
+      </select>
+      <div style="margin-top:6px;font-size:10px;color:var(--text2)">
+        「人間らしい合成」は音声を感情・リズムで自然に調整します
+      </div>
+      <div class="voice-quality-bar" id="voice-quality-bar">
+        <span style="font-size:10px;color:var(--text2);margin-right:4px">自然さ:</span>
+        <div class="vq-dot" id="vq1"></div>
+        <div class="vq-dot" id="vq2"></div>
+        <div class="vq-dot" id="vq3"></div>
+        <div class="vq-dot" id="vq4"></div>
+        <div class="vq-dot" id="vq5"></div>
+      </div>
+    </div>
+
     <div class="voice-row">
       <label>ピッチ</label>
       <input type="range" id="voice-pitch" min="0.5" max="2" step="0.05" value="1.2" oninput="updateVoiceParam('pitch', this.value)">
@@ -560,8 +733,8 @@
     </div>
     <div class="voice-row">
       <label>速度</label>
-      <input type="range" id="voice-rate" min="0.5" max="2" step="0.05" value="1.0" oninput="updateVoiceParam('rate', this.value)">
-      <span class="val" id="val-rate">1.0</span>
+      <input type="range" id="voice-rate" min="0.5" max="2" step="0.05" value="0.95" oninput="updateVoiceParam('rate', this.value)">
+      <span class="val" id="val-rate">0.95</span>
     </div>
     <div class="voice-row">
       <label>音量</label>
@@ -614,15 +787,18 @@ import { VRM, VRMLoaderPlugin, VRMUtils, VRMExpressionPresetName } from '@pixiv/
 window.appState = {
   apiKey: localStorage.getItem('gemini_api_key') || '',
   avatarData: null,
+  avatarList: JSON.parse(localStorage.getItem('avatar_list') || '[]'),
   conversationHistory: [],
   isRecording: false,
   isSpeaking: false,
   currentVrm: null,
-  voiceParams: { pitch: 1.2, rate: 1.0, volume: 0.9 },
+  voiceParams: { pitch: 1.2, rate: 0.95, volume: 0.9 },
   selectedVoiceName: '',
   uploadedImageBase64: null,
   recognition: null,
   currentUtterance: null,
+  voiceEngine: 'human',
+  bodyMotionActive: false,
 };
 
 if (window.appState.apiKey) {
@@ -634,7 +810,6 @@ if (window.appState.apiKey) {
 const canvas = document.getElementById('three-canvas');
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 20);
-// Front-facing: avatar looks at viewer
 camera.position.set(0, 1.45, 1.1);
 camera.lookAt(0, 1.45, 0);
 
@@ -642,7 +817,6 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true 
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setClearColor(0x000000, 0);
 
-// Lighting
 const ambient = new THREE.AmbientLight(0x88aaff, 0.6);
 scene.add(ambient);
 const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -655,7 +829,6 @@ const rimLight = new THREE.DirectionalLight(0x00d4ff, 0.4);
 rimLight.position.set(0, 2, -2);
 scene.add(rimLight);
 
-// Resize handler
 function resizeRenderer() {
   const container = canvas.parentElement;
   const w = container.clientWidth;
@@ -681,11 +854,15 @@ loader.load(vrmUrl,
     VRMUtils.removeUnnecessaryVertices(gltf.scene);
     window.appState.currentVrm = vrm;
     scene.add(vrm.scene);
-    // Face forward - no rotation needed as default faces away, rotate 180
     vrm.scene.rotation.y = 0;
     hideLoading();
     setDot('dot-vrm', 'active');
+
+    // Activate body motion chip
+    document.getElementById('chip-body').classList.add('active');
+    window.appState.bodyMotionActive = true;
     console.log('VRM loaded:', vrm);
+    console.log('Available bones:', Object.keys(vrm.humanoid?.humanBones || {}));
   },
   (p) => {
     if (p.total > 0) setLoadingText(`読み込み中... ${Math.round(p.loaded/p.total*100)}%`);
@@ -693,41 +870,75 @@ loader.load(vrmUrl,
   (e) => { setLoadingText('VRM読み込み失敗: ' + e.message); }
 );
 
-// Blink auto animation
+// ===== ANIMATION STATE =====
 let blinkTimer = 0;
-let blinkState = 0; // 0=open, 1=closing, 2=opening
+let blinkState = 0;
 let blinkValue = 0;
-let autoBlinkActive = false; // when face tracking is active, manual blink from tracking
 let lastFaceTime = 0;
 
-// Talking animation state
 let talkTarget = 0;
 let talkCurrent = 0;
 
-// Smooth head rotation
+// Multi-phoneme mouth state
+let mouthPhoneme = 'neutral'; // aa, ih, ou, ee, neutral
+let mouthPhonemeTimer = 0;
+
 let targetNeckRot = { x: 0, y: 0, z: 0 };
 let currentNeckRot = { x: 0, y: 0, z: 0 };
 
+// Body motion
+let bodyIdleTime = 0;
+let breathPhase = 0;
+let idleArmL = { x: 0, y: 0, z: 0 };
+let idleArmR = { x: 0, y: 0, z: 0 };
+let talkGestureTimer = 0;
+let talkGestureActive = false;
+let talkGestureTarget = { x: 0, y: 0, z: 0 };
+let shoulderSwayPhase = 0;
+let spineSwayPhase = 0;
+
+// Smooth shoulder/hand current
+let curArmL = { x: 0, y: 0, z: 0 };
+let curArmR = { x: 0, y: 0, z: 0 };
+let curHipRot = { x: 0, y: 0, z: 0 };
+let curSpineRot = { x: 0, y: 0, z: 0 };
+
 const clock = new THREE.Clock();
+
+function getHumanBone(vrm, name) {
+  try {
+    return vrm.humanoid?.getNormalizedBoneNode(name);
+  } catch(e) { return null; }
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+function lerpObj(cur, target, t) {
+  cur.x += (target.x - cur.x) * t;
+  cur.y += (target.y - cur.y) * t;
+  cur.z += (target.z - cur.z) * t;
+}
+
 function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
+  const t = clock.getElapsedTime();
   const vrm = window.appState.currentVrm;
+
   if (vrm) {
-    // Smooth neck
     const lerpFactor = 1 - Math.pow(0.001, delta);
+
+    // ── Neck (face tracking) ──
     currentNeckRot.x += (targetNeckRot.x - currentNeckRot.x) * lerpFactor;
     currentNeckRot.y += (targetNeckRot.y - currentNeckRot.y) * lerpFactor;
     currentNeckRot.z += (targetNeckRot.z - currentNeckRot.z) * lerpFactor;
-
-    const neck = vrm.humanoid.getNormalizedBoneNode('neck');
+    const neck = getHumanBone(vrm, 'neck');
     if (neck) {
       neck.rotation.x = currentNeckRot.x;
       neck.rotation.y = currentNeckRot.y;
       neck.rotation.z = currentNeckRot.z;
     }
 
-    // Auto-blink when no face tracking
+    // ── Auto-blink ──
     const noFace = (Date.now() - lastFaceTime) > 2000;
     if (noFace) {
       blinkTimer += delta;
@@ -744,14 +955,158 @@ function animate() {
       vrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkRight, blinkValue);
     }
 
-    // Talking animation
+    // ── Mouth animation with phonemes ──
     if (window.appState.isSpeaking) {
-      talkTarget = 0.3 + Math.abs(Math.sin(Date.now() * 0.01)) * 0.6;
+      // Cycle through phoneme shapes for more natural mouth movement
+      mouthPhonemeTimer += delta;
+      const phonemeRate = 0.08 + Math.random() * 0.05;
+      if (mouthPhonemeTimer > phonemeRate) {
+        mouthPhonemeTimer = 0;
+        const phonemes = ['aa', 'ih', 'ou', 'ee', 'aa', 'neutral', 'aa'];
+        mouthPhoneme = phonemes[Math.floor(Math.random() * phonemes.length)];
+      }
+      const base = 0.2 + Math.abs(Math.sin(t * 8)) * 0.7;
+      talkTarget = base;
+
+      // Clear all mouth shapes
+      vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, 0);
+      vrm.expressionManager?.setValue(VRMExpressionPresetName.Ih, 0);
+      vrm.expressionManager?.setValue(VRMExpressionPresetName.Ou, 0);
+      vrm.expressionManager?.setValue(VRMExpressionPresetName.Ee, 0);
+      vrm.expressionManager?.setValue(VRMExpressionPresetName.Oh, 0);
+
+      talkCurrent += (talkTarget - talkCurrent) * Math.min(1, delta * 14);
+
+      if (mouthPhoneme === 'aa') vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, talkCurrent);
+      else if (mouthPhoneme === 'ih') vrm.expressionManager?.setValue(VRMExpressionPresetName.Ih, talkCurrent * 0.8);
+      else if (mouthPhoneme === 'ou') vrm.expressionManager?.setValue(VRMExpressionPresetName.Ou, talkCurrent * 0.9);
+      else if (mouthPhoneme === 'ee') vrm.expressionManager?.setValue(VRMExpressionPresetName.Ee, talkCurrent * 0.7);
+      else vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, talkCurrent * 0.3);
+
     } else {
       talkTarget = 0;
+      talkCurrent += (talkTarget - talkCurrent) * Math.min(1, delta * 8);
+      vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, talkCurrent);
+      vrm.expressionManager?.setValue(VRMExpressionPresetName.Ih, 0);
+      vrm.expressionManager?.setValue(VRMExpressionPresetName.Ou, 0);
+      vrm.expressionManager?.setValue(VRMExpressionPresetName.Ee, 0);
     }
-    talkCurrent += (talkTarget - talkCurrent) * Math.min(1, delta * 12);
-    vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, talkCurrent);
+
+    // ── Body Motion: Breathing ──
+    breathPhase += delta * 0.8;
+    const breathY = Math.sin(breathPhase) * 0.003;
+    const breathScale = 1 + Math.sin(breathPhase) * 0.003;
+    const chest = getHumanBone(vrm, 'chest') || getHumanBone(vrm, 'spine');
+    if (chest) {
+      chest.rotation.x = Math.sin(breathPhase) * 0.012;
+    }
+
+    // ── Body Motion: Spine sway (gentle idle) ──
+    spineSwayPhase += delta * 0.3;
+    const spineTarget = {
+      x: Math.sin(spineSwayPhase * 0.7) * 0.015,
+      y: Math.sin(spineSwayPhase * 0.5) * 0.008,
+      z: Math.sin(spineSwayPhase) * 0.01,
+    };
+    lerpObj(curSpineRot, spineTarget, delta * 2);
+    const spine = getHumanBone(vrm, 'spine');
+    if (spine) {
+      spine.rotation.x = curSpineRot.x;
+      spine.rotation.y = curSpineRot.y;
+      spine.rotation.z = curSpineRot.z;
+    }
+
+    // ── Body Motion: Shoulder sway ──
+    shoulderSwayPhase += delta * 0.4;
+
+    // ── Body Motion: Arms (idle + gesture when talking) ──
+    // Default idle arm pose
+    let targetArmL = {
+      x: 0.05 + Math.sin(shoulderSwayPhase * 0.8) * 0.03,
+      y: 0.02,
+      z: 0.4 + Math.sin(shoulderSwayPhase * 1.1) * 0.05,
+    };
+    let targetArmR = {
+      x: 0.05 + Math.sin(shoulderSwayPhase * 0.8 + 1.5) * 0.03,
+      y: -0.02,
+      z: -(0.4 + Math.sin(shoulderSwayPhase * 1.1 + 1.5) * 0.05),
+    };
+
+    // Talking gestures
+    if (window.appState.isSpeaking) {
+      talkGestureTimer += delta;
+      if (talkGestureTimer > 0.6 + Math.random() * 0.8) {
+        talkGestureTimer = 0;
+        talkGestureActive = true;
+        // Random expressive gesture
+        const g = Math.floor(Math.random() * 4);
+        if (g === 0) {
+          talkGestureTarget = { x: -0.3, y: 0, z: 0.6 }; // raise left arm
+        } else if (g === 1) {
+          talkGestureTarget = { x: -0.2, y: 0.1, z: 0.8 }; // open left arm out
+        } else if (g === 2) {
+          talkGestureTarget = { x: -0.1, y: 0, z: 1.0 }; // extend left arm
+        } else {
+          talkGestureTarget = { x: 0.05, y: 0, z: 0.4 }; // return to idle
+          talkGestureActive = false;
+        }
+      }
+      if (talkGestureActive) {
+        targetArmL = talkGestureTarget;
+      }
+    } else {
+      talkGestureTimer = 0;
+      talkGestureActive = false;
+    }
+
+    lerpObj(curArmL, targetArmL, delta * 3);
+    lerpObj(curArmR, targetArmR, delta * 3);
+
+    const lUpperArm = getHumanBone(vrm, 'leftUpperArm');
+    const rUpperArm = getHumanBone(vrm, 'rightUpperArm');
+    if (lUpperArm) {
+      lUpperArm.rotation.x = curArmL.x;
+      lUpperArm.rotation.y = curArmL.y;
+      lUpperArm.rotation.z = curArmL.z;
+    }
+    if (rUpperArm) {
+      rUpperArm.rotation.x = curArmR.x;
+      rUpperArm.rotation.y = curArmR.y;
+      rUpperArm.rotation.z = curArmR.z;
+    }
+
+    // Lower arms (slight natural bend)
+    const lLowerArm = getHumanBone(vrm, 'leftLowerArm');
+    const rLowerArm = getHumanBone(vrm, 'rightLowerArm');
+    const bendAmt = 0.1 + Math.sin(shoulderSwayPhase * 0.7) * 0.03;
+    if (lLowerArm) lLowerArm.rotation.z = bendAmt;
+    if (rLowerArm) rLowerArm.rotation.z = -bendAmt;
+
+    // Hands: gentle natural curl
+    const lHand = getHumanBone(vrm, 'leftHand');
+    const rHand = getHumanBone(vrm, 'rightHand');
+    if (lHand) {
+      lHand.rotation.z = Math.sin(shoulderSwayPhase * 0.6) * 0.04;
+      lHand.rotation.x = Math.sin(shoulderSwayPhase * 0.4) * 0.03;
+    }
+    if (rHand) {
+      rHand.rotation.z = Math.sin(shoulderSwayPhase * 0.6 + 1.0) * 0.04;
+      rHand.rotation.x = Math.sin(shoulderSwayPhase * 0.4 + 0.8) * 0.03;
+    }
+
+    // Hips: subtle idle sway
+    const hip = getHumanBone(vrm, 'hips');
+    const hipTarget = {
+      x: Math.sin(breathPhase * 0.5) * 0.005,
+      y: Math.sin(breathPhase * 0.3) * 0.003,
+      z: Math.sin(spineSwayPhase * 0.8) * 0.005,
+    };
+    lerpObj(curHipRot, hipTarget, delta * 1.5);
+    if (hip) {
+      hip.rotation.x = curHipRot.x;
+      hip.rotation.y = curHipRot.y;
+      hip.rotation.z = curHipRot.z;
+    }
 
     vrm.update(delta);
   }
@@ -759,7 +1114,7 @@ function animate() {
 }
 animate();
 
-// Expose target neck rotation for MediaPipe
+// Expose setters for MediaPipe
 window.setNeckTarget = (x, y, z) => {
   targetNeckRot.x = x;
   targetNeckRot.y = y;
@@ -771,13 +1126,11 @@ window.setFaceTracked = (blink_l, blink_r, mouth) => {
   if (!vrm) return;
   vrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkLeft, blink_l);
   vrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkRight, blink_r);
-  // mouth handled by talking anim when speaking, else from face
   if (!window.appState.isSpeaking) {
     vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, mouth);
   }
 };
 
-// Loading helpers
 function setLoadingText(t) { document.getElementById('loading-text').textContent = t; }
 function hideLoading() {
   const el = document.getElementById('loading-overlay');
@@ -785,7 +1138,6 @@ function hideLoading() {
   el.style.opacity = '0';
   setTimeout(() => el.style.display = 'none', 500);
 }
-
 function setDot(id, state) {
   const el = document.getElementById(id);
   el.className = 'status-dot ' + (state || '');
@@ -805,14 +1157,12 @@ window.saveApiKey = function() {
   addMessage('system', key ? '✓ APIキーを保存しました' : 'APIキーをクリアしました');
 };
 
-// Personality presets
 window.setPersonality = function(text, btn) {
   document.getElementById('personality-text').value = text;
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
 };
 
-// Image upload
 window.handleImageUpload = function(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -827,14 +1177,29 @@ window.handleImageUpload = function(e) {
   reader.readAsDataURL(file);
 };
 
-// Voice params
 window.updateVoiceParam = function(param, val) {
   window.appState.voiceParams[param] = parseFloat(val);
   document.getElementById('val-' + param).textContent = parseFloat(val).toFixed(2);
 };
 
+window.updateVoiceEngine = function() {
+  const engine = document.getElementById('voice-engine').value;
+  window.appState.voiceEngine = engine;
+  // Update quality bar
+  const dots = [1,2,3,4,5];
+  const active = engine === 'human' ? 5 : 2;
+  dots.forEach(i => {
+    const el = document.getElementById('vq' + i);
+    if (el) el.className = 'vq-dot' + (i <= active ? ' on' : '');
+  });
+};
+
+// Initialize voice quality bar
+setTimeout(() => {
+  window.updateVoiceEngine();
+}, 100);
+
 // Load voices
-let voicesLoaded = false;
 function loadVoices() {
   const voices = speechSynthesis.getVoices();
   const sel = document.getElementById('voice-select');
@@ -848,249 +1213,140 @@ function loadVoices() {
     opt.textContent = `${v.name} (${v.lang})`;
     sel.appendChild(opt);
   });
-  // Default to first Japanese voice
-  if (jpVoices.length > 0) {
-    sel.value = jpVoices[0].name;
-    if (window.appState) window.appState.selectedVoiceName = jpVoices[0].name;
+  // Prefer Google Japanese voice (most natural)
+  const googleJa = jpVoices.find(v => v.name.includes('Google') && v.lang === 'ja-JP');
+  const preferred = googleJa || jpVoices.find(v => v.lang === 'ja-JP') || jpVoices[0];
+  if (preferred) {
+    sel.value = preferred.name;
+    if (window.appState) window.appState.selectedVoiceName = preferred.name;
   }
-  voicesLoaded = true;
 }
 speechSynthesis.onvoiceschanged = loadVoices;
-// Delay initial call so window.appState is initialized by the module script first
 setTimeout(loadVoices, 0);
 
-// ===== GEMINI API =====
-async function callGemini(messages, systemPrompt, useVision = false) {
-  const apiKey = window.appState.apiKey;
-  if (!apiKey) {
-    addMessage('system', '⚠ APIキーを設定してください');
-    return null;
-  }
-
-  const model = 'gemini-2.5-flash-lite';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-  const contents = messages.map(m => ({
-    role: m.role === 'assistant' ? 'model' : 'user',
-    parts: m.parts || [{ text: m.content }]
-  }));
-
-  const body = {
-    contents,
-    systemInstruction: systemPrompt ? { parts: [{ text: systemPrompt }] } : undefined,
-    generationConfig: { temperature: 0.9, maxOutputTokens: 500 }
-  };
-
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const data = await res.json();
-    if (data.error) {
-      addMessage('system', '⚠ Gemini Error: ' + data.error.message);
-      return null;
-    }
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
-  } catch (e) {
-    addMessage('system', '⚠ 通信エラー: ' + e.message);
-    return null;
-  }
+// ===== HUMAN-LIKE VOICE SYNTHESIS =====
+// Splits text into prosodic chunks and adds natural timing
+function splitIntoChunks(text) {
+  // Split on punctuation, preserving the delimiter
+  const chunks = text.split(/(?<=[。！？、…！？,.!?])/g).filter(c => c.trim());
+  return chunks.length > 0 ? chunks : [text];
 }
 
-// ===== CREATE AVATAR =====
-window.createAvatar = async function() {
-  const desc = document.getElementById('avatar-description').value.trim();
-  const personality = document.getElementById('personality-text').value.trim();
-  const imageB64 = window.appState.uploadedImageBase64;
+function getEmotionParams(text, avatarData) {
+  // Detect emotion from text content for prosodic variation
+  const excited = /！|やった|すごい|わあ|きゃ|うれし|たのし/.test(text);
+  const sad = /悲し|寂し|つらい|ごめん|すまない/.test(text);
+  const question = /？|かな|でしょうか|ですか/.test(text);
+  const gentle = /ふふ|うふ|ありがとう|よかった/.test(text);
 
-  if (!desc && !imageB64) {
-    addMessage('system', '⚠ 外見の説明または画像を入力してください');
-    return;
-  }
+  const basePitch = window.appState.voiceParams.pitch;
+  const baseRate = window.appState.voiceParams.rate;
 
-  const btn = document.getElementById('create-btn');
-  btn.disabled = true;
-  btn.textContent = '生成中...';
-  addMessage('system', 'アバターを生成しています...');
-
-  // Build prompt for Gemini
-  let userParts = [];
-
-  if (imageB64) {
-    userParts.push({ inlineData: { mimeType: 'image/jpeg', data: imageB64 } });
-    userParts.push({ text: '上記の画像のキャラクターをベースにして、アバターの設定を作成してください。' + (desc ? '追加の説明: ' + desc : '') });
-  } else {
-    userParts.push({ text: `以下の説明からアバターの設定を作成してください: ${desc}` });
-  }
-
-  if (personality) {
-    userParts[userParts.length - 1].text += `\n性格・口調の指示: ${personality}`;
-  }
-
-  const systemPrompt = `あなたはAIアバター設定ジェネレーターです。
-与えられた外見・性格の説明から、アバターキャラクターの設定を作成してください。
-必ず以下のJSON形式のみで返答してください（マークダウン不要）:
-{
-  "name": "キャラクター名（日本語、2〜4文字）",
-  "personality": "性格の短い説明（20字以内）",
-  "speechStyle": "口調の特徴（例: タメ語、敬語、関西弁）",
-  "voiceType": "声のタイプ（例: 高め・元気、低め・落ち着き、中音域）",
-  "systemPrompt": "このキャラクターとして会話するためのシステムプロンプト（日本語、100字以内）",
-  "voicePitch": 数値（0.8〜1.8、声のピッチ）,
-  "voiceRate": 数値（0.8〜1.3、話速）
-}`;
-
-  const response = await callGemini(
-    [{ role: 'user', parts: userParts }],
-    systemPrompt
-  );
-
-  btn.disabled = false;
-  btn.textContent = '✦ アバターを作成';
-
-  if (!response) return;
-
-  try {
-    const clean = response.replace(/```json|```/g, '').trim();
-    const avatarData = JSON.parse(clean);
-    window.appState.avatarData = avatarData;
-    window.appState.conversationHistory = [];
-
-    // Update UI
-    document.getElementById('av-name').textContent = avatarData.name || '—';
-    document.getElementById('av-personality').textContent = avatarData.personality || '—';
-    document.getElementById('av-speech-style').textContent = avatarData.speechStyle || '—';
-    document.getElementById('av-voice-type').textContent = avatarData.voiceType || '—';
-
-    // Apply voice settings
-    if (avatarData.voicePitch) {
-      window.appState.voiceParams.pitch = avatarData.voicePitch;
-      document.getElementById('voice-pitch').value = avatarData.voicePitch;
-      document.getElementById('val-pitch').textContent = avatarData.voicePitch.toFixed(2);
-    }
-    if (avatarData.voiceRate) {
-      window.appState.voiceParams.rate = avatarData.voiceRate;
-      document.getElementById('voice-rate').value = avatarData.voiceRate;
-      document.getElementById('val-rate').textContent = avatarData.voiceRate.toFixed(2);
-    }
-
-    const greet = `はじめまして！私は${avatarData.name}です。よろしくね！`;
-    addMessage('avatar', greet, avatarData.name);
-    speak(greet);
-
-    addMessage('system', `✓ アバター「${avatarData.name}」を作成しました`);
-    setDot('dot-ai', 'active');
-  } catch (e) {
-    addMessage('system', '⚠ アバターデータの解析に失敗: ' + e.message);
-    console.error(response);
-  }
-};
-
-window.resetAvatar = function() {
-  window.appState.avatarData = null;
-  window.appState.conversationHistory = [];
-  document.getElementById('av-name').textContent = '— 未設定 —';
-  document.getElementById('av-personality').textContent = '—';
-  document.getElementById('av-speech-style').textContent = '—';
-  document.getElementById('av-voice-type').textContent = '—';
-  clearHistory();
-  addMessage('system', 'アバターをリセットしました');
-};
-
-window.clearHistory = function() {
-  window.appState.conversationHistory = [];
-  document.getElementById('history-count').textContent = '0 ターン';
-};
-
-// ===== CHAT =====
-window.sendMessage = async function() {
-  const input = document.getElementById('chat-input');
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
-  await processUserMessage(text);
-};
-
-async function processUserMessage(text) {
-  if (!window.appState.avatarData) {
-    addMessage('system', '⚠ まずアバターを作成してください');
-    return;
-  }
-
-  addMessage('user', text, 'あなた');
-
-  // Show thinking
-  const thinkEl = document.createElement('div');
-  thinkEl.className = 'thinking';
-  thinkEl.innerHTML = '<span></span><span></span><span></span> 考え中...';
-  thinkEl.id = 'thinking-indicator';
-  document.getElementById('chat-messages').appendChild(thinkEl);
-  scrollChat();
-
-  // Build history
-  const history = window.appState.conversationHistory.map(m => ({
-    role: m.role,
-    parts: [{ text: m.content }]
-  }));
-  history.push({ role: 'user', parts: [{ text }] });
-
-  const systemPrompt = window.appState.avatarData.systemPrompt +
-    '\n返答は必ず日本語で、短く（3文以内）、キャラクターらしく話してください。';
-
-  const response = await callGemini(history, systemPrompt);
-
-  // Remove thinking
-  document.getElementById('thinking-indicator')?.remove();
-
-  if (response) {
-    addMessage('avatar', response, window.appState.avatarData.name);
-    speak(response);
-
-    // Update history
-    window.appState.conversationHistory.push({ role: 'user', content: text });
-    window.appState.conversationHistory.push({ role: 'assistant', content: response });
-    // Keep last 10 turns
-    if (window.appState.conversationHistory.length > 20) {
-      window.appState.conversationHistory = window.appState.conversationHistory.slice(-20);
-    }
-    document.getElementById('history-count').textContent =
-      `${window.appState.conversationHistory.length / 2} ターン`;
-  }
+  if (excited) return { pitch: basePitch * 1.1, rate: baseRate * 1.08 };
+  if (sad) return { pitch: basePitch * 0.92, rate: baseRate * 0.9 };
+  if (question) return { pitch: basePitch * 1.05, rate: baseRate * 0.95 };
+  if (gentle) return { pitch: basePitch * 0.98, rate: baseRate * 0.88 };
+  return { pitch: basePitch, rate: baseRate };
 }
 
-// ===== VOICE SYNTHESIS =====
 window.speak = function(text) {
   if (!text) return;
   speechSynthesis.cancel();
 
+  const engine = window.appState.voiceEngine || 'human';
+
+  if (engine === 'human') {
+    speakHuman(text);
+  } else {
+    speakBasic(text);
+  }
+};
+
+function speakBasic(text) {
   const utter = new SpeechSynthesisUtterance(text);
   const voices = speechSynthesis.getVoices();
   const selName = document.getElementById('voice-select').value;
   const voice = voices.find(v => v.name === selName) || voices.find(v => v.lang.startsWith('ja')) || voices[0];
   if (voice) utter.voice = voice;
-
   utter.pitch = window.appState.voiceParams.pitch;
   utter.rate = window.appState.voiceParams.rate;
   utter.volume = window.appState.voiceParams.volume;
-
-  utter.onstart = () => {
-    window.appState.isSpeaking = true;
-    document.getElementById('speak-btn').style.display = 'flex';
-  };
-  utter.onend = () => {
-    window.appState.isSpeaking = false;
-    document.getElementById('speak-btn').style.display = 'none';
-  };
-  utter.onerror = () => {
-    window.appState.isSpeaking = false;
-    document.getElementById('speak-btn').style.display = 'none';
-  };
-
+  utter.onstart = onSpeakStart;
+  utter.onend = onSpeakEnd;
+  utter.onerror = onSpeakEnd;
   window.appState.currentUtterance = utter;
   speechSynthesis.speak(utter);
-};
+}
+
+function speakHuman(text) {
+  // Select best voice
+  const voices = speechSynthesis.getVoices();
+  const selName = document.getElementById('voice-select').value;
+  let voice = voices.find(v => v.name === selName);
+  if (!voice) {
+    // Prefer Google Japanese for naturalness
+    voice = voices.find(v => v.name.includes('Google') && v.lang === 'ja-JP')
+         || voices.find(v => v.lang === 'ja-JP')
+         || voices.find(v => v.lang.startsWith('ja'))
+         || voices[0];
+  }
+
+  const emotionParams = getEmotionParams(text, window.appState.avatarData);
+  const chunks = splitIntoChunks(text);
+
+  let chunkIndex = 0;
+  window.appState.isSpeaking = true;
+  document.getElementById('speak-btn').style.display = 'flex';
+
+  function speakNextChunk() {
+    if (chunkIndex >= chunks.length || !window.appState.isSpeaking) {
+      onSpeakEnd();
+      return;
+    }
+    const chunk = chunks[chunkIndex++];
+    if (!chunk.trim()) { speakNextChunk(); return; }
+
+    const utter = new SpeechSynthesisUtterance(chunk);
+    if (voice) utter.voice = voice;
+
+    // Natural variation per chunk: slight random pitch/rate drift
+    const pitchVar = 1 + (Math.random() - 0.5) * 0.06;
+    const rateVar = 1 + (Math.random() - 0.5) * 0.04;
+    utter.pitch = emotionParams.pitch * pitchVar;
+    utter.rate = emotionParams.rate * rateVar;
+    utter.volume = window.appState.voiceParams.volume;
+
+    // Slightly slower on sentence-ending punctuation
+    if (/[。！？]$/.test(chunk)) {
+      utter.rate *= 0.93;
+    }
+    // Slightly faster on conjunctive
+    if (/[、,]$/.test(chunk)) {
+      utter.rate *= 1.03;
+    }
+
+    utter.onend = () => {
+      // Natural pause between chunks
+      const pause = /[。！？]$/.test(chunk) ? 120 + Math.random() * 80 : 40 + Math.random() * 30;
+      setTimeout(speakNextChunk, pause);
+    };
+    utter.onerror = onSpeakEnd;
+
+    window.appState.currentUtterance = utter;
+    speechSynthesis.speak(utter);
+  }
+
+  speakNextChunk();
+}
+
+function onSpeakStart() {
+  window.appState.isSpeaking = true;
+  document.getElementById('speak-btn').style.display = 'flex';
+}
+function onSpeakEnd() {
+  window.appState.isSpeaking = false;
+  document.getElementById('speak-btn').style.display = 'none';
+}
 
 window.stopSpeaking = function() {
   speechSynthesis.cancel();
@@ -1117,7 +1373,6 @@ function startVoiceInput() {
   rec.lang = 'ja-JP';
   rec.continuous = false;
   rec.interimResults = false;
-
   rec.onstart = () => {
     window.appState.isRecording = true;
     document.getElementById('mic-btn').classList.add('recording');
@@ -1139,30 +1394,314 @@ function startVoiceInput() {
     document.getElementById('mic-btn').querySelector('span').textContent = '音声入力';
     addMessage('system', '⚠ 音声認識エラー: ' + e.error);
   };
-
   window.appState.recognition = rec;
   rec.start();
 }
+function stopVoiceInput() { window.appState.recognition?.stop(); }
 
-function stopVoiceInput() {
-  window.appState.recognition?.stop();
-}
-
-// ===== CHAT MESSAGES =====
+// ===== CHAT =====
 window.addMessage = function(type, text, name) {
   const container = document.getElementById('chat-messages');
   const div = document.createElement('div');
-  div.className = 'msg ' + (type === 'user' ? 'user' : type === 'system' ? 'avatar' : 'avatar');
+  div.className = 'msg ' + (type === 'user' ? 'user' : 'avatar');
   if (type === 'system') div.style.borderColor = 'rgba(0,212,255,0.2)';
   div.innerHTML = `<div class="name">${name || (type === 'system' ? 'SYSTEM' : type.toUpperCase())}</div>${text}`;
   container.appendChild(div);
-  scrollChat();
+  container.scrollTop = container.scrollHeight;
 };
 
-function scrollChat() {
-  const el = document.getElementById('chat-messages');
-  el.scrollTop = el.scrollHeight;
+window.sendMessage = async function() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  await processUserMessage(text);
+};
+
+async function processUserMessage(text) {
+  if (!window.appState.avatarData) {
+    addMessage('system', '⚠ まずアバターを作成してください');
+    return;
+  }
+  addMessage('user', text, 'あなた');
+
+  const thinkEl = document.createElement('div');
+  thinkEl.className = 'thinking';
+  thinkEl.innerHTML = '<span></span><span></span><span></span> 考え中...';
+  thinkEl.id = 'thinking-indicator';
+  document.getElementById('chat-messages').appendChild(thinkEl);
+  document.getElementById('chat-messages').scrollTop = 99999;
+
+  const history = window.appState.conversationHistory.map(m => ({
+    role: m.role,
+    parts: [{ text: m.content }]
+  }));
+  history.push({ role: 'user', parts: [{ text }] });
+
+  const systemPrompt = window.appState.avatarData.systemPrompt +
+    '\n返答は必ず日本語で、短く（3文以内）、キャラクターらしく話してください。';
+
+  const response = await callGemini(history, systemPrompt);
+  document.getElementById('thinking-indicator')?.remove();
+
+  if (response) {
+    addMessage('avatar', response, window.appState.avatarData.name);
+    speak(response);
+    window.appState.conversationHistory.push({ role: 'user', content: text });
+    window.appState.conversationHistory.push({ role: 'assistant', content: response });
+    if (window.appState.conversationHistory.length > 20) {
+      window.appState.conversationHistory = window.appState.conversationHistory.slice(-20);
+    }
+    document.getElementById('history-count').textContent =
+      `${window.appState.conversationHistory.length / 2} ターン`;
+  }
 }
+
+// ===== GEMINI API =====
+async function callGemini(messages, systemPrompt) {
+  const apiKey = window.appState.apiKey;
+  if (!apiKey) { addMessage('system', '⚠ APIキーを設定してください'); return null; }
+
+  const model = 'gemini-2.5-flash-lite';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const contents = messages.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: m.parts || [{ text: m.content }]
+  }));
+
+  const body = {
+    contents,
+    systemInstruction: systemPrompt ? { parts: [{ text: systemPrompt }] } : undefined,
+    generationConfig: { temperature: 0.9, maxOutputTokens: 500 }
+  };
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (data.error) { addMessage('system', '⚠ Gemini Error: ' + data.error.message); return null; }
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+  } catch (e) {
+    addMessage('system', '⚠ 通信エラー: ' + e.message);
+    return null;
+  }
+}
+
+// ===== AVATAR EMOJI ─ pick from description =====
+function pickAvatarEmoji(desc, name) {
+  if (!desc) desc = '';
+  const d = (desc + name).toLowerCase();
+  if (/ロボ|サイボーグ|機械|android/.test(d)) return '🤖';
+  if (/猫|ねこ|cat/.test(d)) return '🐱';
+  if (/犬|いぬ|dog/.test(d)) return '🐶';
+  if (/妖精|elf|エルフ/.test(d)) return '🧝';
+  if (/魔法|witch|魔女/.test(d)) return '🧙';
+  if (/忍者|ninja/.test(d)) return '🥷';
+  if (/天使|angel/.test(d)) return '👼';
+  if (/悪魔|demon/.test(d)) return '😈';
+  if (/アイドル|idol/.test(d)) return '⭐';
+  if (/お姉さん|お兄さん|大人/.test(d)) return '👤';
+  if (/少女|女の子|girl/.test(d)) return '👧';
+  if (/少年|男の子|boy/.test(d)) return '👦';
+  return '🧑';
+}
+
+// ===== CREATE AVATAR =====
+window.createAvatar = async function() {
+  const desc = document.getElementById('avatar-description').value.trim();
+  const personality = document.getElementById('personality-text').value.trim();
+  const imageB64 = window.appState.uploadedImageBase64;
+
+  if (!desc && !imageB64) {
+    addMessage('system', '⚠ 外見の説明または画像を入力してください');
+    return;
+  }
+
+  const btn = document.getElementById('create-btn');
+  btn.disabled = true;
+  btn.textContent = '生成中...';
+  addMessage('system', 'アバターを生成しています...');
+
+  let userParts = [];
+  if (imageB64) {
+    userParts.push({ inlineData: { mimeType: 'image/jpeg', data: imageB64 } });
+    userParts.push({ text: '上記の画像のキャラクターをベースにして、アバターの設定を作成してください。' + (desc ? '追加の説明: ' + desc : '') });
+  } else {
+    userParts.push({ text: `以下の説明からアバターの設定を作成してください: ${desc}` });
+  }
+  if (personality) {
+    userParts[userParts.length - 1].text += `\n性格・口調の指示: ${personality}`;
+  }
+
+  const systemPrompt = `あなたはAIアバター設定ジェネレーターです。
+与えられた外見・性格の説明から、アバターキャラクターの設定を作成してください。
+必ず以下のJSON形式のみで返答してください（マークダウン不要）:
+{
+  "name": "キャラクター名（日本語、2〜4文字）",
+  "personality": "性格の短い説明（20字以内）",
+  "speechStyle": "口調の特徴（例: タメ語、敬語、関西弁）",
+  "voiceType": "声のタイプ（例: 高め・元気、低め・落ち着き、中音域）",
+  "systemPrompt": "このキャラクターとして会話するためのシステムプロンプト（日本語、100字以内）",
+  "voicePitch": 数値（0.8〜1.8、声のピッチ）,
+  "voiceRate": 数値（0.8〜1.1、話速。人間らしく0.9前後推奨）,
+  "description": "外見の短い説明（30字以内）"
+}`;
+
+  const response = await callGemini([{ role: 'user', parts: userParts }], systemPrompt);
+
+  btn.disabled = false;
+  btn.textContent = '✦ アバターを作成';
+  if (!response) return;
+
+  try {
+    const clean = response.replace(/```json|```/g, '').trim();
+    const avatarData = JSON.parse(clean);
+    avatarData.id = Date.now().toString();
+    avatarData.createdAt = new Date().toLocaleDateString('ja-JP');
+    avatarData.emoji = pickAvatarEmoji(desc, avatarData.name || '');
+    avatarData.inputDesc = desc;
+
+    window.appState.avatarData = avatarData;
+    window.appState.conversationHistory = [];
+
+    // Save to list
+    window.appState.avatarList.push(avatarData);
+    localStorage.setItem('avatar_list', JSON.stringify(window.appState.avatarList));
+
+    // Update info card
+    document.getElementById('av-name').textContent = avatarData.name || '—';
+    document.getElementById('av-personality').textContent = avatarData.personality || '—';
+    document.getElementById('av-speech-style').textContent = avatarData.speechStyle || '—';
+    document.getElementById('av-voice-type').textContent = avatarData.voiceType || '—';
+
+    // Apply voice settings
+    if (avatarData.voicePitch) {
+      window.appState.voiceParams.pitch = avatarData.voicePitch;
+      document.getElementById('voice-pitch').value = avatarData.voicePitch;
+      document.getElementById('val-pitch').textContent = avatarData.voicePitch.toFixed(2);
+    }
+    if (avatarData.voiceRate) {
+      // Ensure natural rate (cap at 1.1 for human-like speech)
+      const naturalRate = Math.min(avatarData.voiceRate, 1.05);
+      window.appState.voiceParams.rate = naturalRate;
+      document.getElementById('voice-rate').value = naturalRate;
+      document.getElementById('val-rate').textContent = naturalRate.toFixed(2);
+    }
+
+    const greet = `はじめまして！私は${avatarData.name}です。よろしくね！`;
+    addMessage('avatar', greet, avatarData.name);
+    speak(greet);
+    addMessage('system', `✓ アバター「${avatarData.name}」を作成しました`);
+    setDot('dot-ai', 'active');
+  } catch (e) {
+    addMessage('system', '⚠ アバターデータの解析に失敗: ' + e.message);
+    console.error(response);
+  }
+};
+
+window.resetAvatar = function() {
+  window.appState.avatarData = null;
+  window.appState.conversationHistory = [];
+  document.getElementById('av-name').textContent = '— 未設定 —';
+  document.getElementById('av-personality').textContent = '—';
+  document.getElementById('av-speech-style').textContent = '—';
+  document.getElementById('av-voice-type').textContent = '—';
+  clearHistory();
+  addMessage('system', 'アバターをリセットしました');
+};
+
+window.clearHistory = function() {
+  window.appState.conversationHistory = [];
+  document.getElementById('history-count').textContent = '0 ターン';
+};
+
+// ===== AVATAR GALLERY =====
+window.openAvatarList = function() {
+  renderAvatarGallery();
+  document.getElementById('avatar-list-modal').classList.add('open');
+};
+window.closeAvatarList = function() {
+  document.getElementById('avatar-list-modal').classList.remove('open');
+};
+
+function renderAvatarGallery() {
+  const grid = document.getElementById('avatar-gallery-grid');
+  const list = window.appState.avatarList || [];
+
+  if (list.length === 0) {
+    grid.innerHTML = '<div class="empty-list">まだアバターが作成されていません<br><span style="font-size:11px;margin-top:8px;display:block">左パネルからアバターを作成しましょう</span></div>';
+    return;
+  }
+
+  grid.innerHTML = '';
+  const activeId = window.appState.avatarData?.id;
+
+  list.forEach((av) => {
+    const card = document.createElement('div');
+    card.className = 'avatar-card' + (av.id === activeId ? ' active-card' : '');
+    card.innerHTML = `
+      <div class="card-avatar-preview">${av.emoji || '🧑'}</div>
+      ${av.id === activeId ? '<div class="card-badge">使用中</div>' : ''}
+      <div class="card-name">${av.name}</div>
+      <div class="card-detail">性格: ${av.personality || '—'}</div>
+      <div class="card-detail">口調: ${av.speechStyle || '—'}</div>
+      <div class="card-detail">声: ${av.voiceType || '—'}</div>
+      <div class="card-detail" style="margin-top:4px;font-size:10px;color:var(--border)">${av.createdAt || ''}</div>
+      <button class="card-delete" onclick="deleteAvatar('${av.id}', event)" title="削除">✕</button>
+    `;
+    card.addEventListener('click', () => loadAvatar(av));
+    grid.appendChild(card);
+  });
+}
+
+window.loadAvatar = function(avatarData) {
+  window.appState.avatarData = avatarData;
+  window.appState.conversationHistory = [];
+
+  document.getElementById('av-name').textContent = avatarData.name || '—';
+  document.getElementById('av-personality').textContent = avatarData.personality || '—';
+  document.getElementById('av-speech-style').textContent = avatarData.speechStyle || '—';
+  document.getElementById('av-voice-type').textContent = avatarData.voiceType || '—';
+
+  if (avatarData.voicePitch) {
+    window.appState.voiceParams.pitch = avatarData.voicePitch;
+    document.getElementById('voice-pitch').value = avatarData.voicePitch;
+    document.getElementById('val-pitch').textContent = avatarData.voicePitch.toFixed(2);
+  }
+  if (avatarData.voiceRate) {
+    const naturalRate = Math.min(avatarData.voiceRate, 1.05);
+    window.appState.voiceParams.rate = naturalRate;
+    document.getElementById('voice-rate').value = naturalRate;
+    document.getElementById('val-rate').textContent = naturalRate.toFixed(2);
+  }
+
+  const greet = `こんにちは！${avatarData.name}です。また話しましょう！`;
+  addMessage('avatar', greet, avatarData.name);
+  speak(greet);
+  addMessage('system', `✓ アバター「${avatarData.name}」を読み込みました`);
+  setDot('dot-ai', 'active');
+  closeAvatarList();
+};
+
+window.deleteAvatar = function(id, event) {
+  event.stopPropagation();
+  window.appState.avatarList = window.appState.avatarList.filter(a => a.id !== id);
+  localStorage.setItem('avatar_list', JSON.stringify(window.appState.avatarList));
+  if (window.appState.avatarData?.id === id) {
+    window.appState.avatarData = null;
+    document.getElementById('av-name').textContent = '— 未設定 —';
+  }
+  renderAvatarGallery();
+};
+
+// Close modal on outside click
+document.getElementById('avatar-list-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeAvatarList();
+});
 
 // ===== MEDIAPIPE FACE TRACKING =====
 const videoEl = document.getElementById('webcam-preview');
@@ -1181,44 +1720,28 @@ function onFaceResults(results) {
   document.getElementById('chip-face').classList.add('active');
 
   const lm = results.multiFaceLandmarks[0];
-
-  // Neck/head rotation
-  const nose = lm[4];
-  const leftEye = lm[33];
-  const rightEye = lm[263];
+  const nose = lm[4], leftEye = lm[33], rightEye = lm[263];
   const roll = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x) * 0.8;
   const pitch = (nose.y - (leftEye.y + rightEye.y) / 2) * 2.5;
   const yaw = (nose.x - (leftEye.x + rightEye.x) / 2) * -3.0;
   window.setNeckTarget && window.setNeckTarget(pitch, yaw, roll);
 
-  // Blink
   const EAR_OPEN = 0.25, EAR_CLOSED = 0.05;
   const leftEAR = calcEAR(lm[159], lm[145], lm[33], lm[133]);
   const rightEAR = calcEAR(lm[386], lm[374], lm[362], lm[263]);
   const lb = 1 - Math.max(0, Math.min(1, (leftEAR - EAR_CLOSED) / (EAR_OPEN - EAR_CLOSED)));
   const rb = 1 - Math.max(0, Math.min(1, (rightEAR - EAR_CLOSED) / (EAR_OPEN - EAR_CLOSED)));
 
-  if (lb > 0.5 || rb > 0.5) {
-    document.getElementById('chip-blink').classList.add('active');
-  } else {
-    document.getElementById('chip-blink').classList.remove('active');
-  }
+  document.getElementById('chip-blink').classList.toggle('active', lb > 0.5 || rb > 0.5);
 
-  // Mouth
   const lipTop = lm[13], lipBottom = lm[14];
   const mouthDist = Math.hypot(lipTop.x - lipBottom.x, lipTop.y - lipBottom.y);
-  let mouth = Math.max(0, Math.min(1, (mouthDist - 0.015) * 15));
-
-  if (mouth > 0.2) {
-    document.getElementById('chip-mouth').classList.add('active');
-  } else {
-    document.getElementById('chip-mouth').classList.remove('active');
-  }
+  const mouth = Math.max(0, Math.min(1, (mouthDist - 0.015) * 15));
+  document.getElementById('chip-mouth').classList.toggle('active', mouth > 0.2);
 
   window.setFaceTracked && window.setFaceTracked(lb, rb, mouth);
 }
 
-// Initialize MediaPipe
 const faceMesh = new FaceMesh({
   locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`
 });
@@ -1230,7 +1753,6 @@ faceMesh.setOptions({
 });
 faceMesh.onResults(onFaceResults);
 
-// Camera
 navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } })
   .then(stream => {
     videoEl.srcObject = stream;
@@ -1247,7 +1769,6 @@ navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMo
     addMessage('system', '⚠ カメラアクセスできません: ' + e.message);
   });
 
-// setDot global
 window.setDot = function(id, state) {
   const el = document.getElementById(id);
   if (el) el.className = 'status-dot ' + (state || '');
