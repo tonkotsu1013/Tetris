@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Avatar Prototype - Expression Version</title>
+    <title>AI VR Avatar Prototype - Expression Version</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #2a2a3a; font-family: sans-serif; }
         #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; }
@@ -24,7 +24,7 @@
     <video id="webcam" autoplay playsinline></video>
     
     <div id="ui">
-        <h1>AIアバター試作機 (Ver.0.3)</h1>
+        <h1>AIアバター試作機 (Ver.0.4)</h1>
         <p>● 首の動きを連動</p>
         <p>★ まばたきを検知（目を閉じるとアバターも閉じます）</p>
         <p>★ 口の動きを検知（口を開けるとアバターも「あ」の口になります）</p>
@@ -38,7 +38,7 @@
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 20);
-        camera.position.set(0.0, 1.4, 1.2); // 少しだけ顔に近づけました
+        camera.position.set(0.0, 1.4, 1.2);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -52,8 +52,9 @@
         scene.add(dirLight);
 
         // --- 2. VRMアバターの読み込み ---
+        // 修正: 404だったURLを、動作確認済みの公開モデルに変更
         const loader = new THREE.GLTFLoader();
-        const vrmUrl = 'https://raw.githubusercontent.com/pixiv/three-vrm/main/packages/three-vrm/examples/models/vrm/three-vrm-avatar-anm.vrm';
+        const vrmUrl = 'https://cdn.jsdelivr.net/gh/pixiv/three-vrm@dev/packages/three-vrm/examples/models/vrm/three-vrm-girl.vrm';
 
         loader.load(
             vrmUrl,
@@ -61,11 +62,19 @@
                 THREE.VRM.from(gltf).then((vrm) => {
                     currentVrm = vrm;
                     scene.add(vrm.scene);
-                    vrm.scene.rotation.y = Math.PI; 
-                    
+                    vrm.scene.rotation.y = Math.PI;
                     document.getElementById('status').innerText = "準備完了！まばたき・口を動かしてね";
                     document.getElementById('status').style.color = "#00ff88";
                 });
+            },
+            (progress) => {
+                const pct = Math.round(progress.loaded / progress.total * 100);
+                document.getElementById('status').innerText = `読み込み中... ${pct}%`;
+            },
+            (error) => {
+                console.error('VRM load error:', error);
+                document.getElementById('status').innerText = "読み込み失敗。コンソールを確認してください。";
+                document.getElementById('status').style.color = "#ff4444";
             }
         );
 
@@ -91,57 +100,59 @@
         // --- 3. MediaPipe で顔・目・口を追跡 ---
         const videoElement = document.getElementById('webcam');
 
+        // EAR（Eye Aspect Ratio）を使ってまばたきを計算する関数
+        // 修正: 以前は固定閾値で 0 or 1 の二値判定だったが、
+        //       EAR比率で 0〜1 の滑らかな値に改善し、より自然な動きに
+        function calcEAR(top, bottom, innerCorner, outerCorner) {
+            const vertical = Math.hypot(top.x - bottom.x, top.y - bottom.y);
+            const horizontal = Math.hypot(innerCorner.x - outerCorner.x, innerCorner.y - outerCorner.y);
+            if (horizontal === 0) return 0;
+            return vertical / horizontal;
+        }
+
         function onResults(results) {
             if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0 && currentVrm) {
-                const landmarks = results.multiFaceLandmarks[0];
-                
-                // --- 首の回転 ---
-                const nose = landmarks[4];
-                const leftEyeCorner = landmarks[33];
-                const rightEyeCorner = landmarks[263];
+                const lm = results.multiFaceLandmarks[0];
 
-                const roll = Math.atan2(rightEyeCorner.y - leftEyeCorner.y, rightEyeCorner.x - leftEyeCorner.x);
-                const pitch = (nose.y - (leftEyeCorner.y + rightEyeCorner.y)/2) * 3; 
-                const yaw = ((nose.x - (leftEyeCorner.x + rightEyeCorner.x)/2)) * -3;
+                // --- 首の回転 ---
+                const nose = lm[4];
+                const leftEyeCorner  = lm[33];
+                const rightEyeCorner = lm[263];
+
+                const roll  = Math.atan2(rightEyeCorner.y - leftEyeCorner.y, rightEyeCorner.x - leftEyeCorner.x);
+                const pitch = (nose.y - (leftEyeCorner.y + rightEyeCorner.y) / 2) * 3;
+                const yaw   = ((nose.x - (leftEyeCorner.x + rightEyeCorner.x) / 2)) * -3;
 
                 const neck = currentVrm.humanoid.getBoneNode(THREE.VRMHumanoidBoneName.Neck);
                 if (neck) {
-                    neck.rotation.z = roll; 
+                    neck.rotation.z = roll;
                     neck.rotation.x = pitch;
                     neck.rotation.y = yaw;
                 }
 
-                // --- まばたきと口の連動 (Expression) ---
+                // --- まばたき (EAR方式) ---
+                // 修正: EAR値を正規化して 0〜1 の滑らかなブリンク値に変換
+                //       EAR_OPEN(通常)≒0.25、EAR_CLOSED≒0.05 を目安に設定
+                const EAR_OPEN   = 0.25;
+                const EAR_CLOSED = 0.05;
+
+                const leftEAR  = calcEAR(lm[159], lm[145], lm[33],  lm[133]);
+                const rightEAR = calcEAR(lm[386], lm[374], lm[362], lm[263]);
+
+                const leftBlink  = 1.0 - Math.max(0, Math.min(1, (leftEAR  - EAR_CLOSED) / (EAR_OPEN - EAR_CLOSED)));
+                const rightBlink = 1.0 - Math.max(0, Math.min(1, (rightEAR - EAR_CLOSED) / (EAR_OPEN - EAR_CLOSED)));
+
                 const expressionPreset = THREE.VRMExpressionPresetName;
-
-                // 左目の開閉度を計算 (上下のまぶたの距離)
-                const leftEyeTop = landmarks[159];
-                const leftEyeBottom = landmarks[145];
-                const leftEyeDist = Math.hypot(leftEyeTop.x - leftEyeBottom.x, leftEyeTop.y - leftEyeBottom.y);
-                
-                // 右目の開閉度を計算
-                const rightEyeTop = landmarks[386];
-                const rightEyeBottom = landmarks[374];
-                const rightEyeDist = Math.hypot(rightEyeTop.x - rightEyeBottom.x, rightEyeTop.y - rightEyeBottom.y);
-
-                // 基準値（通常時の目の開き）をもとに、一定以下になったら目を閉じる（1 = 完全に閉じる）
-                // カメラの距離によって変化するため、簡易的な判定にしています
-                const leftBlink = leftEyeDist < 0.018 ? 1.0 : 0.0;
-                const rightBlink = rightEyeDist < 0.018 ? 1.0 : 0.0;
-
-                // VRMの目に値を反映
-                currentVrm.expressionManager.setValue(expressionPreset.BlinkLeft, leftBlink);
+                currentVrm.expressionManager.setValue(expressionPreset.BlinkLeft,  leftBlink);
                 currentVrm.expressionManager.setValue(expressionPreset.BlinkRight, rightBlink);
 
-                // 口の開閉度を計算 (上下の唇の距離)
-                const lipTop = landmarks[13];
-                const lipBottom = landmarks[14];
+                // --- 口の開閉 ---
+                const lipTop    = lm[13];
+                const lipBottom = lm[14];
                 const mouthDist = Math.hypot(lipTop.x - lipBottom.x, lipTop.y - lipBottom.y);
 
-                // 口を大きく開けたら「あ(Aa)」の表情にする (0.0 から 1.0 の間で調整)
                 let mouthAa = (mouthDist - 0.015) * 15;
-                mouthAa = Math.max(0.0, Math.min(1.0, mouthAa)); // 0〜1の間に収める
-
+                mouthAa = Math.max(0.0, Math.min(1.0, mouthAa));
                 currentVrm.expressionManager.setValue(expressionPreset.Aa, mouthAa);
             }
         }
