@@ -12,4 +12,4 @@ jobs:
     steps:
       - name: Ping Render URL
         # ★ここをあなたのRenderのURLに書き換えてください
-        run: curl https://your-app-name.onrender.com
+        run: curl https://tetris-0yjf.onrender.com/
