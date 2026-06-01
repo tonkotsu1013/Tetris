@@ -851,13 +851,13 @@ function loadVoices() {
   // Default to first Japanese voice
   if (jpVoices.length > 0) {
     sel.value = jpVoices[0].name;
-    window.appState.selectedVoiceName = jpVoices[0].name;
+    if (window.appState) window.appState.selectedVoiceName = jpVoices[0].name;
   }
   voicesLoaded = true;
 }
 speechSynthesis.onvoiceschanged = loadVoices;
-loadVoices();
-window.selectedVoiceName = '';
+// Delay initial call so window.appState is initialized by the module script first
+setTimeout(loadVoices, 0);
 
 // ===== GEMINI API =====
 async function callGemini(messages, systemPrompt, useVision = false) {
