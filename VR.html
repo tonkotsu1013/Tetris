@@ -682,7 +682,7 @@ loader.load(vrmUrl,
     window.appState.currentVrm = vrm;
     scene.add(vrm.scene);
     // Face forward - no rotation needed as default faces away, rotate 180
-    vrm.scene.rotation.y = Math.PI;
+    vrm.scene.rotation.y = 0;
     hideLoading();
     setDot('dot-vrm', 'active');
     console.log('VRM loaded:', vrm);
@@ -867,7 +867,7 @@ async function callGemini(messages, systemPrompt, useVision = false) {
     return null;
   }
 
-  const model = 'gemini-2.0-flash';
+  const model = 'gemini-2.5-flash-lite';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const contents = messages.map(m => ({
