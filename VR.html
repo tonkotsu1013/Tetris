@@ -2,1777 +2,1124 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Avatar Studio</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Zero-G Curve Squash 3D v2</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;700&display=swap');
-
-  :root {
-    --bg: #080c14;
-    --panel: #0d1526;
-    --panel2: #111d35;
-    --border: #1e3a5f;
-    --accent: #00d4ff;
-    --accent2: #7c3aed;
-    --accent3: #00ff9d;
-    --text: #e0f0ff;
-    --text2: #7aa8cc;
-    --danger: #ff4466;
-    --glow: 0 0 20px rgba(0,212,255,0.4);
-    --glow2: 0 0 20px rgba(124,58,237,0.4);
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Noto Sans JP', sans-serif;
-    height: 100vh;
-    overflow: hidden;
-    display: grid;
-    grid-template-columns: 320px 1fr 320px;
-    grid-template-rows: 60px 1fr 180px;
-  }
-
-  header {
-    grid-column: 1 / -1;
-    background: linear-gradient(90deg, var(--bg) 0%, var(--panel) 50%, var(--bg) 100%);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 24px;
-  }
-  header .logo {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 18px;
-    font-weight: 900;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    letter-spacing: 4px;
-  }
-  header .status-bar {
-    display: flex;
-    gap: 20px;
-    font-size: 11px;
-    color: var(--text2);
-    font-family: 'Orbitron', sans-serif;
-  }
-  .status-dot {
-    display: inline-block;
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: var(--text2);
-    margin-right: 5px;
-    animation: pulse 2s infinite;
-  }
-  .status-dot.active { background: var(--accent3); box-shadow: 0 0 8px var(--accent3); }
-  .status-dot.warn { background: #ffaa00; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-
-  .left-panel {
-    background: var(--panel);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .panel-title {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 10px;
-    letter-spacing: 3px;
-    color: var(--accent);
-    padding: 14px 16px 8px;
-    border-bottom: 1px solid var(--border);
-    text-transform: uppercase;
-    flex-shrink: 0;
-  }
-  .panel-scroll {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
-  }
-
-  .setup-section { margin-bottom: 20px; }
-  .setup-label {
-    font-size: 11px;
-    color: var(--text2);
-    margin-bottom: 8px;
-    font-family: 'Orbitron', sans-serif;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-  }
-  textarea, input[type="text"], select {
-    width: 100%;
-    background: var(--panel2);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text);
-    padding: 10px 12px;
-    font-family: 'Noto Sans JP', sans-serif;
-    font-size: 12px;
-    resize: none;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-  textarea:focus, input:focus, select:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px rgba(0,212,255,0.1);
-  }
-  textarea { min-height: 80px; }
-
-  .image-upload-area {
-    border: 2px dashed var(--border);
-    border-radius: 8px;
-    padding: 20px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-size: 12px;
-    color: var(--text2);
-    position: relative;
-  }
-  .image-upload-area:hover { border-color: var(--accent); color: var(--accent); }
-  .image-upload-area input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-  .image-upload-area img { max-width: 100%; max-height: 80px; object-fit: contain; margin-top: 8px; }
-
-  .btn {
-    width: 100%;
-    padding: 10px 16px;
-    border: none;
-    border-radius: 6px;
-    font-family: 'Orbitron', sans-serif;
-    font-size: 11px;
-    letter-spacing: 2px;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-transform: uppercase;
-  }
-  .btn-primary {
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    color: white;
-    box-shadow: var(--glow);
-  }
-  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 0 30px rgba(0,212,255,0.6); }
-  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-  .btn-secondary {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text2);
-    margin-top: 8px;
-  }
-  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
-
-  .right-panel {
-    background: var(--panel);
-    border-left: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .avatar-info-card {
-    margin: 12px;
-    background: var(--panel2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px;
-    font-size: 12px;
-  }
-  .avatar-name {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 14px;
-    color: var(--accent);
-    margin-bottom: 6px;
-  }
-  .avatar-trait {
-    display: flex;
-    justify-content: space-between;
-    margin: 4px 0;
-    color: var(--text2);
-  }
-  .avatar-trait span:last-child { color: var(--text); }
-
-  .voice-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 10px;
-    align-items: center;
-  }
-  .voice-row label { font-size: 11px; color: var(--text2); min-width: 50px; }
-  .voice-row input[type="range"] {
-    flex: 1;
-    height: 4px;
-    -webkit-appearance: none;
-    background: var(--border);
-    border-radius: 2px;
-    outline: none;
-  }
-  .voice-row input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 14px; height: 14px;
-    border-radius: 50%;
-    background: var(--accent);
-    cursor: pointer;
-    box-shadow: var(--glow);
-  }
-  .voice-row .val { font-size: 11px; color: var(--accent); min-width: 30px; text-align: right; }
-
-  .center-area {
-    position: relative;
-    overflow: hidden;
-    background: radial-gradient(ellipse at 50% 30%, #0a1a2e 0%, var(--bg) 70%);
-  }
-  #three-canvas {
-    position: absolute;
-    inset: 0;
-    width: 100% !important;
-    height: 100% !important;
-  }
-  #webcam-preview {
-    position: absolute;
-    bottom: 12px;
-    right: 12px;
-    width: 120px;
-    height: 90px;
-    transform: scaleX(-1);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    opacity: 0.6;
-    object-fit: cover;
-  }
-  .tracking-overlay {
-    position: absolute;
-    top: 12px;
-    left: 12px;
-    display: flex;
-    gap: 8px;
-  }
-  .track-chip {
-    background: rgba(0,0,0,0.6);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 4px 10px;
-    font-size: 10px;
-    font-family: 'Orbitron', sans-serif;
-    color: var(--text2);
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-  .track-chip.active { border-color: var(--accent3); color: var(--accent3); }
-
-  #loading-overlay {
-    position: absolute;
-    inset: 0;
-    background: var(--bg);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-  }
-  .loader-ring {
-    width: 60px; height: 60px;
-    border: 3px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-bottom: 16px;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  #loading-text { font-family: 'Orbitron', sans-serif; font-size: 12px; color: var(--text2); letter-spacing: 2px; }
-
-  .bottom-bar {
-    grid-column: 1 / -1;
-    background: var(--panel);
-    border-top: 1px solid var(--border);
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 0;
-    overflow: hidden;
-  }
-  .chat-messages {
-    padding: 10px 16px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    max-height: 180px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
-  }
-  .msg {
-    font-size: 12px;
-    line-height: 1.5;
-    padding: 6px 12px;
-    border-radius: 8px;
-    max-width: 80%;
-  }
-  .msg.user {
-    background: rgba(0,212,255,0.1);
-    border: 1px solid rgba(0,212,255,0.2);
-    align-self: flex-end;
-    color: var(--text);
-  }
-  .msg.avatar {
-    background: rgba(124,58,237,0.1);
-    border: 1px solid rgba(124,58,237,0.2);
-    align-self: flex-start;
-    color: var(--text);
-  }
-  .msg .name {
-    font-size: 10px;
-    font-family: 'Orbitron', sans-serif;
-    margin-bottom: 3px;
-    opacity: 0.6;
-  }
-  .chat-input-area {
-    border-left: 1px solid var(--border);
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    width: 300px;
-    justify-content: center;
-  }
-  .chat-input-row {
-    display: flex;
-    gap: 8px;
-  }
-  .chat-input-row input {
-    flex: 1;
-    padding: 8px 12px;
-    font-size: 13px;
-  }
-  .chat-btns {
-    display: flex;
-    gap: 8px;
-  }
-  .btn-icon {
-    flex: 1;
-    padding: 8px;
-    border: 1px solid var(--border);
-    background: transparent;
-    border-radius: 6px;
-    color: var(--text2);
-    cursor: pointer;
-    font-size: 16px;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    font-family: 'Orbitron', sans-serif;
-    font-size: 10px;
-  }
-  .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
-  .btn-icon.recording { border-color: var(--danger); color: var(--danger); animation: pulse 1s infinite; }
-  .btn-icon.speaking { border-color: var(--accent3); color: var(--accent3); }
-
-  .api-key-row {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-  }
-  .api-key-row input { flex: 1; font-size: 11px; }
-
-  .preset-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-    margin-bottom: 10px;
-  }
-  .preset-btn {
-    padding: 8px;
-    border: 1px solid var(--border);
-    background: var(--panel2);
-    border-radius: 6px;
-    color: var(--text2);
-    cursor: pointer;
-    font-size: 11px;
-    text-align: center;
-    transition: all 0.2s;
-    font-family: 'Noto Sans JP', sans-serif;
-  }
-  .preset-btn:hover, .preset-btn.active {
-    border-color: var(--accent2);
-    color: var(--accent2);
-    background: rgba(124,58,237,0.1);
-  }
-
-  .grid-scan-line {
-    position: absolute;
-    inset: 0;
-    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,0.01) 2px, rgba(0,212,255,0.01) 4px);
-    pointer-events: none;
-    z-index: 1;
-  }
-
-  .thinking {
-    display: flex;
-    gap: 4px;
-    align-items: center;
-    padding: 6px 12px;
-    background: rgba(124,58,237,0.1);
-    border: 1px solid rgba(124,58,237,0.2);
-    border-radius: 8px;
-    align-self: flex-start;
-    font-size: 11px;
-    color: var(--accent2);
-    font-family: 'Orbitron', sans-serif;
-  }
-  .thinking span {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: var(--accent2);
-    animation: bounce 1.2s infinite;
-  }
-  .thinking span:nth-child(2) { animation-delay: 0.2s; }
-  .thinking span:nth-child(3) { animation-delay: 0.4s; }
-  @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
-
-  /* ===== AVATAR LIST MODAL ===== */
-  #avatar-list-modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.8);
-    z-index: 200;
-    align-items: center;
-    justify-content: center;
-  }
-  #avatar-list-modal.open { display: flex; }
-  .modal-box {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    width: 680px;
-    max-height: 80vh;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-  .modal-header {
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .modal-header h2 {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 13px;
-    color: var(--accent);
-    letter-spacing: 3px;
-  }
-  .modal-close {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text2);
-    cursor: pointer;
-    width: 28px; height: 28px;
-    border-radius: 4px;
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .modal-close:hover { border-color: var(--danger); color: var(--danger); }
-  .avatar-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    padding: 20px;
-    overflow-y: auto;
-    flex: 1;
-  }
-  .avatar-card {
-    background: var(--panel2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px;
-    cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
-  }
-  .avatar-card:hover { border-color: var(--accent); transform: translateY(-2px); }
-  .avatar-card.active-card { border-color: var(--accent3); box-shadow: 0 0 15px rgba(0,255,157,0.2); }
-  .avatar-card .card-name {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 13px;
-    color: var(--accent);
-    margin-bottom: 8px;
-  }
-  .avatar-card .card-detail {
-    font-size: 11px;
-    color: var(--text2);
-    margin: 3px 0;
-  }
-  .avatar-card .card-badge {
-    position: absolute;
-    top: 8px; right: 8px;
-    background: var(--accent3);
-    color: #000;
-    font-size: 9px;
-    font-family: 'Orbitron', sans-serif;
-    padding: 2px 6px;
-    border-radius: 10px;
-  }
-  .avatar-card .card-avatar-preview {
-    width: 100%;
-    height: 60px;
-    border-radius: 6px;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 28px;
-    background: linear-gradient(135deg, rgba(0,212,255,0.1), rgba(124,58,237,0.1));
-    border: 1px solid rgba(255,255,255,0.05);
-  }
-  .card-delete {
-    position: absolute;
-    bottom: 8px; right: 8px;
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text2);
-    cursor: pointer;
-    width: 22px; height: 22px;
-    border-radius: 4px;
-    font-size: 11px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .card-delete:hover { border-color: var(--danger); color: var(--danger); }
-  .empty-list {
-    grid-column: 1/-1;
-    text-align: center;
-    padding: 40px;
-    color: var(--text2);
-    font-size: 13px;
-  }
-
-  /* Voice naturalness indicator */
-  .voice-quality-bar {
-    display: flex;
-    gap: 3px;
-    margin-top: 6px;
-  }
-  .vq-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: var(--border);
-    transition: background 0.3s;
-  }
-  .vq-dot.on { background: var(--accent3); box-shadow: 0 0 4px var(--accent3); }
-
-  /* body motion indicator */
-  .motion-chip {
-    background: rgba(0,0,0,0.6);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 4px 10px;
-    font-size: 10px;
-    font-family: 'Orbitron', sans-serif;
-    color: var(--text2);
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-  .motion-chip.active { border-color: var(--accent2); color: var(--accent2); }
-</style>
-
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.150.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.150.0/examples/jsm/",
-    "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@1/lib/three-vrm.module.js"
-  }
+:root {
+  --c0:#000810; --c1:#00ffc8; --c2:#ff0088; --c3:#0088ff;
+  --c4:rgba(0,255,200,.12); --c5:rgba(255,0,136,.12);
 }
-</script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--c0);overflow:hidden;font-family:'Courier New',monospace;color:var(--c1)}
+canvas{display:block}
+#ui{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
+
+/* HUD */
+#hud{
+  position:fixed;top:16px;left:50%;transform:translateX(-50%);
+  display:flex;gap:0;align-items:stretch;
+  background:rgba(0,8,16,.8);border:1px solid rgba(0,255,200,.25);
+  border-radius:6px;backdrop-filter:blur(12px);overflow:hidden;
+}
+.hud-seg{
+  padding:10px 24px;text-align:center;border-right:1px solid rgba(0,255,200,.15);
+  min-width:90px;
+}
+.hud-seg:last-child{border-right:none}
+.hud-label{font-size:9px;letter-spacing:3px;opacity:.5;text-transform:uppercase;margin-bottom:3px}
+.hud-val{font-size:26px;font-weight:900;letter-spacing:1px;line-height:1}
+.hud-val.cyan{color:var(--c1);text-shadow:0 0 18px rgba(0,255,200,.7)}
+.hud-val.pink{color:var(--c2);text-shadow:0 0 18px rgba(255,0,136,.7)}
+.hud-val.blue{color:var(--c3);text-shadow:0 0 18px rgba(0,136,255,.7)}
+.hud-val.small{font-size:18px;padding-top:4px}
+
+/* Mode tabs */
+#mode-tabs{
+  position:fixed;top:16px;right:20px;display:flex;gap:6px;pointer-events:all;
+}
+.tab-btn{
+  padding:7px 14px;background:transparent;border:1px solid rgba(0,255,200,.3);
+  color:rgba(0,255,200,.5);font-family:'Courier New',monospace;font-size:10px;
+  letter-spacing:2px;cursor:pointer;transition:all .2s;text-transform:uppercase;border-radius:3px;
+}
+.tab-btn.active,.tab-btn:hover{
+  border-color:var(--c1);color:var(--c1);background:rgba(0,255,200,.08);
+  box-shadow:0 0 12px rgba(0,255,200,.2);
+}
+
+/* Controls hint */
+#controls-hint{
+  position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
+  font-size:10px;letter-spacing:2px;color:rgba(0,255,200,.3);
+  background:rgba(0,8,16,.6);padding:8px 20px;border-radius:3px;
+  border:1px solid rgba(0,255,200,.1);white-space:nowrap;
+}
+
+/* Score flash */
+#score-flash{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  font-size:64px;font-weight:900;letter-spacing:6px;text-transform:uppercase;
+  opacity:0;transition:opacity .1s;pointer-events:none;
+}
+
+/* Spin bar */
+#spin-wrap{
+  position:fixed;bottom:52px;left:20px;width:180px;
+  background:rgba(0,8,16,.7);border:1px solid rgba(0,255,200,.2);
+  padding:10px 14px;border-radius:4px;backdrop-filter:blur(8px);
+}
+.sbar-lbl{font-size:9px;letter-spacing:3px;opacity:.5;margin-bottom:5px;text-transform:uppercase}
+.sbar-track{height:5px;background:rgba(0,255,200,.1);border-radius:3px;overflow:hidden}
+.sbar-fill{height:100%;background:linear-gradient(90deg,var(--c1),var(--c2));border-radius:3px;transition:width .06s}
+
+/* Overlay */
+#overlay{
+  position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;background:rgba(0,5,15,.93);z-index:30;pointer-events:all;
+  transition:opacity .4s;
+}
+#overlay.hidden{opacity:0;pointer-events:none}
+.ov-title{font-size:46px;font-weight:900;letter-spacing:8px;color:var(--c1);
+  text-shadow:0 0 40px rgba(0,255,200,.8);text-transform:uppercase;margin-bottom:4px}
+.ov-sub{font-size:11px;letter-spacing:5px;color:rgba(0,255,200,.4);margin-bottom:36px;text-transform:uppercase}
+.ov-score{font-size:72px;font-weight:900;color:var(--c2);text-shadow:0 0 40px rgba(255,0,136,.8);margin-bottom:6px}
+.ov-slbl{font-size:10px;letter-spacing:4px;color:rgba(255,0,136,.5);margin-bottom:32px}
+.ov-opts{display:flex;flex-direction:column;gap:12px;width:320px;margin-bottom:24px}
+.ov-row{display:flex;gap:8px}
+.opt-btn{
+  flex:1;padding:11px 0;background:transparent;border:1px solid rgba(0,255,200,.3);
+  color:rgba(0,255,200,.6);font-family:'Courier New',monospace;font-size:10px;
+  letter-spacing:2px;cursor:pointer;transition:all .25s;text-transform:uppercase;border-radius:3px;
+}
+.opt-btn.active,.opt-btn:hover{
+  border-color:var(--c1);color:var(--c1);background:rgba(0,255,200,.1);
+  box-shadow:0 0 16px rgba(0,255,200,.25);
+}
+.opt-btn.mode2{border-color:rgba(0,136,255,.3);color:rgba(0,136,255,.6)}
+.opt-btn.mode2.active,.opt-btn.mode2:hover{
+  border-color:var(--c3);color:var(--c3);background:rgba(0,136,255,.1);
+  box-shadow:0 0 16px rgba(0,136,255,.25);
+}
+.start-btn{
+  padding:14px 60px;background:transparent;border:2px solid var(--c1);
+  color:var(--c1);font-family:'Courier New',monospace;font-size:14px;
+  letter-spacing:5px;cursor:pointer;transition:all .3s;text-transform:uppercase;border-radius:3px;
+  box-shadow:0 0 0 rgba(0,255,200,0);
+}
+.start-btn:hover{background:rgba(0,255,200,.1);box-shadow:0 0 30px rgba(0,255,200,.3)}
+.ov-info{font-size:10px;letter-spacing:1.5px;color:rgba(0,255,200,.25);text-align:center;line-height:2.2;margin-top:18px}
+</style>
 </head>
 <body>
+<div id="ui">
+  <div id="hud">
+    <div class="hud-seg">
+      <div class="hud-label">Score</div>
+      <div class="hud-val cyan" id="s1">0</div>
+    </div>
+    <div class="hud-seg">
+      <div class="hud-label">AI</div>
+      <div class="hud-val pink" id="s2">0</div>
+    </div>
+    <div class="hud-seg">
+      <div class="hud-label">Speed</div>
+      <div class="hud-val blue small" id="spd">0</div>
+    </div>
+    <div class="hud-seg">
+      <div class="hud-label">Mode</div>
+      <div class="hud-val cyan small" id="mode-lbl">SPHERE</div>
+    </div>
+  </div>
 
-<!-- AVATAR LIST MODAL -->
-<div id="avatar-list-modal">
-  <div class="modal-box">
-    <div class="modal-header">
-      <h2>AVATAR GALLERY</h2>
-      <button class="modal-close" onclick="closeAvatarList()">✕</button>
+  <div id="mode-tabs">
+    <button class="tab-btn active" id="btn-sphere">⬤ Sphere</button>
+    <button class="tab-btn" id="btn-rect">▬ Box</button>
+  </div>
+
+  <div id="spin-wrap">
+    <div class="sbar-lbl">Magnus Spin</div>
+    <div class="sbar-track"><div class="sbar-fill" id="sbar" style="width:0%"></div></div>
+  </div>
+
+  <div id="score-flash"></div>
+  <div id="controls-hint">WASD / ↑↓←→ : Move &nbsp;|&nbsp; Space/Shift : Up/Down &nbsp;|&nbsp; Mouse : Aim &nbsp;|&nbsp; Click : Hit &nbsp;|&nbsp; V : View</div>
+</div>
+
+<div id="overlay">
+  <div class="ov-title" id="ov-title">Zero-G Squash</div>
+  <div class="ov-sub">Magnus Edition · v2</div>
+  <div class="ov-score" id="ov-score" style="display:none">0 – 0</div>
+  <div class="ov-slbl" id="ov-slbl" style="display:none">FINAL SCORE</div>
+  <div class="ov-opts">
+    <div style="font-size:9px;letter-spacing:3px;opacity:.4;margin-bottom:2px;text-transform:uppercase">Court Mode</div>
+    <div class="ov-row">
+      <button class="opt-btn active" id="ob-sphere">⬤ Sphere Court</button>
+      <button class="opt-btn" id="ob-rect">▬ Box Court</button>
     </div>
-    <div class="avatar-grid" id="avatar-gallery-grid">
-      <div class="empty-list">まだアバターが作成されていません</div>
+    <div style="font-size:9px;letter-spacing:3px;opacity:.4;margin-top:8px;margin-bottom:2px;text-transform:uppercase">Camera View</div>
+    <div class="ov-row">
+      <button class="opt-btn active" id="ob-3rd">◎ Third Person</button>
+      <button class="opt-btn" id="ob-1st">◉ First Person</button>
     </div>
+  </div>
+  <button class="start-btn" id="ob-start">LAUNCH</button>
+  <div class="ov-info" id="ov-info">
+    WASD / ↑↓←→ : Move &nbsp;|&nbsp; Space / Shift : Up / Down<br>
+    Mouse : Aim &nbsp;|&nbsp; Click : Swing &nbsp;|&nbsp; V : Switch View<br>
+    Sphere: Hit opponent's body = 1pt &nbsp;|&nbsp; Box: Score in goal = 1pt
   </div>
 </div>
 
-<!-- HEADER -->
-<header>
-  <div class="logo">AI AVATAR STUDIO</div>
-  <div class="status-bar">
-    <span><span class="status-dot" id="dot-cam"></span>カメラ</span>
-    <span><span class="status-dot" id="dot-track"></span>トラッキング</span>
-    <span><span class="status-dot" id="dot-vrm"></span>アバター</span>
-    <span><span class="status-dot" id="dot-ai"></span>Gemini AI</span>
-    <button onclick="openAvatarList()" style="background:transparent;border:1px solid var(--border);color:var(--text2);padding:4px 12px;border-radius:4px;cursor:pointer;font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">一覧 ▤</button>
-  </div>
-</header>
-
-<!-- LEFT PANEL -->
-<div class="left-panel">
-  <div class="panel-title">アバター設定</div>
-  <div class="panel-scroll">
-
-    <div class="setup-section">
-      <div class="setup-label">Gemini API キー</div>
-      <div class="api-key-row">
-        <input type="password" id="api-key" placeholder="AIzaSy..." />
-        <button class="btn btn-secondary" style="width:auto;padding:8px 12px;margin:0" onclick="saveApiKey()">保存</button>
-      </div>
-      <p style="font-size:10px;color:var(--text2);margin-top:5px">
-        <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent)">Google AI Studioで無料取得 →</a>
-      </p>
-    </div>
-
-    <div class="setup-section">
-      <div class="setup-label">アバターの外見説明</div>
-      <textarea id="avatar-description" placeholder="例: 銀髪ショートの女の子、青い瞳、優しそうな笑顔、ロボット感のある近未来ファッション"></textarea>
-    </div>
-
-    <div class="setup-section">
-      <div class="setup-label">または画像をアップロード</div>
-      <div class="image-upload-area" id="upload-area">
-        <input type="file" id="image-input" accept="image/*" onchange="handleImageUpload(event)" />
-        <div id="upload-hint">📷 クリックまたはドロップ</div>
-        <img id="preview-img" style="display:none" />
-      </div>
-    </div>
-
-    <div class="setup-section">
-      <div class="setup-label">性格・口調</div>
-      <div class="preset-grid">
-        <div class="preset-btn" onclick="setPersonality('明るく元気、敬語なし、「だよ！」「ね！」で話す', this)">元気系</div>
-        <div class="preset-btn" onclick="setPersonality('落ち着いて知性的、丁寧語で話す、論理的', this)">知性派</div>
-        <div class="preset-btn" onclick="setPersonality('ツンデレ、素直じゃないが本当は優しい、「べ、別に」とよく言う', this)">ツンデレ</div>
-        <div class="preset-btn" onclick="setPersonality('癒し系お姉さん、ゆっくり話す、よく「ふふ」と笑う', this)">癒し系</div>
-      </div>
-      <textarea id="personality-text" placeholder="例: 明るく元気なキャラクター。友達みたいにタメ語で話す。よく「ね！」「だよ！」と言う。"></textarea>
-    </div>
-
-    <button class="btn btn-primary" id="create-btn" onclick="createAvatar()">
-      ✦ アバターを作成
-    </button>
-    <button class="btn btn-secondary" onclick="resetAvatar()">リセット</button>
-  </div>
-</div>
-
-<!-- CENTER - 3D View -->
-<div class="center-area">
-  <div class="grid-scan-line"></div>
-  <canvas id="three-canvas"></canvas>
-  <video id="webcam-preview" autoplay playsinline muted></video>
-
-  <div class="tracking-overlay">
-    <div class="track-chip" id="chip-face">👁 顔検出</div>
-    <div class="track-chip" id="chip-mouth">👄 口</div>
-    <div class="track-chip" id="chip-blink">😑 瞬き</div>
-    <div class="motion-chip" id="chip-body">🤸 身体動作</div>
-  </div>
-
-  <div id="loading-overlay">
-    <div class="loader-ring"></div>
-    <div id="loading-text">INITIALIZING...</div>
-  </div>
-</div>
-
-<!-- RIGHT PANEL -->
-<div class="right-panel">
-  <div class="panel-title">アバター情報</div>
-
-  <div class="avatar-info-card" id="avatar-card">
-    <div class="avatar-name" id="av-name">— 未設定 —</div>
-    <div class="avatar-trait"><span>性格</span><span id="av-personality">—</span></div>
-    <div class="avatar-trait"><span>声のタイプ</span><span id="av-voice-type">—</span></div>
-    <div class="avatar-trait"><span>口調</span><span id="av-speech-style">—</span></div>
-  </div>
-
-  <div class="panel-title">声の設定</div>
-  <div class="panel-scroll">
-    <div class="setup-section">
-      <div class="setup-label">音声エンジン</div>
-      <select id="voice-engine" onchange="updateVoiceEngine()">
-        <option value="webspeech">ブラウザ内蔵 (WebSpeech)</option>
-        <option value="human">人間らしい合成 (推奨)</option>
-      </select>
-      <div style="margin-top:6px;font-size:10px;color:var(--text2)">
-        「人間らしい合成」は音声を感情・リズムで自然に調整します
-      </div>
-      <div class="voice-quality-bar" id="voice-quality-bar">
-        <span style="font-size:10px;color:var(--text2);margin-right:4px">自然さ:</span>
-        <div class="vq-dot" id="vq1"></div>
-        <div class="vq-dot" id="vq2"></div>
-        <div class="vq-dot" id="vq3"></div>
-        <div class="vq-dot" id="vq4"></div>
-        <div class="vq-dot" id="vq5"></div>
-      </div>
-    </div>
-
-    <div class="voice-row">
-      <label>ピッチ</label>
-      <input type="range" id="voice-pitch" min="0.5" max="2" step="0.05" value="1.2" oninput="updateVoiceParam('pitch', this.value)">
-      <span class="val" id="val-pitch">1.2</span>
-    </div>
-    <div class="voice-row">
-      <label>速度</label>
-      <input type="range" id="voice-rate" min="0.5" max="2" step="0.05" value="0.95" oninput="updateVoiceParam('rate', this.value)">
-      <span class="val" id="val-rate">0.95</span>
-    </div>
-    <div class="voice-row">
-      <label>音量</label>
-      <input type="range" id="voice-volume" min="0" max="1" step="0.05" value="0.9" oninput="updateVoiceParam('volume', this.value)">
-      <span class="val" id="val-volume">0.9</span>
-    </div>
-    <div class="setup-section" style="margin-top:10px">
-      <div class="setup-label">音声</div>
-      <select id="voice-select" onchange="selectedVoiceName = this.value">
-        <option value="">読み込み中...</option>
-      </select>
-    </div>
-
-    <div class="setup-label" style="margin-top:16px">会話履歴</div>
-    <div style="font-size:11px;color:var(--text2);margin-bottom:8px" id="history-count">0 ターン</div>
-    <button class="btn btn-secondary" onclick="clearHistory()">履歴をリセット</button>
-  </div>
-</div>
-
-<!-- BOTTOM - Chat -->
-<div class="bottom-bar">
-  <div class="chat-messages" id="chat-messages">
-    <div class="msg avatar">
-      <div class="name">SYSTEM</div>
-      アバターを作成して、会話を始めましょう！
-    </div>
-  </div>
-  <div class="chat-input-area">
-    <div class="chat-input-row">
-      <input type="text" id="chat-input" placeholder="メッセージを入力..." onkeydown="if(event.key==='Enter')sendMessage()" />
-      <button class="btn-icon" onclick="sendMessage()" title="送信">➤</button>
-    </div>
-    <div class="chat-btns">
-      <button class="btn-icon" id="mic-btn" onclick="toggleVoiceInput()" title="音声入力">
-        🎤 <span>音声入力</span>
-      </button>
-      <button class="btn-icon" id="speak-btn" onclick="stopSpeaking()" title="停止" style="display:none">
-        ⏹ <span>停止</span>
-      </button>
-    </div>
-  </div>
-</div>
-
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js"}}</script>
 <script type="module">
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { VRM, VRMLoaderPlugin, VRMUtils, VRMExpressionPresetName } from '@pixiv/three-vrm';
 
-// ===== STATE =====
-window.appState = {
-  apiKey: localStorage.getItem('gemini_api_key') || '',
-  avatarData: null,
-  avatarList: JSON.parse(localStorage.getItem('avatar_list') || '[]'),
-  conversationHistory: [],
-  isRecording: false,
-  isSpeaking: false,
-  currentVrm: null,
-  voiceParams: { pitch: 1.2, rate: 0.95, volume: 0.9 },
-  selectedVoiceName: '',
-  uploadedImageBase64: null,
-  recognition: null,
-  currentUtterance: null,
-  voiceEngine: 'human',
-  bodyMotionActive: false,
-};
+// ═══════════════════════════════════════════════
+// GLSL SHADERS
+// ═══════════════════════════════════════════════
 
-if (window.appState.apiKey) {
-  document.getElementById('api-key').value = window.appState.apiKey;
-  setDot('dot-ai', 'active');
-}
-
-// ===== THREE.JS SETUP =====
-const canvas = document.getElementById('three-canvas');
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 20);
-camera.position.set(0, 1.45, 1.1);
-camera.lookAt(0, 1.45, 0);
-
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.setClearColor(0x000000, 0);
-
-const ambient = new THREE.AmbientLight(0x88aaff, 0.6);
-scene.add(ambient);
-const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
-keyLight.position.set(0, 3, 2);
-scene.add(keyLight);
-const fillLight = new THREE.DirectionalLight(0x4488ff, 0.5);
-fillLight.position.set(-2, 1, 1);
-scene.add(fillLight);
-const rimLight = new THREE.DirectionalLight(0x00d4ff, 0.4);
-rimLight.position.set(0, 2, -2);
-scene.add(rimLight);
-
-function resizeRenderer() {
-  const container = canvas.parentElement;
-  const w = container.clientWidth;
-  const h = container.clientHeight;
-  renderer.setSize(w, h, false);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-}
-window.addEventListener('resize', resizeRenderer);
-resizeRenderer();
-
-// Load VRM
-const loader = new GLTFLoader();
-loader.register(p => new VRMLoaderPlugin(p));
-
-const vrmUrl = 'https://raw.githubusercontent.com/pixiv/three-vrm/dev/packages/three-vrm/examples/models/VRM1_Constraint_Twist_Sample.vrm';
-
-setLoadingText('VRMモデルを読み込み中...');
-loader.load(vrmUrl,
-  (gltf) => {
-    const vrm = gltf.userData.vrm;
-    if (!vrm) { setLoadingText('VRM読み込み失敗'); return; }
-    VRMUtils.removeUnnecessaryVertices(gltf.scene);
-    window.appState.currentVrm = vrm;
-    scene.add(vrm.scene);
-    vrm.scene.rotation.y = 0;
-    hideLoading();
-    setDot('dot-vrm', 'active');
-
-    // Activate body motion chip
-    document.getElementById('chip-body').classList.add('active');
-    window.appState.bodyMotionActive = true;
-    console.log('VRM loaded:', vrm);
-    console.log('Available bones:', Object.keys(vrm.humanoid?.humanBones || {}));
-  },
-  (p) => {
-    if (p.total > 0) setLoadingText(`読み込み中... ${Math.round(p.loaded/p.total*100)}%`);
-  },
-  (e) => { setLoadingText('VRM読み込み失敗: ' + e.message); }
-);
-
-// ===== ANIMATION STATE =====
-let blinkTimer = 0;
-let blinkState = 0;
-let blinkValue = 0;
-let lastFaceTime = 0;
-
-let talkTarget = 0;
-let talkCurrent = 0;
-
-// Multi-phoneme mouth state
-let mouthPhoneme = 'neutral'; // aa, ih, ou, ee, neutral
-let mouthPhonemeTimer = 0;
-
-let targetNeckRot = { x: 0, y: 0, z: 0 };
-let currentNeckRot = { x: 0, y: 0, z: 0 };
-
-// Body motion
-let bodyIdleTime = 0;
-let breathPhase = 0;
-let idleArmL = { x: 0, y: 0, z: 0 };
-let idleArmR = { x: 0, y: 0, z: 0 };
-let talkGestureTimer = 0;
-let talkGestureActive = false;
-let talkGestureTarget = { x: 0, y: 0, z: 0 };
-let shoulderSwayPhase = 0;
-let spineSwayPhase = 0;
-
-// Smooth shoulder/hand current
-let curArmL = { x: 0, y: 0, z: 0 };
-let curArmR = { x: 0, y: 0, z: 0 };
-let curHipRot = { x: 0, y: 0, z: 0 };
-let curSpineRot = { x: 0, y: 0, z: 0 };
-
-const clock = new THREE.Clock();
-
-function getHumanBone(vrm, name) {
-  try {
-    return vrm.humanoid?.getNormalizedBoneNode(name);
-  } catch(e) { return null; }
-}
-
-function lerp(a, b, t) { return a + (b - a) * t; }
-function lerpObj(cur, target, t) {
-  cur.x += (target.x - cur.x) * t;
-  cur.y += (target.y - cur.y) * t;
-  cur.z += (target.z - cur.z) * t;
-}
-
-function animate() {
-  requestAnimationFrame(animate);
-  const delta = clock.getDelta();
-  const t = clock.getElapsedTime();
-  const vrm = window.appState.currentVrm;
-
-  if (vrm) {
-    const lerpFactor = 1 - Math.pow(0.001, delta);
-
-    // ── Neck (face tracking) ──
-    currentNeckRot.x += (targetNeckRot.x - currentNeckRot.x) * lerpFactor;
-    currentNeckRot.y += (targetNeckRot.y - currentNeckRot.y) * lerpFactor;
-    currentNeckRot.z += (targetNeckRot.z - currentNeckRot.z) * lerpFactor;
-    const neck = getHumanBone(vrm, 'neck');
-    if (neck) {
-      neck.rotation.x = currentNeckRot.x;
-      neck.rotation.y = currentNeckRot.y;
-      neck.rotation.z = currentNeckRot.z;
-    }
-
-    // ── Auto-blink ──
-    const noFace = (Date.now() - lastFaceTime) > 2000;
-    if (noFace) {
-      blinkTimer += delta;
-      const interval = 3 + Math.random() * 2;
-      if (blinkTimer > interval) { blinkTimer = 0; blinkState = 1; }
-      if (blinkState === 1) {
-        blinkValue = Math.min(1, blinkValue + delta * 8);
-        if (blinkValue >= 1) blinkState = 2;
-      } else if (blinkState === 2) {
-        blinkValue = Math.max(0, blinkValue - delta * 6);
-        if (blinkValue <= 0) blinkState = 0;
-      }
-      vrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkLeft, blinkValue);
-      vrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkRight, blinkValue);
-    }
-
-    // ── Mouth animation with phonemes ──
-    if (window.appState.isSpeaking) {
-      // Cycle through phoneme shapes for more natural mouth movement
-      mouthPhonemeTimer += delta;
-      const phonemeRate = 0.08 + Math.random() * 0.05;
-      if (mouthPhonemeTimer > phonemeRate) {
-        mouthPhonemeTimer = 0;
-        const phonemes = ['aa', 'ih', 'ou', 'ee', 'aa', 'neutral', 'aa'];
-        mouthPhoneme = phonemes[Math.floor(Math.random() * phonemes.length)];
-      }
-      const base = 0.2 + Math.abs(Math.sin(t * 8)) * 0.7;
-      talkTarget = base;
-
-      // Clear all mouth shapes
-      vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, 0);
-      vrm.expressionManager?.setValue(VRMExpressionPresetName.Ih, 0);
-      vrm.expressionManager?.setValue(VRMExpressionPresetName.Ou, 0);
-      vrm.expressionManager?.setValue(VRMExpressionPresetName.Ee, 0);
-      vrm.expressionManager?.setValue(VRMExpressionPresetName.Oh, 0);
-
-      talkCurrent += (talkTarget - talkCurrent) * Math.min(1, delta * 14);
-
-      if (mouthPhoneme === 'aa') vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, talkCurrent);
-      else if (mouthPhoneme === 'ih') vrm.expressionManager?.setValue(VRMExpressionPresetName.Ih, talkCurrent * 0.8);
-      else if (mouthPhoneme === 'ou') vrm.expressionManager?.setValue(VRMExpressionPresetName.Ou, talkCurrent * 0.9);
-      else if (mouthPhoneme === 'ee') vrm.expressionManager?.setValue(VRMExpressionPresetName.Ee, talkCurrent * 0.7);
-      else vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, talkCurrent * 0.3);
-
-    } else {
-      talkTarget = 0;
-      talkCurrent += (talkTarget - talkCurrent) * Math.min(1, delta * 8);
-      vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, talkCurrent);
-      vrm.expressionManager?.setValue(VRMExpressionPresetName.Ih, 0);
-      vrm.expressionManager?.setValue(VRMExpressionPresetName.Ou, 0);
-      vrm.expressionManager?.setValue(VRMExpressionPresetName.Ee, 0);
-    }
-
-    // ── Body Motion: Breathing ──
-    breathPhase += delta * 0.8;
-    const breathY = Math.sin(breathPhase) * 0.003;
-    const breathScale = 1 + Math.sin(breathPhase) * 0.003;
-    const chest = getHumanBone(vrm, 'chest') || getHumanBone(vrm, 'spine');
-    if (chest) {
-      chest.rotation.x = Math.sin(breathPhase) * 0.012;
-    }
-
-    // ── Body Motion: Spine sway (gentle idle) ──
-    spineSwayPhase += delta * 0.3;
-    const spineTarget = {
-      x: Math.sin(spineSwayPhase * 0.7) * 0.015,
-      y: Math.sin(spineSwayPhase * 0.5) * 0.008,
-      z: Math.sin(spineSwayPhase) * 0.01,
-    };
-    lerpObj(curSpineRot, spineTarget, delta * 2);
-    const spine = getHumanBone(vrm, 'spine');
-    if (spine) {
-      spine.rotation.x = curSpineRot.x;
-      spine.rotation.y = curSpineRot.y;
-      spine.rotation.z = curSpineRot.z;
-    }
-
-    // ── Body Motion: Shoulder sway ──
-    shoulderSwayPhase += delta * 0.4;
-
-    // ── Body Motion: Arms (idle + gesture when talking) ──
-    // Default idle arm pose
-    let targetArmL = {
-      x: 0.05 + Math.sin(shoulderSwayPhase * 0.8) * 0.03,
-      y: 0.02,
-      z: 0.4 + Math.sin(shoulderSwayPhase * 1.1) * 0.05,
-    };
-    let targetArmR = {
-      x: 0.05 + Math.sin(shoulderSwayPhase * 0.8 + 1.5) * 0.03,
-      y: -0.02,
-      z: -(0.4 + Math.sin(shoulderSwayPhase * 1.1 + 1.5) * 0.05),
-    };
-
-    // Talking gestures
-    if (window.appState.isSpeaking) {
-      talkGestureTimer += delta;
-      if (talkGestureTimer > 0.6 + Math.random() * 0.8) {
-        talkGestureTimer = 0;
-        talkGestureActive = true;
-        // Random expressive gesture
-        const g = Math.floor(Math.random() * 4);
-        if (g === 0) {
-          talkGestureTarget = { x: -0.3, y: 0, z: 0.6 }; // raise left arm
-        } else if (g === 1) {
-          talkGestureTarget = { x: -0.2, y: 0.1, z: 0.8 }; // open left arm out
-        } else if (g === 2) {
-          talkGestureTarget = { x: -0.1, y: 0, z: 1.0 }; // extend left arm
-        } else {
-          talkGestureTarget = { x: 0.05, y: 0, z: 0.4 }; // return to idle
-          talkGestureActive = false;
-        }
-      }
-      if (talkGestureActive) {
-        targetArmL = talkGestureTarget;
-      }
-    } else {
-      talkGestureTimer = 0;
-      talkGestureActive = false;
-    }
-
-    lerpObj(curArmL, targetArmL, delta * 3);
-    lerpObj(curArmR, targetArmR, delta * 3);
-
-    const lUpperArm = getHumanBone(vrm, 'leftUpperArm');
-    const rUpperArm = getHumanBone(vrm, 'rightUpperArm');
-    if (lUpperArm) {
-      lUpperArm.rotation.x = curArmL.x;
-      lUpperArm.rotation.y = curArmL.y;
-      lUpperArm.rotation.z = curArmL.z;
-    }
-    if (rUpperArm) {
-      rUpperArm.rotation.x = curArmR.x;
-      rUpperArm.rotation.y = curArmR.y;
-      rUpperArm.rotation.z = curArmR.z;
-    }
-
-    // Lower arms (slight natural bend)
-    const lLowerArm = getHumanBone(vrm, 'leftLowerArm');
-    const rLowerArm = getHumanBone(vrm, 'rightLowerArm');
-    const bendAmt = 0.1 + Math.sin(shoulderSwayPhase * 0.7) * 0.03;
-    if (lLowerArm) lLowerArm.rotation.z = bendAmt;
-    if (rLowerArm) rLowerArm.rotation.z = -bendAmt;
-
-    // Hands: gentle natural curl
-    const lHand = getHumanBone(vrm, 'leftHand');
-    const rHand = getHumanBone(vrm, 'rightHand');
-    if (lHand) {
-      lHand.rotation.z = Math.sin(shoulderSwayPhase * 0.6) * 0.04;
-      lHand.rotation.x = Math.sin(shoulderSwayPhase * 0.4) * 0.03;
-    }
-    if (rHand) {
-      rHand.rotation.z = Math.sin(shoulderSwayPhase * 0.6 + 1.0) * 0.04;
-      rHand.rotation.x = Math.sin(shoulderSwayPhase * 0.4 + 0.8) * 0.03;
-    }
-
-    // Hips: subtle idle sway
-    const hip = getHumanBone(vrm, 'hips');
-    const hipTarget = {
-      x: Math.sin(breathPhase * 0.5) * 0.005,
-      y: Math.sin(breathPhase * 0.3) * 0.003,
-      z: Math.sin(spineSwayPhase * 0.8) * 0.005,
-    };
-    lerpObj(curHipRot, hipTarget, delta * 1.5);
-    if (hip) {
-      hip.rotation.x = curHipRot.x;
-      hip.rotation.y = curHipRot.y;
-      hip.rotation.z = curHipRot.z;
-    }
-
-    vrm.update(delta);
+/* ── Sphere court shader ── */
+const sphereVert = `
+uniform float uTime;
+uniform vec3  uImpact[4];
+uniform float uImpactT[4];
+uniform float uImpactOn[4];
+varying vec2 vUv; varying vec3 vN; varying float vRipple;
+void main(){
+  vUv=uv; vN=normal;
+  vec3 p=position; float rip=0.0;
+  for(int i=0;i<4;i++){
+    if(uImpactOn[i]<.5) continue;
+    float age=uTime-uImpactT[i]; if(age<0.||age>2.2) continue;
+    float d=acos(clamp(dot(normalize(p),normalize(uImpact[i])),-1.,1.));
+    float front=age*2.0; float env=exp(-pow((d-front)/.1,2.));
+    float dec=exp(-age*1.4);
+    rip+=sin(d*20.-age*14.)*env*dec*.045;
   }
-  renderer.render(scene, camera);
-}
-animate();
-
-// Expose setters for MediaPipe
-window.setNeckTarget = (x, y, z) => {
-  targetNeckRot.x = x;
-  targetNeckRot.y = y;
-  targetNeckRot.z = z;
-};
-window.setFaceTracked = (blink_l, blink_r, mouth) => {
-  lastFaceTime = Date.now();
-  const vrm = window.appState.currentVrm;
-  if (!vrm) return;
-  vrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkLeft, blink_l);
-  vrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkRight, blink_r);
-  if (!window.appState.isSpeaking) {
-    vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, mouth);
-  }
-};
-
-function setLoadingText(t) { document.getElementById('loading-text').textContent = t; }
-function hideLoading() {
-  const el = document.getElementById('loading-overlay');
-  el.style.transition = 'opacity 0.5s';
-  el.style.opacity = '0';
-  setTimeout(() => el.style.display = 'none', 500);
-}
-function setDot(id, state) {
-  const el = document.getElementById(id);
-  el.className = 'status-dot ' + (state || '');
-}
-window.setDot = setDot;
-</script>
-
-<script>
-// ===== NON-MODULE SCRIPTS =====
-
-// API Key
-window.saveApiKey = function() {
-  const key = document.getElementById('api-key').value.trim();
-  window.appState.apiKey = key;
-  localStorage.setItem('gemini_api_key', key);
-  setDot('dot-ai', key ? 'active' : '');
-  addMessage('system', key ? '✓ APIキーを保存しました' : 'APIキーをクリアしました');
-};
-
-window.setPersonality = function(text, btn) {
-  document.getElementById('personality-text').value = text;
-  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-};
-
-window.handleImageUpload = function(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    const b64 = ev.target.result.split(',')[1];
-    window.appState.uploadedImageBase64 = b64;
-    document.getElementById('preview-img').src = ev.target.result;
-    document.getElementById('preview-img').style.display = 'block';
-    document.getElementById('upload-hint').style.display = 'none';
-  };
-  reader.readAsDataURL(file);
-};
-
-window.updateVoiceParam = function(param, val) {
-  window.appState.voiceParams[param] = parseFloat(val);
-  document.getElementById('val-' + param).textContent = parseFloat(val).toFixed(2);
-};
-
-window.updateVoiceEngine = function() {
-  const engine = document.getElementById('voice-engine').value;
-  window.appState.voiceEngine = engine;
-  // Update quality bar
-  const dots = [1,2,3,4,5];
-  const active = engine === 'human' ? 5 : 2;
-  dots.forEach(i => {
-    const el = document.getElementById('vq' + i);
-    if (el) el.className = 'vq-dot' + (i <= active ? ' on' : '');
-  });
-};
-
-// Initialize voice quality bar
-setTimeout(() => {
-  window.updateVoiceEngine();
-}, 100);
-
-// Load voices
-function loadVoices() {
-  const voices = speechSynthesis.getVoices();
-  const sel = document.getElementById('voice-select');
-  const jpVoices = voices.filter(v => v.lang.startsWith('ja'));
-  const allVoices = [...jpVoices, ...voices.filter(v => !v.lang.startsWith('ja'))];
-  if (allVoices.length === 0) return;
-  sel.innerHTML = '';
-  allVoices.forEach(v => {
-    const opt = document.createElement('option');
-    opt.value = v.name;
-    opt.textContent = `${v.name} (${v.lang})`;
-    sel.appendChild(opt);
-  });
-  // Prefer Google Japanese voice (most natural)
-  const googleJa = jpVoices.find(v => v.name.includes('Google') && v.lang === 'ja-JP');
-  const preferred = googleJa || jpVoices.find(v => v.lang === 'ja-JP') || jpVoices[0];
-  if (preferred) {
-    sel.value = preferred.name;
-    if (window.appState) window.appState.selectedVoiceName = preferred.name;
-  }
-}
-speechSynthesis.onvoiceschanged = loadVoices;
-setTimeout(loadVoices, 0);
-
-// ===== HUMAN-LIKE VOICE SYNTHESIS =====
-// Splits text into prosodic chunks and adds natural timing
-function splitIntoChunks(text) {
-  // Split on punctuation, preserving the delimiter
-  const chunks = text.split(/(?<=[。！？、…！？,.!?])/g).filter(c => c.trim());
-  return chunks.length > 0 ? chunks : [text];
-}
-
-function getEmotionParams(text, avatarData) {
-  // Detect emotion from text content for prosodic variation
-  const excited = /！|やった|すごい|わあ|きゃ|うれし|たのし/.test(text);
-  const sad = /悲し|寂し|つらい|ごめん|すまない/.test(text);
-  const question = /？|かな|でしょうか|ですか/.test(text);
-  const gentle = /ふふ|うふ|ありがとう|よかった/.test(text);
-
-  const basePitch = window.appState.voiceParams.pitch;
-  const baseRate = window.appState.voiceParams.rate;
-
-  if (excited) return { pitch: basePitch * 1.1, rate: baseRate * 1.08 };
-  if (sad) return { pitch: basePitch * 0.92, rate: baseRate * 0.9 };
-  if (question) return { pitch: basePitch * 1.05, rate: baseRate * 0.95 };
-  if (gentle) return { pitch: basePitch * 0.98, rate: baseRate * 0.88 };
-  return { pitch: basePitch, rate: baseRate };
-}
-
-window.speak = function(text) {
-  if (!text) return;
-  speechSynthesis.cancel();
-
-  const engine = window.appState.voiceEngine || 'human';
-
-  if (engine === 'human') {
-    speakHuman(text);
-  } else {
-    speakBasic(text);
-  }
-};
-
-function speakBasic(text) {
-  const utter = new SpeechSynthesisUtterance(text);
-  const voices = speechSynthesis.getVoices();
-  const selName = document.getElementById('voice-select').value;
-  const voice = voices.find(v => v.name === selName) || voices.find(v => v.lang.startsWith('ja')) || voices[0];
-  if (voice) utter.voice = voice;
-  utter.pitch = window.appState.voiceParams.pitch;
-  utter.rate = window.appState.voiceParams.rate;
-  utter.volume = window.appState.voiceParams.volume;
-  utter.onstart = onSpeakStart;
-  utter.onend = onSpeakEnd;
-  utter.onerror = onSpeakEnd;
-  window.appState.currentUtterance = utter;
-  speechSynthesis.speak(utter);
-}
-
-function speakHuman(text) {
-  // Select best voice
-  const voices = speechSynthesis.getVoices();
-  const selName = document.getElementById('voice-select').value;
-  let voice = voices.find(v => v.name === selName);
-  if (!voice) {
-    // Prefer Google Japanese for naturalness
-    voice = voices.find(v => v.name.includes('Google') && v.lang === 'ja-JP')
-         || voices.find(v => v.lang === 'ja-JP')
-         || voices.find(v => v.lang.startsWith('ja'))
-         || voices[0];
-  }
-
-  const emotionParams = getEmotionParams(text, window.appState.avatarData);
-  const chunks = splitIntoChunks(text);
-
-  let chunkIndex = 0;
-  window.appState.isSpeaking = true;
-  document.getElementById('speak-btn').style.display = 'flex';
-
-  function speakNextChunk() {
-    if (chunkIndex >= chunks.length || !window.appState.isSpeaking) {
-      onSpeakEnd();
-      return;
-    }
-    const chunk = chunks[chunkIndex++];
-    if (!chunk.trim()) { speakNextChunk(); return; }
-
-    const utter = new SpeechSynthesisUtterance(chunk);
-    if (voice) utter.voice = voice;
-
-    // Natural variation per chunk: slight random pitch/rate drift
-    const pitchVar = 1 + (Math.random() - 0.5) * 0.06;
-    const rateVar = 1 + (Math.random() - 0.5) * 0.04;
-    utter.pitch = emotionParams.pitch * pitchVar;
-    utter.rate = emotionParams.rate * rateVar;
-    utter.volume = window.appState.voiceParams.volume;
-
-    // Slightly slower on sentence-ending punctuation
-    if (/[。！？]$/.test(chunk)) {
-      utter.rate *= 0.93;
-    }
-    // Slightly faster on conjunctive
-    if (/[、,]$/.test(chunk)) {
-      utter.rate *= 1.03;
-    }
-
-    utter.onend = () => {
-      // Natural pause between chunks
-      const pause = /[。！？]$/.test(chunk) ? 120 + Math.random() * 80 : 40 + Math.random() * 30;
-      setTimeout(speakNextChunk, pause);
-    };
-    utter.onerror = onSpeakEnd;
-
-    window.appState.currentUtterance = utter;
-    speechSynthesis.speak(utter);
-  }
-
-  speakNextChunk();
-}
-
-function onSpeakStart() {
-  window.appState.isSpeaking = true;
-  document.getElementById('speak-btn').style.display = 'flex';
-}
-function onSpeakEnd() {
-  window.appState.isSpeaking = false;
-  document.getElementById('speak-btn').style.display = 'none';
-}
-
-window.stopSpeaking = function() {
-  speechSynthesis.cancel();
-  window.appState.isSpeaking = false;
-  document.getElementById('speak-btn').style.display = 'none';
-};
-
-// ===== VOICE INPUT =====
-window.toggleVoiceInput = function() {
-  if (window.appState.isRecording) {
-    stopVoiceInput();
-  } else {
-    startVoiceInput();
-  }
-};
-
-function startVoiceInput() {
-  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-    addMessage('system', '⚠ このブラウザは音声認識非対応です（Chromeを使用してください）');
-    return;
-  }
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const rec = new SR();
-  rec.lang = 'ja-JP';
-  rec.continuous = false;
-  rec.interimResults = false;
-  rec.onstart = () => {
-    window.appState.isRecording = true;
-    document.getElementById('mic-btn').classList.add('recording');
-    document.getElementById('mic-btn').querySelector('span').textContent = '録音中...';
-  };
-  rec.onresult = (e) => {
-    const transcript = e.results[0][0].transcript;
-    document.getElementById('chat-input').value = transcript;
-    processUserMessage(transcript);
-  };
-  rec.onend = () => {
-    window.appState.isRecording = false;
-    document.getElementById('mic-btn').classList.remove('recording');
-    document.getElementById('mic-btn').querySelector('span').textContent = '音声入力';
-  };
-  rec.onerror = (e) => {
-    window.appState.isRecording = false;
-    document.getElementById('mic-btn').classList.remove('recording');
-    document.getElementById('mic-btn').querySelector('span').textContent = '音声入力';
-    addMessage('system', '⚠ 音声認識エラー: ' + e.error);
-  };
-  window.appState.recognition = rec;
-  rec.start();
-}
-function stopVoiceInput() { window.appState.recognition?.stop(); }
-
-// ===== CHAT =====
-window.addMessage = function(type, text, name) {
-  const container = document.getElementById('chat-messages');
-  const div = document.createElement('div');
-  div.className = 'msg ' + (type === 'user' ? 'user' : 'avatar');
-  if (type === 'system') div.style.borderColor = 'rgba(0,212,255,0.2)';
-  div.innerHTML = `<div class="name">${name || (type === 'system' ? 'SYSTEM' : type.toUpperCase())}</div>${text}`;
-  container.appendChild(div);
-  container.scrollTop = container.scrollHeight;
-};
-
-window.sendMessage = async function() {
-  const input = document.getElementById('chat-input');
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
-  await processUserMessage(text);
-};
-
-async function processUserMessage(text) {
-  if (!window.appState.avatarData) {
-    addMessage('system', '⚠ まずアバターを作成してください');
-    return;
-  }
-  addMessage('user', text, 'あなた');
-
-  const thinkEl = document.createElement('div');
-  thinkEl.className = 'thinking';
-  thinkEl.innerHTML = '<span></span><span></span><span></span> 考え中...';
-  thinkEl.id = 'thinking-indicator';
-  document.getElementById('chat-messages').appendChild(thinkEl);
-  document.getElementById('chat-messages').scrollTop = 99999;
-
-  const history = window.appState.conversationHistory.map(m => ({
-    role: m.role,
-    parts: [{ text: m.content }]
-  }));
-  history.push({ role: 'user', parts: [{ text }] });
-
-  const systemPrompt = window.appState.avatarData.systemPrompt +
-    '\n返答は必ず日本語で、短く（3文以内）、キャラクターらしく話してください。';
-
-  const response = await callGemini(history, systemPrompt);
-  document.getElementById('thinking-indicator')?.remove();
-
-  if (response) {
-    addMessage('avatar', response, window.appState.avatarData.name);
-    speak(response);
-    window.appState.conversationHistory.push({ role: 'user', content: text });
-    window.appState.conversationHistory.push({ role: 'assistant', content: response });
-    if (window.appState.conversationHistory.length > 20) {
-      window.appState.conversationHistory = window.appState.conversationHistory.slice(-20);
-    }
-    document.getElementById('history-count').textContent =
-      `${window.appState.conversationHistory.length / 2} ターン`;
-  }
-}
-
-// ===== GEMINI API =====
-async function callGemini(messages, systemPrompt) {
-  const apiKey = window.appState.apiKey;
-  if (!apiKey) { addMessage('system', '⚠ APIキーを設定してください'); return null; }
-
-  const model = 'gemini-2.5-flash-lite';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-  const contents = messages.map(m => ({
-    role: m.role === 'assistant' ? 'model' : 'user',
-    parts: m.parts || [{ text: m.content }]
-  }));
-
-  const body = {
-    contents,
-    systemInstruction: systemPrompt ? { parts: [{ text: systemPrompt }] } : undefined,
-    generationConfig: { temperature: 0.9, maxOutputTokens: 500 }
-  };
-
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const data = await res.json();
-    if (data.error) { addMessage('system', '⚠ Gemini Error: ' + data.error.message); return null; }
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
-  } catch (e) {
-    addMessage('system', '⚠ 通信エラー: ' + e.message);
-    return null;
-  }
-}
-
-// ===== AVATAR EMOJI ─ pick from description =====
-function pickAvatarEmoji(desc, name) {
-  if (!desc) desc = '';
-  const d = (desc + name).toLowerCase();
-  if (/ロボ|サイボーグ|機械|android/.test(d)) return '🤖';
-  if (/猫|ねこ|cat/.test(d)) return '🐱';
-  if (/犬|いぬ|dog/.test(d)) return '🐶';
-  if (/妖精|elf|エルフ/.test(d)) return '🧝';
-  if (/魔法|witch|魔女/.test(d)) return '🧙';
-  if (/忍者|ninja/.test(d)) return '🥷';
-  if (/天使|angel/.test(d)) return '👼';
-  if (/悪魔|demon/.test(d)) return '😈';
-  if (/アイドル|idol/.test(d)) return '⭐';
-  if (/お姉さん|お兄さん|大人/.test(d)) return '👤';
-  if (/少女|女の子|girl/.test(d)) return '👧';
-  if (/少年|男の子|boy/.test(d)) return '👦';
-  return '🧑';
-}
-
-// ===== CREATE AVATAR =====
-window.createAvatar = async function() {
-  const desc = document.getElementById('avatar-description').value.trim();
-  const personality = document.getElementById('personality-text').value.trim();
-  const imageB64 = window.appState.uploadedImageBase64;
-
-  if (!desc && !imageB64) {
-    addMessage('system', '⚠ 外見の説明または画像を入力してください');
-    return;
-  }
-
-  const btn = document.getElementById('create-btn');
-  btn.disabled = true;
-  btn.textContent = '生成中...';
-  addMessage('system', 'アバターを生成しています...');
-
-  let userParts = [];
-  if (imageB64) {
-    userParts.push({ inlineData: { mimeType: 'image/jpeg', data: imageB64 } });
-    userParts.push({ text: '上記の画像のキャラクターをベースにして、アバターの設定を作成してください。' + (desc ? '追加の説明: ' + desc : '') });
-  } else {
-    userParts.push({ text: `以下の説明からアバターの設定を作成してください: ${desc}` });
-  }
-  if (personality) {
-    userParts[userParts.length - 1].text += `\n性格・口調の指示: ${personality}`;
-  }
-
-  const systemPrompt = `あなたはAIアバター設定ジェネレーターです。
-与えられた外見・性格の説明から、アバターキャラクターの設定を作成してください。
-必ず以下のJSON形式のみで返答してください（マークダウン不要）:
-{
-  "name": "キャラクター名（日本語、2〜4文字）",
-  "personality": "性格の短い説明（20字以内）",
-  "speechStyle": "口調の特徴（例: タメ語、敬語、関西弁）",
-  "voiceType": "声のタイプ（例: 高め・元気、低め・落ち着き、中音域）",
-  "systemPrompt": "このキャラクターとして会話するためのシステムプロンプト（日本語、100字以内）",
-  "voicePitch": 数値（0.8〜1.8、声のピッチ）,
-  "voiceRate": 数値（0.8〜1.1、話速。人間らしく0.9前後推奨）,
-  "description": "外見の短い説明（30字以内）"
+  vRipple=rip;
+  gl_Position=projectionMatrix*modelViewMatrix*vec4(p+normal*rip,1.);
+}`;
+const sphereFrag = `
+uniform float uTime;
+varying vec2 vUv; varying vec3 vN; varying float vRipple;
+float grid(vec2 u,float f,float t){vec2 g=abs(fract(u*f)-.5);return 1.-smoothstep(0.,t,min(g.x,g.y));}
+void main(){
+  vec3 n=normalize(vN);
+  vec2 su=vec2(atan(n.z,n.x)/(6.2832)+.5,acos(n.y)/3.1416);
+  float g1=grid(su,8.,.018); float g2=grid(su,24.,.009); float g3=grid(su,2.,.028);
+  float scan=sin(su.y*50.-uTime*1.5)*.03+.97;
+  float rg=abs(vRipple)*28.;
+  vec3 base=vec3(0.,.015,.045);
+  vec3 gc=vec3(0.,.75,.65)*(g1*1.1+g2*.45)*scan+vec3(0.,.25,.45)*g3;
+  vec3 rc=mix(vec3(1.,0.,.7),vec3(1.,1.,1.),rg)*rg;
+  gl_FragColor=vec4(base+gc+rc,.8+g1*.15+rg*.4);
 }`;
 
-  const response = await callGemini([{ role: 'user', parts: userParts }], systemPrompt);
-
-  btn.disabled = false;
-  btn.textContent = '✦ アバターを作成';
-  if (!response) return;
-
-  try {
-    const clean = response.replace(/```json|```/g, '').trim();
-    const avatarData = JSON.parse(clean);
-    avatarData.id = Date.now().toString();
-    avatarData.createdAt = new Date().toLocaleDateString('ja-JP');
-    avatarData.emoji = pickAvatarEmoji(desc, avatarData.name || '');
-    avatarData.inputDesc = desc;
-
-    window.appState.avatarData = avatarData;
-    window.appState.conversationHistory = [];
-
-    // Save to list
-    window.appState.avatarList.push(avatarData);
-    localStorage.setItem('avatar_list', JSON.stringify(window.appState.avatarList));
-
-    // Update info card
-    document.getElementById('av-name').textContent = avatarData.name || '—';
-    document.getElementById('av-personality').textContent = avatarData.personality || '—';
-    document.getElementById('av-speech-style').textContent = avatarData.speechStyle || '—';
-    document.getElementById('av-voice-type').textContent = avatarData.voiceType || '—';
-
-    // Apply voice settings
-    if (avatarData.voicePitch) {
-      window.appState.voiceParams.pitch = avatarData.voicePitch;
-      document.getElementById('voice-pitch').value = avatarData.voicePitch;
-      document.getElementById('val-pitch').textContent = avatarData.voicePitch.toFixed(2);
-    }
-    if (avatarData.voiceRate) {
-      // Ensure natural rate (cap at 1.1 for human-like speech)
-      const naturalRate = Math.min(avatarData.voiceRate, 1.05);
-      window.appState.voiceParams.rate = naturalRate;
-      document.getElementById('voice-rate').value = naturalRate;
-      document.getElementById('val-rate').textContent = naturalRate.toFixed(2);
-    }
-
-    const greet = `はじめまして！私は${avatarData.name}です。よろしくね！`;
-    addMessage('avatar', greet, avatarData.name);
-    speak(greet);
-    addMessage('system', `✓ アバター「${avatarData.name}」を作成しました`);
-    setDot('dot-ai', 'active');
-  } catch (e) {
-    addMessage('system', '⚠ アバターデータの解析に失敗: ' + e.message);
-    console.error(response);
+/* ── Box court shader ── */
+const boxVert = `
+uniform float uTime;
+uniform vec3  uImpact[4];
+uniform float uImpactT[4];
+uniform float uImpactOn[4];
+varying vec2 vUv; varying vec3 vWPos; varying float vRipple;
+void main(){
+  vUv=uv;
+  vec4 wp=modelMatrix*vec4(position,1.); vWPos=wp.xyz;
+  float rip=0.0;
+  for(int i=0;i<4;i++){
+    if(uImpactOn[i]<.5) continue;
+    float age=uTime-uImpactT[i]; if(age<0.||age>2.) continue;
+    float d=distance(vWPos,uImpact[i]);
+    float front=age*4.; float env=exp(-pow((d-front)/.4,2.));
+    float dec=exp(-age*1.6);
+    rip+=sin(d*8.-age*10.)*env*dec*.06;
   }
-};
+  vRipple=rip;
+  gl_Position=projectionMatrix*modelViewMatrix*vec4(position+normal*rip,1.);
+}`;
+const boxFrag = `
+uniform float uTime;
+varying vec2 vUv; varying vec3 vWPos; varying float vRipple;
+float grid(vec2 u,float f,float t){vec2 g=abs(fract(u*f)-.5);return 1.-smoothstep(0.,t,min(g.x,g.y));}
+void main(){
+  float g1=grid(vUv,10.,.025); float g2=grid(vUv,30.,.012);
+  float scan=sin(vUv.y*40.-uTime*1.2)*.04+.96;
+  float rg=abs(vRipple)*22.;
+  vec3 base=vec3(0.,.01,.035);
+  vec3 gc=vec3(.1,.6,1.)*(g1*.9+g2*.4)*scan;
+  vec3 rc=mix(vec3(.8,.1,1.),vec3(1.,1.,1.),rg)*rg;
+  gl_FragColor=vec4(base+gc+rc,.78+g1*.18+rg*.35);
+}`;
 
-window.resetAvatar = function() {
-  window.appState.avatarData = null;
-  window.appState.conversationHistory = [];
-  document.getElementById('av-name').textContent = '— 未設定 —';
-  document.getElementById('av-personality').textContent = '—';
-  document.getElementById('av-speech-style').textContent = '—';
-  document.getElementById('av-voice-type').textContent = '—';
-  clearHistory();
-  addMessage('system', 'アバターをリセットしました');
-};
+/* ── Ball shader ── */
+const ballVert=`varying vec3 vN,vV;
+void main(){vN=normalMatrix*normal;vec4 mv=modelViewMatrix*vec4(position,1.);vV=-mv.xyz;gl_Position=projectionMatrix*mv;}`;
+const ballFrag=`uniform float uTime,uSpin,uTeam;
+varying vec3 vN,vV;
+void main(){
+  vec3 N=normalize(vN),V=normalize(vV);
+  float rim=pow(1.-max(dot(N,V),0.),2.5);
+  vec3 ca=uTeam<.5?vec3(.1,.7,1.):vec3(1.,.2,.5);
+  vec3 cb=uTeam<.5?vec3(0.,1.,.8):vec3(1.,0.,.6);
+  vec3 cc=mix(ca,cb,uSpin);
+  float b=sin(vN.y*10.+uTime*uSpin*6.)*.5+.5;
+  gl_FragColor=vec4(cc*.5+cb*rim*1.5+mix(cc,cb,b)*.25,.95);
+}`;
 
-window.clearHistory = function() {
-  window.appState.conversationHistory = [];
-  document.getElementById('history-count').textContent = '0 ターン';
-};
+/* ── Player (capsule) shader ── */
+const playerVert=`varying vec3 vN,vV;
+void main(){vN=normalMatrix*normal;vec4 mv=modelViewMatrix*vec4(position,1.);vV=-mv.xyz;gl_Position=projectionMatrix*mv;}`;
+const playerFrag=`uniform vec3 uCol; uniform float uHit;
+varying vec3 vN,vV;
+void main(){
+  vec3 N=normalize(vN),V=normalize(vV);
+  float rim=pow(1.-max(dot(N,V),0.),2.2);
+  vec3 c=uCol+uCol*rim*.8+vec3(1.,1.,1.)*uHit*.4;
+  gl_FragColor=vec4(c,.85+rim*.12);
+}`;
 
-// ===== AVATAR GALLERY =====
-window.openAvatarList = function() {
-  renderAvatarGallery();
-  document.getElementById('avatar-list-modal').classList.add('open');
-};
-window.closeAvatarList = function() {
-  document.getElementById('avatar-list-modal').classList.remove('open');
-};
+/* ── Goal shader ── */
+const goalFrag=`uniform vec3 uCol; uniform float uTime, uFlash;
+varying vec2 vUv;
+void main(){
+  float d=length(vUv-.5)*2.;
+  float rings=sin(d*12.-uTime*4.)*.5+.5;
+  float edge=1.-smoothstep(.8,1.,d);
+  float flash=uFlash*exp(-uTime*.5);
+  vec3 c=uCol*(rings*.5+.5)*edge+vec3(1.)*flash*edge;
+  gl_FragColor=vec4(c,edge*(0.3+rings*.2+flash*.5));
+}`;
+const goalVert=`varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`;
 
-function renderAvatarGallery() {
-  const grid = document.getElementById('avatar-gallery-grid');
-  const list = window.appState.avatarList || [];
+/* ── Trail shader ── */
+const trailVert=`attribute float aA; varying float vA;
+void main(){vA=aA;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`;
+const trailFrag=`uniform vec3 uC; varying float vA; void main(){gl_FragColor=vec4(uC,vA);}`;
 
-  if (list.length === 0) {
-    grid.innerHTML = '<div class="empty-list">まだアバターが作成されていません<br><span style="font-size:11px;margin-top:8px;display:block">左パネルからアバターを作成しましょう</span></div>';
-    return;
+/* ── Prediction shader ── */
+const predFrag=`uniform float uTime; varying vec2 vUv;
+void main(){
+  float dash=step(.5,fract(vUv.x*20.-uTime*3.));
+  gl_FragColor=vec4(1.,.05,.6,dash*.5);
+}`;
+
+// ═══════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════
+const SPHERE_R   = 14;
+const BOX_W      = 20, BOX_H = 12, BOX_D = 28;
+const BALL_R     = 0.28;
+const PLAYER_H   = 1.8, PLAYER_R_BODY = 0.4, PLAYER_RACKET_R = 1.1;
+const MAGNUS_K   = 0.02;
+const SPIN_DECAY = 0.993;
+const AIR_DRAG   = 0.012;   // per-frame drag factor
+const MIN_SPEED  = 5;
+const MAX_SPEED  = 22;
+const GOAL_W     = 3.5, GOAL_H = 2.5;
+
+// ═══════════════════════════════════════════════
+// UTILITY
+// ═══════════════════════════════════════════════
+function lerp(a,b,t){return a+(b-a)*t}
+function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v))}
+function v3(x=0,y=0,z=0){return new THREE.Vector3(x,y,z)}
+
+// ═══════════════════════════════════════════════
+// GAME STATE
+// ═══════════════════════════════════════════════
+let courtMode = 'sphere'; // 'sphere' | 'rect'
+let camMode   = '3rd';    // '3rd' | '1st'
+let gameState = 'menu';   // 'menu'|'playing'|'gameover'
+let scoreLocked = false;  // prevent multi-scoring during reset delay
+let score1=0, score2=0;
+let bestScore=0;
+const WIN_SCORE = 7;
+
+// ═══════════════════════════════════════════════
+// THREE.JS SETUP
+// ═══════════════════════════════════════════════
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=false;
+document.body.insertBefore(renderer.domElement, document.body.firstChild);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 300);
+camera.position.set(0,2,-22);
+camera.lookAt(0,0,0);
+scene.add(new THREE.AmbientLight(0x001525,3));
+const keyLight = new THREE.PointLight(0x00ffc8,4,40);
+scene.add(keyLight);
+
+// ═══════════════════════════════════════════════
+// IMPACT RING BUFFER
+// ═══════════════════════════════════════════════
+const MAX_IMP=4;
+let impactRing=[...Array(MAX_IMP)].map(()=>({pos:v3(),t:-999,on:false}));
+let impHead=0;
+let impUniforms=null; // set per-mode
+
+function addImpact(pos,t){
+  const i=impHead%MAX_IMP; impHead++;
+  impactRing[i].pos.copy(pos);
+  impactRing[i].t=t;
+  impactRing[i].on=true;
+  spawnParticles(pos,24);
+}
+function pushImpactsToUniforms(u,now){
+  for(let i=0;i<MAX_IMP;i++){
+    const im=impactRing[i];
+    if(im.on && now-im.t>2.2) im.on=false;
+    u.uImpact.value[i].copy(im.pos);
+    u.uImpactT.value[i]=im.t;
+    u.uImpactOn.value[i]=im.on?1:0;
   }
+}
 
-  grid.innerHTML = '';
-  const activeId = window.appState.avatarData?.id;
+// ═══════════════════════════════════════════════
+// OBJECTS (created once, toggled by mode)
+// ═══════════════════════════════════════════════
 
-  list.forEach((av) => {
-    const card = document.createElement('div');
-    card.className = 'avatar-card' + (av.id === activeId ? ' active-card' : '');
-    card.innerHTML = `
-      <div class="card-avatar-preview">${av.emoji || '🧑'}</div>
-      ${av.id === activeId ? '<div class="card-badge">使用中</div>' : ''}
-      <div class="card-name">${av.name}</div>
-      <div class="card-detail">性格: ${av.personality || '—'}</div>
-      <div class="card-detail">口調: ${av.speechStyle || '—'}</div>
-      <div class="card-detail">声: ${av.voiceType || '—'}</div>
-      <div class="card-detail" style="margin-top:4px;font-size:10px;color:var(--border)">${av.createdAt || ''}</div>
-      <button class="card-delete" onclick="deleteAvatar('${av.id}', event)" title="削除">✕</button>
-    `;
-    card.addEventListener('click', () => loadAvatar(av));
-    grid.appendChild(card);
+/* ── Court materials ── */
+function makeCrtUniforms(){
+  return {
+    uTime:{value:0},
+    uImpact:{value:[v3(),v3(),v3(),v3()]},
+    uImpactT:{value:[0,0,0,0]},
+    uImpactOn:{value:[0,0,0,0]},
+  };
+}
+const sphereU = makeCrtUniforms();
+const boxU    = makeCrtUniforms();
+
+/* ── Sphere court ── */
+const sphereGeo = new THREE.SphereGeometry(SPHERE_R,72,72);
+const sphereMat = new THREE.ShaderMaterial({
+  vertexShader:sphereVert,fragmentShader:sphereFrag,
+  uniforms:sphereU, side:THREE.BackSide, transparent:true, depthWrite:false
+});
+const sphereMesh = new THREE.Mesh(sphereGeo,sphereMat);
+scene.add(sphereMesh);
+
+/* ── Box court (6 walls) ── */
+const boxGroup = new THREE.Group();
+scene.add(boxGroup);
+function makeWall(w,h,tx,ty,tz,rx,ry,rz){
+  const g=new THREE.PlaneGeometry(w,h,24,16);
+  const m=new THREE.ShaderMaterial({
+    vertexShader:boxVert,fragmentShader:boxFrag,
+    uniforms:boxU, side:THREE.DoubleSide, transparent:true, depthWrite:false
   });
+  const mesh=new THREE.Mesh(g,m);
+  mesh.position.set(tx,ty,tz);
+  mesh.rotation.set(rx,ry,rz);
+  boxGroup.add(mesh);
+}
+// Back, Front, Left, Right, Top, Bottom
+makeWall(BOX_W,BOX_H,  0,0, BOX_D/2,  0,0,0);
+makeWall(BOX_W,BOX_H,  0,0,-BOX_D/2,  0,Math.PI,0);
+makeWall(BOX_D,BOX_H, -BOX_W/2,0,0,   0,Math.PI/2,0);
+makeWall(BOX_D,BOX_H,  BOX_W/2,0,0,   0,-Math.PI/2,0);
+makeWall(BOX_W,BOX_D,  0, BOX_H/2,0,  Math.PI/2,0,0);
+makeWall(BOX_W,BOX_D,  0,-BOX_H/2,0, -Math.PI/2,0,0);
+
+/* ── Goals ── */
+const goalUniforms1 = {uCol:{value:new THREE.Color(0x00ffc8)}, uTime:{value:0}, uFlash:{value:0}};
+const goalUniforms2 = {uCol:{value:new THREE.Color(0xff0088)}, uTime:{value:0}, uFlash:{value:0}};
+const goalMat1 = new THREE.ShaderMaterial({vertexShader:goalVert,fragmentShader:goalFrag,uniforms:goalUniforms1,transparent:true,depthWrite:false,side:THREE.DoubleSide});
+const goalMat2 = new THREE.ShaderMaterial({vertexShader:goalVert,fragmentShader:goalFrag,uniforms:goalUniforms2,transparent:true,depthWrite:false,side:THREE.DoubleSide});
+const goalGeo = new THREE.PlaneGeometry(GOAL_W,GOAL_H);
+const goalMesh1 = new THREE.Mesh(goalGeo,goalMat1); // P1's goal (player side) – if AI scores
+const goalMesh2 = new THREE.Mesh(goalGeo,goalMat2); // P2's goal (opponent side)
+scene.add(goalMesh1); scene.add(goalMesh2);
+
+/* ── Ball ── */
+const ballUniforms = {uTime:{value:0},uSpin:{value:0},uTeam:{value:0}};
+const ballMat = new THREE.ShaderMaterial({
+  vertexShader:ballVert,fragmentShader:ballFrag,
+  uniforms:ballUniforms,transparent:true
+});
+const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R,32,32),ballMat);
+scene.add(ballMesh);
+const ballLight = new THREE.PointLight(0x00aaff,3,6);
+scene.add(ballLight);
+
+/* ── Players ── */
+function makePlayer(color){
+  const g=new THREE.Group();
+  const u={uCol:{value:new THREE.Color(color)}, uHit:{value:0}};
+  const mat=new THREE.ShaderMaterial({vertexShader:playerVert,fragmentShader:playerFrag,uniforms:u,transparent:true,side:THREE.FrontSide});
+  // body
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(PLAYER_R_BODY,PLAYER_H*.6,8,16),mat);
+  g.add(body);
+  // racket disc
+  const rMat=new THREE.MeshBasicMaterial({color:color,transparent:true,opacity:.45,side:THREE.DoubleSide,wireframe:false});
+  const rGeo=new THREE.CircleGeometry(PLAYER_RACKET_R,32);
+  const racket=new THREE.Mesh(rGeo,rMat);
+  g.add(racket);
+  g.userData={uniforms:u,racket,color};
+  return g;
+}
+const player1 = makePlayer(0x00ffc8);
+const player2 = makePlayer(0xff0088);
+scene.add(player1); scene.add(player2);
+
+/* ── Trail ── */
+const TRAIL_N=48;
+const trailPos=new Float32Array(TRAIL_N*3);
+const trailA  =new Float32Array(TRAIL_N);
+const trailGeo=new THREE.BufferGeometry();
+trailGeo.setAttribute('position',new THREE.BufferAttribute(trailPos,3));
+trailGeo.setAttribute('aA',new THREE.BufferAttribute(trailA,1));
+const trailU={uC:{value:new THREE.Color(0x00aaff)}};
+const trailLine=new THREE.Line(trailGeo,new THREE.ShaderMaterial({
+  vertexShader:trailVert,fragmentShader:trailFrag,uniforms:trailU,transparent:true,depthWrite:false
+}));
+scene.add(trailLine);
+let trailHist=[];
+
+/* ── Prediction ── */
+const PRED_N=60;
+const predPos=new Float32Array(PRED_N*3);
+const predGeo=new THREE.BufferGeometry();
+predGeo.setAttribute('position',new THREE.BufferAttribute(predPos,3));
+predGeo.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(PRED_N*2),2));
+const predLine=new THREE.Line(predGeo,new THREE.LineBasicMaterial({
+  color:0xff0077,transparent:true,opacity:.4,depthWrite:false
+}));
+scene.add(predLine);
+predLine.visible=false;
+
+/* ── Particles ── */
+const PART_N=200;
+const partPos=new Float32Array(PART_N*3);
+const partV  =[...Array(PART_N)].map(()=>v3());
+const partLife=new Float32Array(PART_N);
+const partGeo=new THREE.BufferGeometry();
+partGeo.setAttribute('position',new THREE.BufferAttribute(partPos,3));
+const partMesh=new THREE.Points(partGeo,new THREE.PointsMaterial({
+  color:0x00ffc8,size:.1,transparent:true,opacity:.85,depthWrite:false,
+  blending:THREE.AdditiveBlending
+}));
+scene.add(partMesh);
+let partHead=0;
+
+function spawnParticles(origin,n){
+  for(let i=0;i<n;i++){
+    const idx=partHead%PART_N; partHead++;
+    const i3=idx*3;
+    partPos[i3]=origin.x; partPos[i3+1]=origin.y; partPos[i3+2]=origin.z;
+    const spd=1.5+Math.random()*3.5;
+    const th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+    partV[idx].set(spd*Math.sin(ph)*Math.cos(th),spd*Math.sin(ph)*Math.sin(th),spd*Math.cos(ph));
+    partLife[idx]=1;
+  }
 }
 
-window.loadAvatar = function(avatarData) {
-  window.appState.avatarData = avatarData;
-  window.appState.conversationHistory = [];
+// ═══════════════════════════════════════════════
+// PHYSICS STATE
+// ═══════════════════════════════════════════════
+const ballPos  = v3();
+const ballVel  = v3();
+const ballSpin = v3();
 
-  document.getElementById('av-name').textContent = avatarData.name || '—';
-  document.getElementById('av-personality').textContent = avatarData.personality || '—';
-  document.getElementById('av-speech-style').textContent = avatarData.speechStyle || '—';
-  document.getElementById('av-voice-type').textContent = avatarData.voiceType || '—';
+// Player 1 (human)
+const p1Pos    = v3();  // world position
+const p1PrevPos= v3();
+const p1Vel    = v3();
+let   p1HitCd  = 0;
 
-  if (avatarData.voicePitch) {
-    window.appState.voiceParams.pitch = avatarData.voicePitch;
-    document.getElementById('voice-pitch').value = avatarData.voicePitch;
-    document.getElementById('val-pitch').textContent = avatarData.voicePitch.toFixed(2);
+// Player 2 (AI or human)
+const p2Pos    = v3();
+const p2PrevPos= v3();
+const p2Vel    = v3();
+let   p2HitCd  = 0;
+
+// ═══════════════════════════════════════════════
+// INPUT
+// ═══════════════════════════════════════════════
+const keys={};
+const mouse=new THREE.Vector2();
+const mouseVel=new THREE.Vector2();
+const prevMouse=new THREE.Vector2();
+let   clicking=false;
+
+window.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(e.code==='KeyV' && gameState==='playing'){
+    setCamMode(camMode==='3rd'?'1st':'3rd');
   }
-  if (avatarData.voiceRate) {
-    const naturalRate = Math.min(avatarData.voiceRate, 1.05);
-    window.appState.voiceParams.rate = naturalRate;
-    document.getElementById('voice-rate').value = naturalRate;
-    document.getElementById('val-rate').textContent = naturalRate.toFixed(2);
-  }
-
-  const greet = `こんにちは！${avatarData.name}です。また話しましょう！`;
-  addMessage('avatar', greet, avatarData.name);
-  speak(greet);
-  addMessage('system', `✓ アバター「${avatarData.name}」を読み込みました`);
-  setDot('dot-ai', 'active');
-  closeAvatarList();
-};
-
-window.deleteAvatar = function(id, event) {
-  event.stopPropagation();
-  window.appState.avatarList = window.appState.avatarList.filter(a => a.id !== id);
-  localStorage.setItem('avatar_list', JSON.stringify(window.appState.avatarList));
-  if (window.appState.avatarData?.id === id) {
-    window.appState.avatarData = null;
-    document.getElementById('av-name').textContent = '— 未設定 —';
-  }
-  renderAvatarGallery();
-};
-
-// Close modal on outside click
-document.getElementById('avatar-list-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeAvatarList();
+});
+window.addEventListener('keyup',  e=>{keys[e.code]=false});
+window.addEventListener('mousemove',e=>{
+  prevMouse.copy(mouse);
+  mouse.set(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1);
+  mouseVel.set(mouse.x-prevMouse.x, mouse.y-prevMouse.y);
+});
+window.addEventListener('mousedown',e=>{if(e.button===0)clicking=true;});
+window.addEventListener('mouseup',  e=>{if(e.button===0)clicking=false;});
+window.addEventListener('contextmenu',e=>e.preventDefault());
+window.addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
 });
 
-// ===== MEDIAPIPE FACE TRACKING =====
-const videoEl = document.getElementById('webcam-preview');
+// ═══════════════════════════════════════════════
+// UI WIRING
+// ═══════════════════════════════════════════════
+function setCourtMode(m){
+  courtMode=m;
+  document.getElementById('ob-sphere').classList.toggle('active',m==='sphere');
+  document.getElementById('ob-rect').classList.toggle('active',m==='rect');
+  document.getElementById('btn-sphere').classList.toggle('active',m==='sphere');
+  document.getElementById('btn-rect').classList.toggle('active',m==='rect');
+  document.getElementById('mode-lbl').textContent=m==='sphere'?'SPHERE':'BOX';
+}
+function setCamMode(v){
+  camMode=v;
+  document.getElementById('ob-3rd').classList.toggle('active',v==='3rd');
+  document.getElementById('ob-1st').classList.toggle('active',v==='1st');
+}
+document.getElementById('ob-sphere').onclick=()=>setCourtMode('sphere');
+document.getElementById('ob-rect').onclick  =()=>setCourtMode('rect');
+document.getElementById('ob-3rd').onclick   =()=>setCamMode('3rd');
+document.getElementById('ob-1st').onclick   =()=>setCamMode('1st');
+document.getElementById('btn-sphere').onclick=()=>setCourtMode('sphere');
+document.getElementById('btn-rect').onclick  =()=>setCourtMode('rect');
+document.getElementById('ob-start').onclick  =()=>startGame();
 
-function calcEAR(top, bottom, inner, outer) {
-  const v = Math.hypot(top.x - bottom.x, top.y - bottom.y);
-  const h = Math.hypot(inner.x - outer.x, inner.y - outer.y);
-  return h === 0 ? 0 : v / h;
+function startGame(){
+  scoreLocked = false;
+  score1=0; score2=0;
+  gameState='playing';
+  document.getElementById('overlay').classList.add('hidden');
+  document.getElementById('ov-title').textContent='Zero-G Squash';
+  document.getElementById('ov-score').style.display='none';
+  document.getElementById('ov-slbl').style.display='none';
+  // mode-specific visibility
+  sphereMesh.visible = courtMode==='sphere';
+  boxGroup.visible   = courtMode==='rect';
+  resetRound();
+  updateHUD();
 }
 
-function onFaceResults(results) {
-  if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
-    document.getElementById('chip-face').classList.remove('active');
-    return;
+function resetRound(){
+  // ball spawn in center, random direction
+  ballPos.set(0, 0.5, 0);
+  const angle = Math.random()*Math.PI*2;
+  const vy    = (Math.random()-.5)*3;
+  const spd   = 9 + Math.random()*3;
+  ballVel.set(Math.cos(angle)*spd, vy, Math.sin(angle)*spd*.6);
+  if(Math.random()<.5) ballVel.z *= -1;
+  ballSpin.set(0,0,0);
+  trailHist=[];
+
+  // Reset impacts
+  impactRing.forEach(im=>im.on=false);
+  impHead=0;
+
+  // Place players
+  if(courtMode==='sphere'){
+    p1Pos.set(0,0,-SPHERE_R*.82);
+    p2Pos.set(0,0, SPHERE_R*.82);
+  } else {
+    p1Pos.set(0,0,-BOX_D/2+1.5);
+    p2Pos.set(0,0, BOX_D/2-1.5);
   }
-  document.getElementById('chip-face').classList.add('active');
+  p1PrevPos.copy(p1Pos); p2PrevPos.copy(p2Pos);
+  p1Vel.set(0,0,0); p2Vel.set(0,0,0);
+  p1HitCd=0; p2HitCd=0;
+  // Snap camera to player immediately (no lerp jump)
+  const _away = p1Pos.length()>0.01 ? p1Pos.clone().normalize() : new THREE.Vector3(0,0,-1);
+  camera.position.copy(p1Pos.clone().addScaledVector(_away,5).add(new THREE.Vector3(0,2.5,0)));
 
-  const lm = results.multiFaceLandmarks[0];
-  const nose = lm[4], leftEye = lm[33], rightEye = lm[263];
-  const roll = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x) * 0.8;
-  const pitch = (nose.y - (leftEye.y + rightEye.y) / 2) * 2.5;
-  const yaw = (nose.x - (leftEye.x + rightEye.x) / 2) * -3.0;
-  window.setNeckTarget && window.setNeckTarget(pitch, yaw, roll);
-
-  const EAR_OPEN = 0.25, EAR_CLOSED = 0.05;
-  const leftEAR = calcEAR(lm[159], lm[145], lm[33], lm[133]);
-  const rightEAR = calcEAR(lm[386], lm[374], lm[362], lm[263]);
-  const lb = 1 - Math.max(0, Math.min(1, (leftEAR - EAR_CLOSED) / (EAR_OPEN - EAR_CLOSED)));
-  const rb = 1 - Math.max(0, Math.min(1, (rightEAR - EAR_CLOSED) / (EAR_OPEN - EAR_CLOSED)));
-
-  document.getElementById('chip-blink').classList.toggle('active', lb > 0.5 || rb > 0.5);
-
-  const lipTop = lm[13], lipBottom = lm[14];
-  const mouthDist = Math.hypot(lipTop.x - lipBottom.x, lipTop.y - lipBottom.y);
-  const mouth = Math.max(0, Math.min(1, (mouthDist - 0.015) * 15));
-  document.getElementById('chip-mouth').classList.toggle('active', mouth > 0.2);
-
-  window.setFaceTracked && window.setFaceTracked(lb, rb, mouth);
+  // Goal positions
+  positionGoals();
 }
 
-const faceMesh = new FaceMesh({
-  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`
-});
-faceMesh.setOptions({
-  maxNumFaces: 1,
-  refineLandmarks: true,
-  minDetectionConfidence: 0.5,
-  minTrackingConfidence: 0.5
-});
-faceMesh.onResults(onFaceResults);
+function positionGoals(){
+  if(courtMode==='sphere'){
+    // Goals on opposite poles inside sphere
+    goalMesh1.position.set(0,0,-SPHERE_R+.3);
+    goalMesh1.rotation.set(0,0,0);
+    goalMesh2.position.set(0,0, SPHERE_R-.3);
+    goalMesh2.rotation.set(0,Math.PI,0);
+  } else {
+    goalMesh1.position.set(0,0,-BOX_D/2+.3);
+    goalMesh1.rotation.set(0,0,0);
+    goalMesh2.position.set(0,0, BOX_D/2-.3);
+    goalMesh2.rotation.set(0,Math.PI,0);
+  }
+  goalMesh1.visible=true;
+  goalMesh2.visible=true;
+}
 
-navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } })
-  .then(stream => {
-    videoEl.srcObject = stream;
-    setDot('dot-cam', 'active');
-    const cam = new Camera(videoEl, {
-      onFrame: async () => { await faceMesh.send({ image: videoEl }); },
-      width: 640, height: 480
-    });
-    cam.start();
-    setDot('dot-track', 'active');
-  })
-  .catch(e => {
-    setDot('dot-cam', 'warn');
-    addMessage('system', '⚠ カメラアクセスできません: ' + e.message);
-  });
+// ═══════════════════════════════════════════════
+// PHYSICS HELPERS
+// ═══════════════════════════════════════════════
+function magnusForce(vel,spin){
+  return new THREE.Vector3().crossVectors(spin,vel).multiplyScalar(MAGNUS_K);
+}
 
-window.setDot = function(id, state) {
-  const el = document.getElementById(id);
-  if (el) el.className = 'status-dot ' + (state || '');
-};
+function physicsStep(dt){
+  // Magnus
+  const mf = magnusForce(ballVel, ballSpin);
+  ballVel.addScaledVector(mf, dt);
+
+  // Air drag – slow down toward terminal minimum
+  const spd = ballVel.length();
+  if(spd > MIN_SPEED){
+    const drag = AIR_DRAG * (spd - MIN_SPEED);
+    ballVel.addScaledVector(ballVel.clone().normalize(), -drag * dt * 60);
+  }
+  // Clamp
+  const spd2=ballVel.length();
+  if(spd2 > MAX_SPEED) ballVel.multiplyScalar(MAX_SPEED/spd2);
+  if(spd2 < MIN_SPEED*0.5) ballVel.normalize().multiplyScalar(MIN_SPEED);
+
+  ballSpin.multiplyScalar(Math.pow(SPIN_DECAY, dt*60));
+
+  ballPos.addScaledVector(ballVel, dt);
+}
+
+// ── Sphere bouncing ──────────────────────────
+function bounceInSphere(now){
+  const d=ballPos.length();
+  if(d >= SPHERE_R - BALL_R){
+    const n=ballPos.clone().normalize();
+    const vn=ballVel.dot(n);
+    ballVel.addScaledVector(n,-2*vn*0.96);
+    ballSpin.multiplyScalar(.8);
+    const tang=ballVel.clone().sub(n.clone().multiplyScalar(ballVel.dot(n)));
+    ballSpin.addScaledVector(new THREE.Vector3().crossVectors(n,tang),.18);
+    ballPos.copy(n.multiplyScalar(SPHERE_R-BALL_R-.02));
+    addImpact(ballPos.clone(),now);
+  }
+}
+
+// ── Box bouncing ─────────────────────────────
+function bounceInBox(now){
+  const hw=BOX_W/2-BALL_R, hh=BOX_H/2-BALL_R, hd=BOX_D/2-BALL_R;
+  let hit=false; const hitPos=v3();
+  if(Math.abs(ballPos.x)>hw){
+    ballVel.x*=-0.96; ballPos.x=Math.sign(ballPos.x)*hw; hit=true; hitPos.copy(ballPos);
+  }
+  if(Math.abs(ballPos.y)>hh){
+    ballVel.y*=-0.96; ballPos.y=Math.sign(ballPos.y)*hh; hit=true; hitPos.copy(ballPos);
+  }
+  if(Math.abs(ballPos.z)>hd){
+    ballVel.z*=-0.96; ballPos.z=Math.sign(ballPos.z)*hd; hit=true; hitPos.copy(ballPos);
+  }
+  if(hit){ ballSpin.multiplyScalar(.8); addImpact(hitPos,now); }
+}
+
+// ── Goal check ───────────────────────────────
+function checkGoals(now){
+  const g=GOAL_W/2, gh=GOAL_H/2;
+  // Box mode: z endpoints are goals
+  // Sphere mode: check near poles
+  if(courtMode==='rect'){
+    const hd=BOX_D/2;
+    if(ballPos.z <= -hd+.2 && Math.abs(ballPos.x)<g && Math.abs(ballPos.y)<gh){
+      // P1 goal – P2 scores
+      goalScore(2,now); return;
+    }
+    if(ballPos.z >= hd-.2 && Math.abs(ballPos.x)<g && Math.abs(ballPos.y)<gh){
+      // P2 goal – P1 scores
+      goalScore(1,now); return;
+    }
+  } else {
+    // In sphere mode, goals are at poles; check proximity to goal plane
+    const poleZ=SPHERE_R*.85;
+    if(ballPos.z < -poleZ+.5 && Math.abs(ballPos.x)<g && Math.abs(ballPos.y)<gh){
+      goalScore(2,now); return;
+    }
+    if(ballPos.z > poleZ-.5 && Math.abs(ballPos.x)<g && Math.abs(ballPos.y)<gh){
+      goalScore(1,now); return;
+    }
+  }
+}
+
+function goalScore(scorer,now){
+  if(scoreLocked) return;
+  scoreLocked = true;
+  if(scorer===1){ score1++; flashGoal(goalMesh2,goalUniforms2,now); scoreFlash('P1 GOAL!','var(--c1)'); }
+  else           { score2++; flashGoal(goalMesh1,goalUniforms1,now); scoreFlash('P2 GOAL!','var(--c2)'); }
+  updateHUD();
+  if(score1>=WIN_SCORE || score2>=WIN_SCORE){ setTimeout(()=>endGame(),1200); }
+  else setTimeout(()=>{ scoreLocked=false; resetRound(); },900);
+}
+
+function flashGoal(mesh,u,now){
+  u.uFlash.value=1;
+  setTimeout(()=>u.uFlash.value=0,600);
+  spawnParticles(mesh.position,40);
+}
+
+// ── Body hit (sphere mode) ───────────────────
+function checkBodyHit(pPos,isP1,now){
+  const diff = ballPos.clone().sub(pPos);
+  const dist  = diff.length();
+  const hitR  = PLAYER_R_BODY + BALL_R + 0.2;
+  if(dist < hitR){
+    if(scoreLocked) return;
+    scoreLocked = true;
+    // Player body was hit by ball
+    if(isP1){ score2++; scoreFlash('HIT!','var(--c2)'); }
+    else     { score1++; scoreFlash('HIT!','var(--c1)'); }
+    spawnParticles(pPos,35);
+    player1.userData.uniforms.uHit.value=isP1?1:0;
+    player2.userData.uniforms.uHit.value=isP1?0:1;
+    setTimeout(()=>{ player1.userData.uniforms.uHit.value=0; player2.userData.uniforms.uHit.value=0; },300);
+    updateHUD();
+    if(score1>=WIN_SCORE||score2>=WIN_SCORE){ setTimeout(()=>endGame(),1200); }
+    else setTimeout(()=>{ scoreLocked=false; resetRound(); },900);
+  }
+}
+
+// ═══════════════════════════════════════════════
+// PLAYER MOVEMENT
+// ═══════════════════════════════════════════════
+const CAM_ROT = new THREE.Euler(0,0,0,'YXZ');
+const camTarget = v3(0,4,-16);
+
+function movePlayer1(dt){
+  const spd=8;
+  let dx=0,dz=0,dy=0;
+  if(keys['KeyW']||keys['ArrowUp'])    dz= spd*dt;
+  if(keys['KeyS']||keys['ArrowDown'])  dz=-spd*dt;
+  if(keys['KeyA']||keys['ArrowLeft'])  dx=-spd*dt;
+  if(keys['KeyD']||keys['ArrowRight']) dx= spd*dt;
+  if(keys['Space'])                    dy= spd*dt;
+  if(keys['ShiftLeft']||keys['ControlLeft']) dy=-spd*dt;
+
+  p1PrevPos.copy(p1Pos);
+  p1Pos.x=clamp(p1Pos.x+dx, -getLimit('x'), getLimit('x'));
+  p1Pos.y=clamp(p1Pos.y+dy, -getLimit('y'), getLimit('y'));
+  p1Pos.z=clamp(p1Pos.z+dz, getZMinP1(), courtMode==='sphere'? 0 : -1);
+  p1Vel.copy(p1Pos).sub(p1PrevPos).divideScalar(dt);
+
+  if(p1HitCd>0) p1HitCd-=dt;
+}
+
+function movePlayer2(dt){
+  {
+    aiMove(p2Pos,p2PrevPos,p2Vel,dt,true);
+  }
+  if(p2HitCd>0) p2HitCd-=dt;
+}
+
+function getLimit(ax){
+  if(courtMode==='sphere') return SPHERE_R*.78;
+  if(ax==='x') return BOX_W/2-PLAYER_R_BODY*1.5;
+  if(ax==='y') return BOX_H/2-PLAYER_R_BODY*1.5;
+  if(ax==='z') return BOX_D/2-PLAYER_R_BODY*1.5;
+}
+function getZMinP1(){ return courtMode==='sphere'? -SPHERE_R*.9 : -BOX_D/2+PLAYER_R_BODY*1.5; }
+function getZMinP2(){ return courtMode==='sphere'?  SPHERE_R*.1 :  BOX_D/2-PLAYER_R_BODY*5; }
+
+// ── AI ────────────────────────────────────────
+function aiMove(aPos,aPrev,aVel,dt,isP2){
+  aPrev.copy(aPos);
+  const factor=isP2?1:-1;
+  const zBound=courtMode==='sphere'? SPHERE_R*.78 : BOX_D/2-PLAYER_R_BODY*1.5;
+
+  // Predict where ball will be at AI z plane
+  let simPos=ballPos.clone(), simVel=ballVel.clone(), simSpin=ballSpin.clone();
+  let targetXY=new THREE.Vector2(ballPos.x,ballPos.y);
+  for(let i=0;i<90;i++){
+    const mf=new THREE.Vector3().crossVectors(simSpin,simVel).multiplyScalar(MAGNUS_K);
+    simVel.addScaledVector(mf,.016);
+    simSpin.multiplyScalar(SPIN_DECAY);
+    simPos.addScaledVector(simVel,.016);
+    // If ball reaches AI side
+    if((isP2 && simPos.z>zBound*.5) || (!isP2 && simPos.z<-zBound*.5)){
+      targetXY.set(simPos.x,simPos.y); break;
+    }
+  }
+  const diff2=new THREE.Vector2(targetXY.x-aPos.x, targetXY.y-aPos.y);
+  const spd=6+Math.min(score2+score1,5)*.4;
+  const step=diff2.clone().clampLength(0,spd*dt);
+  aPos.x=clamp(aPos.x+step.x,-getLimit('x'),getLimit('x'));
+  aPos.y=clamp(aPos.y+step.y,-getLimit('y'),getLimit('y'));
+  aPos.z=clamp(aPos.z, isP2?getZMinP2():-zBound, isP2?zBound:getZMinP1());
+  // Try to maintain z position
+  const targetZ=isP2? zBound*.7 : -zBound*.7;
+  aPos.z=lerp(aPos.z, targetZ, .05);
+  aVel.copy(aPos).sub(aPrev).divideScalar(dt);
+}
+
+// ── Racket hit ─────────────────────────────────
+function tryHit(pPos,pVel,isP1,isSwing,now){
+  if(!isSwing) return;
+  const cd=isP1?p1HitCd:p2HitCd;
+  if(cd>0) return;
+  const diff=ballPos.clone().sub(pPos);
+  const dist=diff.length();
+  if(dist < PLAYER_RACKET_R + BALL_R + 0.3){
+    // Hit!
+    const norm=diff.clone().normalize();
+    // Reflect + racket velocity
+    const vn=ballVel.dot(norm);
+    if(vn<0){ // ball coming toward us
+      ballVel.addScaledVector(norm,-2*vn*0.95);
+    }
+    // Power from racket velocity
+    const pSpeed=pVel.dot(norm);
+    if(pSpeed>0.1) ballVel.addScaledVector(norm,pSpeed*.7);
+
+    // Spin from mouse or racket lateral vel
+    const lateral=pVel.clone().sub(norm.clone().multiplyScalar(pVel.dot(norm)));
+    const spinGain=new THREE.Vector3().crossVectors(norm,lateral).multiplyScalar(.5);
+    if(isP1){
+      spinGain.x+=mouseVel.y*12;
+      spinGain.y+=mouseVel.x*12;
+    }
+    ballSpin.add(spinGain);
+    ballSpin.clampLength(0,18);
+
+    // Ensure minimum outgoing speed
+    const outSpd=ballVel.length();
+    if(outSpd<MIN_SPEED+2) ballVel.normalize().multiplyScalar(MIN_SPEED+2);
+
+    spawnParticles(ballPos.clone(),20);
+    addImpact(ballPos.clone(),now);
+
+    if(isP1) p1HitCd=.25; else p2HitCd=.25;
+
+    // Hit glow
+    const hitP=isP1?player1:player2;
+    hitP.userData.uniforms.uHit.value=.8;
+    setTimeout(()=>hitP.userData.uniforms.uHit.value=0,200);
+  }
+}
+
+// ── AI auto swing ─────────────────────────────
+function aiSwingCheck(pPos,pVel,isP2,now){
+  const diff=ballPos.clone().sub(pPos);
+  const dist=diff.length();
+  const cd=isP2?p2HitCd:p1HitCd;
+  if(cd>0) return;
+  if(dist < PLAYER_RACKET_R+BALL_R+.4){
+    tryHit(pPos,pVel,!isP2,true,now);
+  }
+}
+
+// ═══════════════════════════════════════════════
+// PREDICTION LINE
+// ═══════════════════════════════════════════════
+function updatePrediction(){
+  if(gameState!=='playing'){ predLine.visible=false; return; }
+  // Only show when ball heading toward P1
+  const heading=(ballVel.z<0 && courtMode==='sphere') || (ballVel.z<0 && courtMode==='rect');
+  if(!heading){ predLine.visible=false; return; }
+  predLine.visible=true;
+
+  let sPos=ballPos.clone(), sVel=ballVel.clone(), sSpin=ballSpin.clone();
+  const dt=1/60;
+  for(let i=0;i<PRED_N;i++){
+    const mf=magnusForce(sVel,sSpin);
+    sVel.addScaledVector(mf,dt);
+    sSpin.multiplyScalar(SPIN_DECAY);
+    sPos.addScaledVector(sVel,dt);
+    if(courtMode==='sphere'){
+      if(sPos.length()>SPHERE_R-BALL_R){
+        const n=sPos.clone().normalize(); sVel.reflect(n); sPos.copy(n.multiplyScalar(SPHERE_R-BALL_R-.02));
+      }
+    } else {
+      const hw=BOX_W/2-BALL_R,hh=BOX_H/2-BALL_R,hd=BOX_D/2-BALL_R;
+      if(Math.abs(sPos.x)>hw){sVel.x*=-1;sPos.x=Math.sign(sPos.x)*hw;}
+      if(Math.abs(sPos.y)>hh){sVel.y*=-1;sPos.y=Math.sign(sPos.y)*hh;}
+      if(Math.abs(sPos.z)>hd){sVel.z*=-1;sPos.z=Math.sign(sPos.z)*hd;}
+    }
+    predPos[i*3]=sPos.x; predPos[i*3+1]=sPos.y; predPos[i*3+2]=sPos.z;
+  }
+  predGeo.attributes.position.needsUpdate=true;
+}
+
+// ═══════════════════════════════════════════════
+// TRAIL
+// ═══════════════════════════════════════════════
+function updateTrail(){
+  trailHist.push(ballPos.clone());
+  if(trailHist.length>TRAIL_N) trailHist.shift();
+  for(let i=0;i<TRAIL_N;i++){
+    const p=trailHist[i]||ballPos;
+    trailPos[i*3]=p.x; trailPos[i*3+1]=p.y; trailPos[i*3+2]=p.z;
+    trailA[i]=i/TRAIL_N*.7;
+  }
+  trailGeo.attributes.position.needsUpdate=true;
+  trailGeo.attributes.aA.needsUpdate=true;
+  const spinMag=ballSpin.length();
+  const t=Math.min(spinMag/14,1);
+  trailU.uC.value.setRGB(1-t, .5+(1-t)*.5, 1);
+}
+
+// ═══════════════════════════════════════════════
+// PLAYER MESH UPDATE
+// ═══════════════════════════════════════════════
+function updatePlayerMesh(group,pos,isP1,now){
+  group.position.copy(pos);
+  // Racket faces toward ball
+  const rk=group.userData.racket;
+  const toBall=ballPos.clone().sub(pos).normalize();
+  const quat=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1),toBall);
+  rk.quaternion.copy(quat);
+  rk.position.copy(toBall.clone().multiplyScalar(PLAYER_R_BODY+.05));
+}
+
+// ═══════════════════════════════════════════════
+// CAMERA
+// ═══════════════════════════════════════════════
+function updateCamera(dt){
+  // "Behind" the player = outward from court center
+  const awayFromCenter = p1Pos.length() > 0.01
+    ? p1Pos.clone().normalize()
+    : new THREE.Vector3(0, 0, -1);
+
+  if(camMode==='1st'){
+    // First person: sit at player eye, look at ball
+    const eye = p1Pos.clone().add(new THREE.Vector3(0, 0.35, 0));
+    camera.position.copy(eye);
+    camera.lookAt(ballPos);
+  } else {
+    // Third person: behind + above player, tracking ball
+    const desired = p1Pos.clone()
+      .addScaledVector(awayFromCenter, 5)
+      .add(new THREE.Vector3(0, 2.5, 0));
+    camera.position.lerp(desired, Math.min(1, dt * 9));
+    const lookPt = ballPos.clone().lerp(p1Pos, 0.15);
+    camera.lookAt(lookPt);
+  }
+}
+
+// ═══════════════════════════════════════════════
+// HUD & FLASH
+// ═══════════════════════════════════════════════
+function updateHUD(){
+  document.getElementById('s1').textContent=score1;
+  document.getElementById('s2').textContent=score2;
+  document.getElementById('spd').textContent=ballVel.length().toFixed(1);
+  const spinMag=ballSpin.length();
+  document.getElementById('sbar').style.width=(Math.min(spinMag/14,1)*100)+'%';
+  ballUniforms.uSpin.value=Math.min(spinMag/14,1);
+}
+
+let flashTimer=null;
+function scoreFlash(text,color){
+  const el=document.getElementById('score-flash');
+  el.textContent=text; el.style.color=color; el.style.opacity='1';
+  if(flashTimer) clearTimeout(flashTimer);
+  flashTimer=setTimeout(()=>el.style.opacity='0',900);
+}
+
+function endGame(){
+  gameState='gameover';
+  const winner=score1>score2?'YOU WIN!':'AI WINS';
+  document.getElementById('ov-title').textContent=winner;
+  document.getElementById('ov-score').textContent=`${score1} – ${score2}`;
+  document.getElementById('ov-score').style.display='block';
+  document.getElementById('ov-slbl').style.display='block';
+  document.getElementById('overlay').classList.remove('hidden');
+  document.getElementById('ob-start').textContent='PLAY AGAIN';
+}
+
+// ═══════════════════════════════════════════════
+// PARTICLES
+// ═══════════════════════════════════════════════
+function updateParticles(dt){
+  let any=false;
+  for(let i=0;i<PART_N;i++){
+    if(partLife[i]<=0) continue; any=true;
+    partLife[i]-=dt*1.8;
+    if(partLife[i]<0){partLife[i]=0;continue;}
+    const i3=i*3;
+    partPos[i3]  +=partV[i].x*dt;
+    partPos[i3+1]+=partV[i].y*dt;
+    partPos[i3+2]+=partV[i].z*dt;
+    partV[i].multiplyScalar(.97);
+  }
+  if(any) partGeo.attributes.position.needsUpdate=true;
+}
+
+// ═══════════════════════════════════════════════
+// RENDER LOOP
+// ═══════════════════════════════════════════════
+const clock=new THREE.Clock();
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt  = Math.min(clock.getDelta(),.05);
+  const now = clock.elapsedTime;
+
+  // Update shader times
+  sphereU.uTime.value=now;
+  boxU.uTime.value=now;
+  ballUniforms.uTime.value=now;
+  goalUniforms1.uTime.value=now;
+  goalUniforms2.uTime.value=now;
+
+  if(gameState==='playing'){
+    // Player movement
+    movePlayer1(dt);
+    movePlayer2(dt);
+
+    // Physics
+    physicsStep(dt);
+    if(courtMode==='sphere') bounceInSphere(now);
+    else                      bounceInBox(now);
+
+    // Goal / body hit checks
+    checkGoals(now);
+    if(courtMode==='sphere'){
+      checkBodyHit(p1Pos,true,now);
+      checkBodyHit(p2Pos,false,now);
+    }
+
+    // Player 1 hit (click)
+    if(clicking) tryHit(p1Pos,p1Vel,true,true,now);
+
+    // Player 2 hit (AI only)
+    aiSwingCheck(p2Pos,p2Vel,true,now);
+
+    // Update meshes
+    updatePlayerMesh(player1,p1Pos,true,now);
+    player1.visible = (camMode !== '1st'); // hide self in first person
+    updatePlayerMesh(player2,p2Pos,false,now);
+    ballMesh.position.copy(ballPos);
+    ballMesh.rotation.x+=ballSpin.x*dt;
+    ballMesh.rotation.y+=ballSpin.y*dt;
+    ballMesh.rotation.z+=ballSpin.z*dt;
+    ballLight.position.copy(ballPos);
+    const spinMag=ballSpin.length();
+    const st=Math.min(spinMag/14,1);
+    ballLight.color.setRGB(1-st*.5, .4+st*.1, 1);
+    ballLight.intensity=2+spinMag*.15;
+
+    updateTrail();
+    updatePrediction();
+    updateCamera(dt);
+    updateHUD();
+
+    // Court gentle rotation (sphere only)
+    if(courtMode==='sphere') sphereMesh.rotation.y+=dt*.008;
+
+    // Push impact data to uniforms
+    const u=courtMode==='sphere'?sphereU:boxU;
+    pushImpactsToUniforms(u,now);
+
+    // Deadzone rings pulse
+    goalUniforms1.uFlash.value=Math.max(0,goalUniforms1.uFlash.value-dt*2);
+    goalUniforms2.uFlash.value=Math.max(0,goalUniforms2.uFlash.value-dt*2);
+  }
+
+  updateParticles(dt);
+  renderer.render(scene,camera);
+}
+
+animate();
 </script>
 </body>
 </html>
