@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VRM Model Viewer</title>
+    <title>VRM Overworld Controller</title>
     <style>
         body { margin: 0; overflow: hidden; }
         canvas { display: block; }
@@ -35,71 +35,129 @@
         renderer.setPixelRatio(window.devicePixelRatio);
 
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xdddddd); // 背景色を薄いグレーに設定
+        scene.background = new THREE.Color(0x87CEEB); // 背景色を空色に変更
+        scene.fog = new THREE.Fog(0x87CEEB, 10, 50);  // 遠景をぼかすフォグを追加
+
+        // --- 2. オーバーワールド（地面）の追加 ---
+        const gridHelper = new THREE.GridHelper(200, 200, 0x888888, 0xcccccc);
+        scene.add(gridHelper);
 
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-        camera.position.set(0, 1.2, -3); // カメラの初期位置（キャラクターの正面）
+        camera.position.set(0, 2, -4); // キャラクターの背後・斜め上に配置
 
-        // マウス操作の設定
         const controls = new OrbitControls(camera, renderer.domElement);
-        controls.target.set(0, 1.0, 0); // 見る中心をキャラクターの胸のあたりに
+        controls.target.set(0, 1.0, 0);
+        controls.enablePan = false; // パン操作を無効化（キャラクターを見失わないため）
+        controls.maxPolarAngle = Math.PI / 2 - 0.05; // 地下にカメラが潜らないように制限
         controls.update();
 
-        // --- 2. ライトの設定 ---
+        // --- 3. ライトの設定 ---
         const directionalLight = new THREE.DirectionalLight(0xffffff, Math.PI);
-        directionalLight.position.set(1, 1, 1).normalize();
+        directionalLight.position.set(1, 2, 1).normalize();
         scene.add(directionalLight);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
 
-        // --- 3. VRMモデルの読み込み ---
+        // --- 4. キー入力の管理 ---
+        const keys = {};
+        window.addEventListener('keydown', (e) => { keys[e.code] = true; });
+        window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+        // --- 5. VRMモデルの読み込み ---
         let currentVrm = undefined;
         const loader = new GLTFLoader();
 
-        // GLTFLoaderにVRMプラグインを登録
-        loader.register((parser) => {
-            return new VRMLoaderPlugin(parser);
-        });
+        loader.register((parser) => new VRMLoaderPlugin(parser));
 
-        // ★ここに表示したいVRMファイルのパスを指定します★
-        const vrmUrl = './ayame_v1.1.vrm'; 
+        const vrmUrl = './ayame_v1.1.vrm'; // ★VRMファイルのパス★
 
         loader.load(
             vrmUrl,
             (gltf) => {
                 const vrm = gltf.userData.vrm;
                 currentVrm = vrm;
-                
-                // VRMをシーンに追加
                 scene.add(vrm.scene);
-                
-                // モデルが後ろを向いている場合は180度回転させる
-                vrm.scene.rotation.y = Math.PI;
-
                 console.log('VRMの読み込みに成功しました');
             },
             (progress) => console.log('Loading model...', 100.0 * (progress.loaded / progress.total), '%'),
             (error) => console.error('VRMの読み込みに失敗しました', error)
         );
 
-        // --- 4. レンダリングループ（アニメーション） ---
+        // --- 6. 移動およびアニメーション制御 ---
         const clock = new THREE.Clock();
+        const moveSpeed = 4.0;       // 移動速度
+        const rotationSpeed = 10.0;  // 旋回速度
+        const walkBobbingAmp = 0.05; // 歩行時の上下の揺れ幅
+        const walkBobbingFreq = 15.0; // 歩行時の揺れスピード
 
         function animate() {
             requestAnimationFrame(animate);
             const deltaTime = clock.getDelta();
 
-            // VRMの更新（髪の揺れや瞬きなどを動かすために必要）
             if (currentVrm) {
+                const vrmScene = currentVrm.scene;
+
+                // 6-1. 入力ベクトルの計算
+                let inputZ = 0;
+                let inputX = 0;
+                if (keys['KeyW'] || keys['ArrowUp']) inputZ -= 1;
+                if (keys['KeyS'] || keys['ArrowDown']) inputZ += 1;
+                if (keys['KeyA'] || keys['ArrowLeft']) inputX -= 1;
+                if (keys['KeyD'] || keys['ArrowRight']) inputX += 1;
+
+                const inputVector = new THREE.Vector3(inputX, 0, inputZ).normalize();
+
+                if (inputVector.lengthSq() > 0) {
+                    // 6-2. カメラの向きを基準にした移動方向の計算
+                    const cameraForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+                    cameraForward.y = 0; // 水平移動のみにするためYを潰す
+                    cameraForward.normalize();
+
+                    const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+                    cameraRight.y = 0;
+                    cameraRight.normalize();
+
+                    // 実際のワールド空間での進行方向ベクトル
+                    const moveDirection = new THREE.Vector3()
+                        .addScaledVector(cameraRight, inputVector.x)
+                        .addScaledVector(cameraForward, inputVector.z)
+                        .normalize();
+
+                    // 6-3. モデルとカメラの移動
+                    const moveDelta = moveDirection.clone().multiplyScalar(moveSpeed * deltaTime);
+                    vrmScene.position.add(moveDelta);
+                    camera.position.add(moveDelta); // カメラも同調して移動させる
+
+                    // 6-4. 進行方向への滑らかな旋回処理
+                    // VRMの正面（+Z軸）を進行方向に向けるための目標位置
+                    const lookTarget = vrmScene.position.clone().sub(moveDirection); 
+                    const targetMatrix = new THREE.Matrix4().lookAt(vrmScene.position, lookTarget, new THREE.Vector3(0, 1, 0));
+                    const targetQuat = new THREE.Quaternion().setFromRotationMatrix(targetMatrix);
+                    
+                    // Quaternion.slerpで滑らかに回転させる
+                    vrmScene.quaternion.slerp(targetQuat, rotationSpeed * deltaTime);
+
+                    // 6-5. 簡易歩行アニメーション（Y軸のバウンド）
+                    vrmScene.position.y = Math.abs(Math.sin(clock.elapsedTime * walkBobbingFreq)) * walkBobbingAmp;
+                } else {
+                    // 移動していない時はY軸（高さ）を滑らかにゼロに戻す
+                    vrmScene.position.y = THREE.MathUtils.lerp(vrmScene.position.y, 0, 10 * deltaTime);
+                }
+
+                // 6-6. OrbitControlsの注視点を常にキャラクターの胸のあたりに更新
+                controls.target.copy(vrmScene.position).add(new THREE.Vector3(0, 1.0, 0));
+                
+                // VRM自体の更新処理（瞬きや揺れモノなど）
                 currentVrm.update(deltaTime);
             }
 
+            controls.update(); // カメラ位置などを確定
             renderer.render(scene, camera);
         }
         animate();
 
-        // --- 5. ウィンドウサイズ変更への対応 ---
+        // --- 7. ウィンドウサイズ変更への対応 ---
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
