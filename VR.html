@@ -1,168 +1,584 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VRM Overworld Controller</title>
-    <style>
-        body { margin: 0; overflow: hidden; }
-        canvas { display: block; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>あやめ ワールド</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+  #canvas { display: block; width: 100vw; height: 100vh; }
+
+  #ui {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 8px; align-items: center;
+    background: rgba(10,10,20,0.7); border: 1px solid rgba(180,140,255,0.3);
+    border-radius: 14px; padding: 10px 20px;
+    backdrop-filter: blur(10px); color: rgba(255,255,255,0.7);
+    font-size: 13px; letter-spacing: 0.05em;
+    pointer-events: none;
+  }
+  #ui kbd {
+    background: rgba(180,140,255,0.2); border: 1px solid rgba(180,140,255,0.4);
+    border-radius: 5px; padding: 2px 7px; color: #c8a8ff; font-size: 12px;
+  }
+
+  #loading {
+    position: fixed; inset: 0; background: #0a0a0f;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 100; color: white;
+  }
+  #loading h1 { font-size: 2rem; letter-spacing: 0.3em; color: #c8a8ff; margin-bottom: 16px; }
+  #loading p { color: rgba(255,255,255,0.5); font-size: 0.9rem; letter-spacing: 0.1em; }
+  .bar-wrap { width: 240px; height: 3px; background: rgba(255,255,255,0.1); border-radius: 99px; margin-top: 24px; overflow: hidden; }
+  .bar { height: 100%; width: 0%; background: linear-gradient(90deg, #7a4fff, #c8a8ff); border-radius: 99px; transition: width 0.3s; }
+
+  #crosshair {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 12px; height: 12px; pointer-events: none; opacity: 0.5;
+  }
+  #crosshair::before, #crosshair::after {
+    content:''; position:absolute; background: rgba(255,255,255,0.6);
+  }
+  #crosshair::before { width:100%; height:1px; top:50%; left:0; }
+  #crosshair::after  { width:1px; height:100%; left:50%; top:0; }
+
+  #minimap {
+    position: fixed; top: 16px; right: 16px;
+    width: 120px; height: 120px;
+    background: rgba(10,10,20,0.75); border: 1px solid rgba(180,140,255,0.3);
+    border-radius: 10px; overflow: hidden; backdrop-filter: blur(8px);
+  }
+  #minimap canvas { width: 100%; height: 100%; }
+
+  #stats {
+    position: fixed; top: 16px; left: 16px;
+    background: rgba(10,10,20,0.7); border: 1px solid rgba(180,140,255,0.2);
+    border-radius: 10px; padding: 10px 14px;
+    color: rgba(255,255,255,0.6); font-size: 12px;
+    backdrop-filter: blur(8px); line-height: 1.8;
+  }
+  #stats span { color: #c8a8ff; }
+</style>
 </head>
 <body>
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-                "@pixiv/three-vrm": "https://unpkg.com/@pixiv/three-vrm@2.1.2/lib/three-vrm.module.js"
-            }
-        }
-    </script>
+<canvas id="canvas"></canvas>
+<div id="crosshair"></div>
+<div id="minimap"><canvas id="mmcanvas" width="120" height="120"></canvas></div>
+<div id="stats">
+  位置: <span id="pos">0, 0</span><br>
+  速度: <span id="spd">0</span>
+</div>
+<div id="ui">
+  <kbd>W A S D</kbd> 移動 &nbsp;|&nbsp; <kbd>マウス</kbd> 視点 &nbsp;|&nbsp; <kbd>Space</kbd> ジャンプ &nbsp;|&nbsp; <kbd>Shift</kbd> ダッシュ
+</div>
+<div id="loading">
+  <h1>あやめ</h1>
+  <p>ワールドを読み込んでいます...</p>
+  <div class="bar-wrap"><div class="bar" id="bar"></div></div>
+  <p id="loadmsg" style="margin-top:12px; font-size:0.75rem; opacity:0.4;">three.js を初期化中</p>
+</div>
 
-    <script type="module">
-        import * as THREE from 'three';
-        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { VRMLoaderPlugin } from '@pixiv/three-vrm';
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
 
-        // --- 1. 基本設定（シーン、カメラ、レンダラー） ---
-        const canvas = document.createElement('canvas');
-        document.body.appendChild(canvas);
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
+// ─── VRM ローダー (CDN から動的ロード) ────────────────────────────────────
+const setBar = (p, msg) => {
+  document.getElementById('bar').style.width = p + '%';
+  if (msg) document.getElementById('loadmsg').textContent = msg;
+};
 
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB); // 背景色を空色に変更
-        scene.fog = new THREE.Fog(0x87CEEB, 10, 50);  // 遠景をぼかすフォグを追加
+// @pixiv/three-vrm を UMD で読み込む
+await new Promise(resolve => {
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@2/lib/three-vrm.js';
+  s.onload = resolve; document.head.appendChild(s);
+});
 
-        // --- 2. オーバーワールド（地面）の追加 ---
-        const gridHelper = new THREE.GridHelper(200, 200, 0x888888, 0xcccccc);
-        scene.add(gridHelper);
+const { VRMLoaderPlugin, VRMUtils, VRMExpressionPresetName } = window.THREE_VRM;
 
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-        camera.position.set(0, 2, -4); // キャラクターの背後・斜め上に配置
+// ─── シーン ───────────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
 
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.target.set(0, 1.0, 0);
-        controls.enablePan = false; // パン操作を無効化（キャラクターを見失わないため）
-        controls.maxPolarAngle = Math.PI / 2 - 0.05; // 地下にカメラが潜らないように制限
-        controls.update();
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1030);
+scene.fog = new THREE.FogExp2(0x1a1030, 0.018);
 
-        // --- 3. ライトの設定 ---
-        const directionalLight = new THREE.DirectionalLight(0xffffff, Math.PI);
-        directionalLight.position.set(1, 2, 1).normalize();
-        scene.add(directionalLight);
+const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 300);
+camera.position.set(0, 1.6, 3);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(ambientLight);
+// ─── ライト ───────────────────────────────────────────────────────────────
+const ambient = new THREE.AmbientLight(0x8080c0, 1.2);
+scene.add(ambient);
 
-        // --- 4. キー入力の管理 ---
-        const keys = {};
-        window.addEventListener('keydown', (e) => { keys[e.code] = true; });
-        window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+const sun = new THREE.DirectionalLight(0xffe0c0, 2.0);
+sun.position.set(20, 40, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 0.5;
+sun.shadow.camera.far = 200;
+sun.shadow.camera.left = sun.shadow.camera.bottom = -50;
+sun.shadow.camera.right = sun.shadow.camera.top = 50;
+scene.add(sun);
 
-        // --- 5. VRMモデルの読み込み ---
-        let currentVrm = undefined;
-        const loader = new GLTFLoader();
+const fillLight = new THREE.DirectionalLight(0x4060ff, 0.6);
+fillLight.position.set(-10, 5, -10);
+scene.add(fillLight);
 
-        loader.register((parser) => new VRMLoaderPlugin(parser));
+// ─── ワールド生成 ─────────────────────────────────────────────────────────
+function makeMat(col, rough = 0.8, metal = 0) {
+  return new THREE.MeshStandardMaterial({ color: col, roughness: rough, metalness: metal });
+}
 
-        const vrmUrl = './ayame_v1.1.vrm'; // ★VRMファイルのパス★
+// 地面
+const groundGeo = new THREE.PlaneGeometry(200, 200, 40, 40);
+// 少し起伏をつける
+const gPos = groundGeo.attributes.position;
+for (let i = 0; i < gPos.count; i++) {
+  const x = gPos.getX(i), z = gPos.getZ(i);
+  if (Math.abs(x) > 8 || Math.abs(z) > 8) {
+    gPos.setY(i, Math.sin(x * 0.15) * Math.cos(z * 0.15) * 1.2);
+  }
+}
+groundGeo.computeVertexNormals();
+const ground = new THREE.Mesh(groundGeo, makeMat(0x2d1f4a, 0.9));
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
 
-        loader.load(
-            vrmUrl,
-            (gltf) => {
-                const vrm = gltf.userData.vrm;
-                currentVrm = vrm;
-                scene.add(vrm.scene);
-                console.log('VRMの読み込みに成功しました');
-            },
-            (progress) => console.log('Loading model...', 100.0 * (progress.loaded / progress.total), '%'),
-            (error) => console.error('VRMの読み込みに失敗しました', error)
-        );
+// グリッドライン
+const grid = new THREE.GridHelper(200, 80, 0x4a2080, 0x3a1060);
+grid.position.y = 0.01;
+scene.add(grid);
 
-        // --- 6. 移動およびアニメーション制御 ---
-        const clock = new THREE.Clock();
-        const moveSpeed = 4.0;       // 移動速度
-        const rotationSpeed = 10.0;  // 旋回速度
-        const walkBobbingAmp = 0.05; // 歩行時の上下の揺れ幅
-        const walkBobbingFreq = 15.0; // 歩行時の揺れスピード
+// 木 (円柱 + 球)
+function addTree(x, z) {
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.15, 0.2, 2, 8),
+    makeMat(0x4a2010)
+  );
+  trunk.position.set(x, 1, z);
+  trunk.castShadow = true; trunk.receiveShadow = true;
+  scene.add(trunk);
 
-        function animate() {
-            requestAnimationFrame(animate);
-            const deltaTime = clock.getDelta();
+  const leaves = new THREE.Mesh(
+    new THREE.SphereGeometry(1.2, 8, 8),
+    makeMat(0x1a4030, 0.9)
+  );
+  leaves.position.set(x, 3, z);
+  leaves.castShadow = true;
+  scene.add(leaves);
 
-            if (currentVrm) {
-                const vrmScene = currentVrm.scene;
+  // 光る実
+  const glow = new THREE.Mesh(
+    new THREE.SphereGeometry(0.12, 6, 6),
+    new THREE.MeshStandardMaterial({ color: 0x80ffcc, emissive: 0x40ffaa, emissiveIntensity: 1 })
+  );
+  glow.position.set(x + 0.5, 2.5, z + 0.3);
+  scene.add(glow);
+}
 
-                // 6-1. 入力ベクトルの計算
-                let inputZ = 0;
-                let inputX = 0;
-                if (keys['KeyW'] || keys['ArrowUp']) inputZ -= 1;
-                if (keys['KeyS'] || keys['ArrowDown']) inputZ += 1;
-                if (keys['KeyA'] || keys['ArrowLeft']) inputX -= 1;
-                if (keys['KeyD'] || keys['ArrowRight']) inputX += 1;
+// 石柱
+function addPillar(x, z, h = 4) {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.8, h, 0.8),
+    makeMat(0x3a3060, 0.7, 0.1)
+  );
+  mesh.position.set(x, h / 2, z);
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  scene.add(mesh);
 
-                const inputVector = new THREE.Vector3(inputX, 0, inputZ).normalize();
+  // 頂上の光
+  const top = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.3),
+    new THREE.MeshStandardMaterial({ color: 0x9060ff, emissive: 0x7040ff, emissiveIntensity: 2 })
+  );
+  top.position.set(x, h + 0.4, z);
+  scene.add(top);
 
-                if (inputVector.lengthSq() > 0) {
-                    // 6-2. カメラの向きを基準にした移動方向の計算
-                    const cameraForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-                    cameraForward.y = 0; // 水平移動のみにするためYを潰す
-                    cameraForward.normalize();
+  const pl = new THREE.PointLight(0x9060ff, 2, 8);
+  pl.position.set(x, h + 0.5, z);
+  scene.add(pl);
+}
 
-                    const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-                    cameraRight.y = 0;
-                    cameraRight.normalize();
+// 鳥居風ゲート
+function addGate(x, z) {
+  const mat = makeMat(0xff3020, 0.6);
+  const col1 = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,5,8), mat);
+  col1.position.set(x - 1.5, 2.5, z); col1.castShadow=true; scene.add(col1);
+  const col2 = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,5,8), mat);
+  col2.position.set(x + 1.5, 2.5, z); col2.castShadow=true; scene.add(col2);
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(4, 0.3, 0.3), mat);
+  beam.position.set(x, 5.2, z); scene.add(beam);
+  const beam2 = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.2, 0.25), mat);
+  beam2.position.set(x, 4.4, z); scene.add(beam2);
 
-                    // 実際のワールド空間での進行方向ベクトル
-                    const moveDirection = new THREE.Vector3()
-                        .addScaledVector(cameraRight, inputVector.x)
-                        .addScaledVector(cameraForward, inputVector.z)
-                        .normalize();
+  // ランタン
+  [-1.2, 1.2].forEach(dx => {
+    const lantern = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 0.4, 0.3),
+      new THREE.MeshStandardMaterial({ color: 0xff8000, emissive: 0xff4000, emissiveIntensity: 1.5 })
+    );
+    lantern.position.set(x + dx, 4.8, z); scene.add(lantern);
+    const lp = new THREE.PointLight(0xff6000, 1.5, 6);
+    lp.position.set(x + dx, 4.8, z); scene.add(lp);
+  });
+}
 
-                    // 6-3. モデルとカメラの移動
-                    const moveDelta = moveDirection.clone().multiplyScalar(moveSpeed * deltaTime);
-                    vrmScene.position.add(moveDelta);
-                    camera.position.add(moveDelta); // カメラも同調して移動させる
+// 配置
+setBar(20, 'ワールドを生成中');
+const treePositions = [
+  [5,5],[5,-5],[-5,5],[-5,-5],[8,2],[2,8],[-8,2],[-2,-8],
+  [12,10],[10,-12],[-12,8],[-10,-10],[15,3],[3,15],[14,-8],[-14,5]
+];
+treePositions.forEach(([x,z]) => addTree(x, z));
 
-                    // 6-4. 進行方向への滑らかな旋回処理
-                    // VRMの正面（+Z軸）を進行方向に向けるための目標位置
-                    const lookTarget = vrmScene.position.clone().sub(moveDirection); 
-                    const targetMatrix = new THREE.Matrix4().lookAt(vrmScene.position, lookTarget, new THREE.Vector3(0, 1, 0));
-                    const targetQuat = new THREE.Quaternion().setFromRotationMatrix(targetMatrix);
-                    
-                    // Quaternion.slerpで滑らかに回転させる
-                    vrmScene.quaternion.slerp(targetQuat, rotationSpeed * deltaTime);
+[[-18,0],[18,0],[0,18],[0,-18],[-12,12],[12,-12]].forEach(([x,z]) => addPillar(x, z, 3 + Math.random()*3));
 
-                    // 6-5. 簡易歩行アニメーション（Y軸のバウンド）
-                    vrmScene.position.y = Math.abs(Math.sin(clock.elapsedTime * walkBobbingFreq)) * walkBobbingAmp;
-                } else {
-                    // 移動していない時はY軸（高さ）を滑らかにゼロに戻す
-                    vrmScene.position.y = THREE.MathUtils.lerp(vrmScene.position.y, 0, 10 * deltaTime);
-                }
+addGate(0, -15);
+addGate(0, 15);
 
-                // 6-6. OrbitControlsの注視点を常にキャラクターの胸のあたりに更新
-                controls.target.copy(vrmScene.position).add(new THREE.Vector3(0, 1.0, 0));
-                
-                // VRM自体の更新処理（瞬きや揺れモノなど）
-                currentVrm.update(deltaTime);
-            }
+// パーティクル (星)
+const starGeo = new THREE.BufferGeometry();
+const starPos = new Float32Array(3000);
+for (let i = 0; i < 3000; i += 3) {
+  starPos[i]   = (Math.random() - 0.5) * 300;
+  starPos[i+1] = Math.random() * 80 + 10;
+  starPos[i+2] = (Math.random() - 0.5) * 300;
+}
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.3, transparent: true, opacity: 0.7 }));
+scene.add(stars);
 
-            controls.update(); // カメラ位置などを確定
-            renderer.render(scene, camera);
-        }
-        animate();
+// ─── VRM ロード ───────────────────────────────────────────────────────────
+setBar(40, 'キャラクターを読み込み中');
+const loader = new GLTFLoader();
+loader.register(parser => new VRMLoaderPlugin(parser));
 
-        // --- 7. ウィンドウサイズ変更への対応 ---
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-    </script>
+let vrm = null;
+let mixer = null;
+// アニメーションクリップ格納
+const clips = { idle: null, walk: null, run: null, jump: null };
+let currentAction = null;
+let currentState = 'idle';
+
+try {
+  const gltf = await new Promise((res, rej) =>
+    loader.load('ayame_v1_1.vrm', res, e => setBar(40 + e.loaded/e.total*30, '読み込み中 ' + Math.round(e.loaded/e.total*100) + '%'), rej)
+  );
+
+  vrm = gltf.userData.vrm;
+  VRMUtils.removeUnnecessaryVertices(vrm.scene);
+  VRMUtils.removeUnnecessaryJoints(vrm.scene);
+  vrm.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  scene.add(vrm.scene);
+
+  // ミキサー
+  mixer = new THREE.AnimationMixer(vrm.scene);
+
+  // ── プロシージャルアニメーション ────────────────────────────────────────
+  // アニメーションはVRM humanoid ボーンを直接動かすプロシージャル方式で実装
+  setBar(80, 'アニメーションを準備中');
+
+} catch(e) {
+  console.error('VRM load failed', e);
+  document.getElementById('loadmsg').textContent = 'VRM読み込みエラー: ' + e.message;
+}
+
+setBar(95, '最終調整中');
+
+// ─── キャラクターコントローラー ───────────────────────────────────────────
+const keys = {};
+window.addEventListener('keydown', e => { keys[e.code] = true; });
+window.addEventListener('keyup',   e => { keys[e.code] = false; });
+
+// マウス視点
+let yaw = 0, pitch = 0;
+let isLocked = false;
+canvas.addEventListener('click', () => canvas.requestPointerLock());
+document.addEventListener('pointerlockchange', () => { isLocked = document.pointerLockElement === canvas; });
+document.addEventListener('mousemove', e => {
+  if (!isLocked) return;
+  yaw   -= e.movementX * 0.002;
+  pitch -= e.movementY * 0.002;
+  pitch  = Math.max(-0.6, Math.min(0.8, pitch));
+});
+
+// タッチ対応 (モバイル)
+let touchStart = null;
+canvas.addEventListener('touchstart', e => { touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY }; });
+canvas.addEventListener('touchmove', e => {
+  if (!touchStart) return;
+  yaw   -= (e.touches[0].clientX - touchStart.x) * 0.005;
+  pitch -= (e.touches[0].clientY - touchStart.y) * 0.005;
+  pitch  = Math.max(-0.6, Math.min(0.8, pitch));
+  touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+});
+
+// キャラ状態
+const charPos = new THREE.Vector3(0, 0, 0);
+let velY = 0;
+const GRAVITY = -20;
+const JUMP_FORCE = 7;
+let isOnGround = true;
+let isJumping = false;
+let jumpTime = 0;
+
+// ─── プロシージャルアニメーション ────────────────────────────────────────
+let animTime = 0;
+const PI = Math.PI;
+
+function getGroundY(x, z) {
+  if (Math.abs(x) > 8 || Math.abs(z) > 8) {
+    return Math.sin(x * 0.15) * Math.cos(z * 0.15) * 1.2;
+  }
+  return 0;
+}
+
+function applyProceduralAnim(vrm, state, t, speed) {
+  if (!vrm || !vrm.humanoid) return;
+  const hips      = vrm.humanoid.getNormalizedBoneNode('hips');
+  const spine     = vrm.humanoid.getNormalizedBoneNode('spine');
+  const chest     = vrm.humanoid.getNormalizedBoneNode('chest');
+  const head      = vrm.humanoid.getNormalizedBoneNode('head');
+  const leftArm   = vrm.humanoid.getNormalizedBoneNode('leftUpperArm');
+  const rightArm  = vrm.humanoid.getNormalizedBoneNode('rightUpperArm');
+  const leftFore  = vrm.humanoid.getNormalizedBoneNode('leftLowerArm');
+  const rightFore = vrm.humanoid.getNormalizedBoneNode('rightLowerArm');
+  const leftThigh = vrm.humanoid.getNormalizedBoneNode('leftUpperLeg');
+  const rightThigh= vrm.humanoid.getNormalizedBoneNode('rightUpperLeg');
+  const leftKnee  = vrm.humanoid.getNormalizedBoneNode('leftLowerLeg');
+  const rightKnee = vrm.humanoid.getNormalizedBoneNode('rightLowerLeg');
+
+  const freq = state === 'run' ? 2.5 : 1.6;
+  const amp  = state === 'idle' ? 0.03 : (state === 'run' ? 0.25 : 0.18);
+  const sw   = Math.sin(t * freq);
+  const sw2  = Math.sin(t * freq * 2);
+
+  if (state === 'idle') {
+    if (hips)  hips.position.y  = Math.sin(t * 1.2) * 0.005;
+    if (spine) spine.rotation.z = Math.sin(t * 0.8) * 0.01;
+    if (chest) chest.rotation.z = Math.sin(t * 0.8 + 0.2) * 0.01;
+    if (head)  { head.rotation.y = Math.sin(t * 0.5) * 0.05; head.rotation.z = Math.sin(t * 0.6) * 0.015; }
+    // 自然な腕の下垂
+    if (leftArm)  leftArm.rotation.z =  0.15 + Math.sin(t*0.9)*0.02;
+    if (rightArm) rightArm.rotation.z = -0.15 - Math.sin(t*0.9)*0.02;
+    if (leftFore)  leftFore.rotation.z =  0.05;
+    if (rightFore) rightFore.rotation.z = -0.05;
+    if (leftThigh)  leftThigh.rotation.x = 0;
+    if (rightThigh) rightThigh.rotation.x = 0;
+    if (leftKnee)  leftKnee.rotation.x = 0;
+    if (rightKnee) rightKnee.rotation.x = 0;
+  } else if (state === 'walk' || state === 'run') {
+    if (hips)  { hips.position.y = Math.abs(sw2) * 0.04; hips.rotation.y = sw * 0.08; }
+    if (spine) spine.rotation.z = sw * 0.04;
+    if (chest) chest.rotation.z = -sw * 0.05;
+    if (head)  head.rotation.y = -sw * 0.04;
+    // 腕の振り
+    if (leftArm)  leftArm.rotation.x  =  sw * amp * 0.8;
+    if (rightArm) rightArm.rotation.x = -sw * amp * 0.8;
+    if (leftArm)  leftArm.rotation.z  =  0.2;
+    if (rightArm) rightArm.rotation.z = -0.2;
+    if (leftFore)  leftFore.rotation.z =  0.1 + Math.max(0, sw) * 0.3;
+    if (rightFore) rightFore.rotation.z = -0.1 - Math.max(0, -sw) * 0.3;
+    // 脚の動き
+    if (leftThigh)  leftThigh.rotation.x  =  sw * amp * 1.2;
+    if (rightThigh) rightThigh.rotation.x = -sw * amp * 1.2;
+    if (leftKnee)   leftKnee.rotation.x   = Math.max(0, -sw) * amp * 0.8;
+    if (rightKnee)  rightKnee.rotation.x  = Math.max(0, sw) * amp * 0.8;
+  } else if (state === 'jump') {
+    const jt = Math.min(jumpTime, 0.8);
+    if (hips)  hips.position.y = Math.sin(jt * PI) * 0.1;
+    if (leftThigh)  leftThigh.rotation.x  = -0.4 + Math.sin(jt * PI) * 0.3;
+    if (rightThigh) rightThigh.rotation.x = -0.4 + Math.sin(jt * PI) * 0.3;
+    if (leftKnee)   leftKnee.rotation.x  = 0.6 - Math.sin(jt * PI) * 0.4;
+    if (rightKnee)  rightKnee.rotation.x = 0.6 - Math.sin(jt * PI) * 0.4;
+    if (leftArm)  { leftArm.rotation.x  = -0.5; leftArm.rotation.z =  0.3; }
+    if (rightArm) { rightArm.rotation.x = -0.5; rightArm.rotation.z = -0.3; }
+  }
+}
+
+// ─── カメラ追従 ────────────────────────────────────────────────────────────
+const CAM_DIST = 3.5;
+const CAM_HEIGHT = 1.5;
+
+// ─── ミニマップ ───────────────────────────────────────────────────────────
+const mmCtx = document.getElementById('mmcanvas').getContext('2d');
+function drawMinimap() {
+  mmCtx.fillStyle = '#120a20';
+  mmCtx.fillRect(0, 0, 120, 120);
+  // グリッド
+  mmCtx.strokeStyle = '#2a1550'; mmCtx.lineWidth = 0.5;
+  for (let i = 0; i < 120; i += 12) {
+    mmCtx.beginPath(); mmCtx.moveTo(i,0); mmCtx.lineTo(i,120); mmCtx.stroke();
+    mmCtx.beginPath(); mmCtx.moveTo(0,i); mmCtx.lineTo(120,i); mmCtx.stroke();
+  }
+  // 木
+  mmCtx.fillStyle = '#1a5030';
+  treePositions.forEach(([tx,tz]) => {
+    const mx = 60 + tx * 1.5, mz = 60 + tz * 1.5;
+    mmCtx.beginPath(); mmCtx.arc(mx, mz, 2.5, 0, PI*2); mmCtx.fill();
+  });
+  // プレイヤー
+  const px = 60 + charPos.x * 1.5, pz = 60 + charPos.z * 1.5;
+  // 視線方向
+  mmCtx.save();
+  mmCtx.translate(px, pz);
+  mmCtx.rotate(yaw + PI);
+  mmCtx.fillStyle = '#c8a8ff';
+  mmCtx.beginPath(); mmCtx.moveTo(0,-6); mmCtx.lineTo(-3,3); mmCtx.lineTo(3,3); mmCtx.closePath(); mmCtx.fill();
+  mmCtx.restore();
+  // ドット
+  mmCtx.fillStyle = '#ffffff';
+  mmCtx.beginPath(); mmCtx.arc(px, pz, 2, 0, PI*2); mmCtx.fill();
+}
+
+// ─── リサイズ ─────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ─── メインループ ─────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+let lastState = 'idle';
+
+function update(dt) {
+  animTime += dt;
+
+  // ─ 移動ベクトル
+  const dash = keys['ShiftLeft'] || keys['ShiftRight'];
+  const walkSpeed = dash ? 8 : 4;
+  let moveX = 0, moveZ = 0;
+  if (keys['KeyW'] || keys['ArrowUp'])    moveZ -= 1;
+  if (keys['KeyS'] || keys['ArrowDown'])  moveZ += 1;
+  if (keys['KeyA'] || keys['ArrowLeft'])  moveX -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) moveX += 1;
+
+  const moving = moveX !== 0 || moveZ !== 0;
+
+  // カメラ方向に合わせてキャラ移動
+  const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+  const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+  const moveDir = fwd.clone().multiplyScalar(-moveZ).add(right.clone().multiplyScalar(moveX));
+
+  if (moving) {
+    moveDir.normalize();
+    charPos.addScaledVector(moveDir, walkSpeed * dt);
+  }
+
+  // 範囲制限
+  charPos.x = Math.max(-90, Math.min(90, charPos.x));
+  charPos.z = Math.max(-90, Math.min(90, charPos.z));
+
+  // ジャンプ & 重力
+  if ((keys['Space'] || keys['KeyZ']) && isOnGround) {
+    velY = JUMP_FORCE;
+    isOnGround = false;
+    isJumping = true;
+    jumpTime = 0;
+  }
+  if (!isOnGround) jumpTime += dt;
+
+  velY += GRAVITY * dt;
+  charPos.y += velY * dt;
+
+  const groundY = getGroundY(charPos.x, charPos.z);
+  if (charPos.y <= groundY) {
+    charPos.y = groundY;
+    velY = 0;
+    isOnGround = true;
+    isJumping = false;
+  }
+
+  // ─ アニメーション状態
+  let state = 'idle';
+  if (isJumping || !isOnGround) state = 'jump';
+  else if (moving && dash)  state = 'run';
+  else if (moving)          state = 'walk';
+  currentState = state;
+
+  // VRM 更新
+  if (vrm) {
+    // キャラクター位置
+    vrm.scene.position.copy(charPos);
+
+    // 向き: 移動方向に向く
+    if (moving) {
+      const targetYaw = Math.atan2(moveDir.x, moveDir.z);
+      const currentYaw = vrm.scene.rotation.y;
+      let diff = targetYaw - currentYaw;
+      while (diff >  PI) diff -= 2*PI;
+      while (diff < -PI) diff += 2*PI;
+      vrm.scene.rotation.y += diff * Math.min(1, 12 * dt);
+    }
+
+    // プロシージャルアニメーション
+    applyProceduralAnim(vrm, state, animTime, walkSpeed);
+
+    // 表情: 歩きでブリンク
+    if (vrm.expressionManager) {
+      const blink = Math.sin(animTime * 0.7) > 0.97 ? 1 : 0;
+      vrm.expressionManager.setValue(VRMExpressionPresetName.BlinkLeft,  blink);
+      vrm.expressionManager.setValue(VRMExpressionPresetName.BlinkRight, blink);
+      vrm.expressionManager.update();
+    }
+
+    vrm.update(dt);
+  }
+
+  // ─ カメラ
+  const camTarget = charPos.clone().add(new THREE.Vector3(0, 1.2, 0));
+  const camOffset = new THREE.Vector3(
+    Math.sin(yaw) * CAM_DIST,
+    CAM_HEIGHT + Math.sin(pitch) * CAM_DIST,
+    Math.cos(yaw) * CAM_DIST
+  );
+  camera.position.lerp(camTarget.clone().add(camOffset), 0.15);
+  camera.lookAt(camTarget);
+
+  // ─ 星の回転
+  stars.rotation.y += 0.0001;
+
+  // ─ UI
+  document.getElementById('pos').textContent = `${charPos.x.toFixed(1)}, ${charPos.z.toFixed(1)}`;
+  document.getElementById('spd').textContent = moving ? (dash ? '8' : '4') : '0';
+
+  drawMinimap();
+}
+
+// ─── ローディング完了 ─────────────────────────────────────────────────────
+setBar(100, '完了！');
+setTimeout(() => {
+  document.getElementById('loading').style.transition = 'opacity 0.8s';
+  document.getElementById('loading').style.opacity = '0';
+  setTimeout(() => document.getElementById('loading').remove(), 800);
+}, 500);
+
+// ─── レンダーループ ───────────────────────────────────────────────────────
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  update(dt);
+  renderer.render(scene, camera);
+});
+</script>
 </body>
 </html>
