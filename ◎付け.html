@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini API 自動採点アプリ</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    h1 { font-size: 1.5rem; border-bottom: 2px solid #4285f4; padding-bottom: 10px; }
+    .config-box { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+    input[type="password"] { width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box; }
+    
+    /* ドラッグ＆ドロップエリアのスタイル */
+    .drop-zone {
+      margin-top: 10px;
+      padding: 30px 15px;
+      border: 2px dashed #4285f4;
+      border-radius: 8px;
+      text-align: center;
+      background-color: #f8fbff;
+      cursor: pointer;
+      transition: background-color 0.2s, border-color 0.2s;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      background-color: #e8f0fe;
+      border-color: #1a73e8;
+    }
+    .drop-zone p { margin: 0; color: #5f6368; pointer-events: none; }
+    
+    /* アップロードされたファイルのリスト */
+    .file-list { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .file-badge { background: #e0e0e0; padding: 5px 10px; border-radius: 15px; font-size: 0.85rem; display: flex; align-items: center; }
+
+    .upload-section { margin-bottom: 25px; }
+    
+    /* ボタン類のスタイル */
+    button { background-color: #4285f4; color: white; border: none; padding: 12px 20px; border-radius: 4px; cursor: pointer; font-size: 1.1rem; width: 100%; font-weight: bold; }
+    button:hover { background-color: #3367d6; }
+    button:disabled { background-color: #ccc; cursor: not-allowed; }
+    
+    .camera-btn { background-color: #34a853; width: auto; font-size: 0.9rem; padding: 8px 15px; margin-bottom: 10px; display: inline-flex; align-items: center; gap: 5px;}
+    .camera-btn:hover { background-color: #2d9249; }
+    
+    #loading { display: none; text-align: center; margin: 20px 0; font-weight: bold; color: #4285f4; }
+    
+    /* 採点結果のスタイル */
+    .result-item { margin-bottom: 15px; padding: 15px; border-radius: 8px; border-left: 5px solid; }
+    .correct { background-color: #e6f4ea; border-color: #34a853; }
+    .incorrect { background-color: #fce8e6; border-color: #ea4335; }
+    .correct h3 { color: #1e8e3e; margin-top: 0; }
+    .incorrect h3 { color: #d93025; margin-top: 0; }
+    .detail { margin: 5px 0; font-size: 0.95rem; }
+
+    /* カメラ用モーダルのスタイル */
+    .camera-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; flex-direction: column; }
+    .camera-content { background: white; padding: 15px; border-radius: 8px; text-align: center; max-width: 95%; width: 500px; }
+    #cameraVideo { width: 100%; max-height: 60vh; background-color: #000; border-radius: 4px; object-fit: cover; transition: opacity 0.1s; }
+    .camera-controls { margin-top: 15px; display: flex; gap: 10px; justify-content: center; }
+    .capture-btn { background-color: #ff9800; }
+    .capture-btn:hover { background-color: #e68a00; }
+    .close-btn { background-color: #7f8c8d; }
+    .close-btn:hover { background-color: #6c7a7d; }
+  </style>
+</head>
+<body>
+
+  <h1>📝 Gemini 自動採点アプリ</h1>
+
+  <div class="config-box">
+    <label for="apiKey"><strong>Gemini API キー:</strong></label>
+    <input type="password" id="apiKey" placeholder="AIzaSy...">
+    <small>※APIキーはブラウザから直接Googleに送信され、どこにも保存されません。</small>
+  </div>
+
+  <div class="upload-section">
+    <strong>📄 模範解答（答えのページ）</strong><br>
+    <button type="button" class="camera-btn" onclick="openCamera('answer')">📷 カメラで撮影する</button>
+    <div class="drop-zone" id="answerDropZone">
+      <p>ここに画像をドラッグ＆ドロップするか、クリックしてファイルを選択</p>
+      <input type="file" id="answerInput" accept="image/*" multiple style="display: none;">
+    </div>
+    <div id="answerFileList" class="file-list"></div>
+  </div>
+
+  <div class="upload-section">
+    <strong>✍️ 生徒の回答（回答のページ）</strong><br>
+    <button type="button" class="camera-btn" onclick="openCamera('student')">📷 カメラで撮影する</button>
+    <div class="drop-zone" id="studentDropZone">
+      <p>ここに画像をドラッグ＆ドロップするか、クリックしてファイルを選択</p>
+      <input type="file" id="studentInput" accept="image/*" multiple style="display: none;">
+    </div>
+    <div id="studentFileList" class="file-list"></div>
+  </div>
+
+  <button id="gradeBtn">採点開始</button>
+
+  <div id="loading">採点中...（画像枚数が多いと数十秒かかる場合があります）</div>
+  <div id="resultsArea"></div>
+
+  <div id="cameraModal" class="camera-modal">
+    <div class="camera-content">
+      <h3 style="margin-top: 0; margin-bottom: 10px;">プリントを撮影</h3>
+      <p style="font-size: 0.85rem; color: #666; margin-top: 0;">連続で何枚でも撮影できます</p>
+      <video id="cameraVideo" autoplay playsinline></video>
+      <canvas id="cameraCanvas" style="display: none;"></canvas>
+      <div class="camera-controls">
+        <button id="captureBtn" class="capture-btn">📸 撮影！</button>
+        <button id="closeCameraBtn" class="close-btn">✖ 完了して閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let answerFilesArray = [];
+    let studentFilesArray = [];
+
+    // --- ファイルバッジ作成用の共通関数 ---
+    function addBadge(listId, fileName) {
+      const fileList = document.getElementById(listId);
+      const badge = document.createElement('div');
+      badge.className = 'file-badge';
+      badge.textContent = `📎 ${fileName}`;
+      fileList.appendChild(badge);
+    }
+
+    // --- ドラッグ＆ドロップのセットアップ関数 ---
+    function setupDropZone(zoneId, inputId, listId, fileArray) {
+      const dropZone = document.getElementById(zoneId);
+      const fileInput = document.getElementById(inputId);
+
+      dropZone.addEventListener('click', () => fileInput.click());
+
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+      });
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        handleFiles(e.dataTransfer.files);
+      });
+
+      fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+        fileInput.value = ""; 
+      });
+
+      function handleFiles(files) {
+        for (const file of files) {
+          if (file.type.startsWith('image/')) {
+            fileArray.push(file);
+            addBadge(listId, file.name);
+          }
+        }
+      }
+    }
+
+    setupDropZone('answerDropZone', 'answerInput', 'answerFileList', answerFilesArray);
+    setupDropZone('studentDropZone', 'studentInput', 'studentFileList', studentFilesArray);
+
+    // --- カメラ撮影機能 ---
+    let currentCameraTarget = null;
+    let videoStream = null;
+    let photoCounter = 1;
+
+    async function openCamera(target) {
+      currentCameraTarget = target;
+      const modal = document.getElementById('cameraModal');
+      const video = document.getElementById('cameraVideo');
+      
+      try {
+        // スマホのアウトカメラ（環境カメラ）を優先的に要求
+        videoStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' },
+          audio: false
+        });
+        video.srcObject = videoStream;
+        modal.style.display = 'flex';
+      } catch (err) {
+        console.error("カメラエラー:", err);
+        alert('カメラを起動できませんでした。ブラウザのカメラ許可設定を確認してください。');
+      }
+    }
+
+    function closeCamera() {
+      const modal = document.getElementById('cameraModal');
+      if (videoStream) {
+        // カメラのストリームを停止してリソースを開放
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+      }
+      modal.style.display = 'none';
+    }
+
+    document.getElementById('closeCameraBtn').addEventListener('click', closeCamera);
+
+    // 撮影ボタンの処理
+    document.getElementById('captureBtn').addEventListener('click', () => {
+      const video = document.getElementById('cameraVideo');
+      const canvas = document.getElementById('cameraCanvas');
+      const ctx = canvas.getContext('2d');
+      
+      // ビデオの実際の解像度に合わせてキャンバスサイズを設定
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      // 現在のフレームをキャンバスに描画
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // キャンバスの画像をJPEG形式のBlob（ファイルデータ）に変換
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        
+        const fileName = `カメラ撮影_${photoCounter}.jpg`;
+        const file = new File([blob], fileName, { type: 'image/jpeg' });
+        photoCounter++;
+        
+        // 指定された配列に画像を追加し、画面にバッジを表示
+        if (currentCameraTarget === 'answer') {
+          answerFilesArray.push(file);
+          addBadge('answerFileList', fileName);
+        } else if (currentCameraTarget === 'student') {
+          studentFilesArray.push(file);
+          addBadge('studentFileList', fileName);
+        }
+
+        // 撮影したことがわかるように一瞬画面を暗くする（シャッターエフェクト）
+        video.style.opacity = '0.3';
+        setTimeout(() => video.style.opacity = '1', 150);
+        
+      }, 'image/jpeg', 0.9); // 画質0.9で生成
+    });
+
+
+    // --- 画像をBase64形式に変換する関数 ---
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+          const base64Data = reader.result.split(',')[1];
+          resolve({ inlineData: { data: base64Data, mimeType: file.type } });
+        };
+        reader.onerror = error => reject(error);
+      });
+    }
+
+    // --- 採点開始ボタンの処理 ---
+    document.getElementById('gradeBtn').addEventListener('click', async () => {
+      const apiKey = document.getElementById('apiKey').value.trim();
+
+      if (!apiKey) { alert('APIキーを入力してください。'); return; }
+      if (answerFilesArray.length === 0) { alert('模範解答の画像をアップロードまたは撮影してください。'); return; }
+      if (studentFilesArray.length === 0) { alert('生徒の回答の画像をアップロードまたは撮影してください。'); return; }
+
+      const btn = document.getElementById('gradeBtn');
+      const loading = document.getElementById('loading');
+      const resultsArea = document.getElementById('resultsArea');
+
+      btn.disabled = true;
+      loading.style.display = 'block';
+      resultsArea.innerHTML = '';
+
+      try {
+        const answerParts = await Promise.all(answerFilesArray.map(fileToBase64));
+        const studentParts = await Promise.all(studentFilesArray.map(fileToBase64));
+
+        const promptText = `
+          あなたは優秀な採点アシスタントです。
+          提供された【模範解答の画像】と【生徒の回答の画像】を比較し、生徒の回答を採点してください。
+          結果は以下のJSONスキーマに従ったJSON配列のみで出力してください。Markdownの装飾は一切不要です。
+          
+          ルール:
+          - あっている場合: 問題番号と正解のみを出力。
+          - 間違っている場合: 問題番号、正解、生徒の回答、および間違えた理由の解説を出力。
+
+          フォーマット例:
+          [
+            { "question_number": "1", "is_correct": true, "correct_answer": "ア" },
+            { "question_number": "2", "is_correct": false, "correct_answer": "徳川家康", "student_answer": "豊臣秀吉", "explanation": "江戸幕府を開いたのは徳川家康です。" }
+          ]
+        `;
+
+        const contents = [
+          { role: "user", parts: [
+              { text: promptText },
+              { text: "【模範解答の画像】" },
+              ...answerParts,
+              { text: "【生徒の回答の画像】" },
+              ...studentParts
+            ]
+          }
+        ];
+
+        const modelName = "gemini-2.5-flash"; 
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: contents,
+            generationConfig: { response_mime_type: "application/json" }
+          })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error?.message || 'API通信エラーが発生しました。');
+        }
+
+        const data = await response.json();
+        const jsonString = data.candidates[0].content.parts[0].text;
+        const results = JSON.parse(jsonString);
+
+        if (results.length === 0) {
+          resultsArea.innerHTML = '<p>採点結果を取得できませんでした。画像が不鮮明か、問題が検出できませんでした。</p>';
+        } else {
+          results.forEach(item => {
+            const div = document.createElement('div');
+            div.className = `result-item ${item.is_correct ? 'correct' : 'incorrect'}`;
+            
+            if (item.is_correct) {
+              div.innerHTML = `
+                <h3>◎ 問題 ${item.question_number}</h3>
+                <div class="detail"><strong>正解:</strong> ${item.correct_answer || '記載なし'}</div>
+              `;
+            } else {
+              div.innerHTML = `
+                <h3>❌ 問題 ${item.question_number}</h3>
+                <div class="detail"><strong>正解:</strong> ${item.correct_answer || '記載なし'}</div>
+                <div class="detail"><strong>生徒の回答:</strong> <span style="color:red;">${item.student_answer || '空欄または判別不能'}</span></div>
+                <div class="detail" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ea4335;">
+                  <strong>💡 解説:</strong><br>${item.explanation || '解説はありません。'}
+                </div>
+              `;
+            }
+            resultsArea.appendChild(div);
+          });
+        }
+
+      } catch (error) {
+        console.error(error);
+        alert(`エラーが発生しました:\n${error.message}`);
+      } finally {
+        btn.disabled = false;
+        loading.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>
