@@ -10,6 +10,10 @@
     .config-box { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
     input[type="password"] { width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box; }
     
+    /* 保存チェックボックスのスタイル */
+    .save-option { display: block; margin-top: 8px; font-size: 0.85rem; color: #5f6368; cursor: pointer; }
+    .save-option input { margin-right: 5px; vertical-align: middle; }
+
     /* ドラッグ＆ドロップエリアのスタイル */
     .drop-zone {
       margin-top: 10px;
@@ -69,7 +73,11 @@
   <div class="config-box">
     <label for="apiKey"><strong>Gemini API キー:</strong></label>
     <input type="password" id="apiKey" placeholder="AIzaSy...">
-    <small>※APIキーはブラウザから直接Googleに送信され、どこにも保存されません。</small>
+    
+    <label class="save-option">
+      <input type="checkbox" id="saveApiKeyCheck"> APIキーをブラウザに保存する（次回から自動入力）
+    </label>
+    <small style="display: block; margin-top: 5px; color: #666;">※キーはあなたのブラウザ内（LocalStorage）にのみ保存されます。学校の共有PCなどではチェックを外してください。</small>
   </div>
 
   <div class="upload-section">
@@ -113,6 +121,15 @@
   <script>
     let answerFilesArray = [];
     let studentFilesArray = [];
+
+    // --- 【新規】ページ読み込み時にキャッシュからAPIキーを復元 ---
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedKey = localStorage.getItem('gemini_api_key');
+      if (savedKey) {
+        document.getElementById('apiKey').value = savedKey;
+        document.getElementById('saveApiKeyCheck').checked = true;
+      }
+    });
 
     // --- ファイルバッジ作成用の共通関数 ---
     function addBadge(listId, fileName) {
@@ -173,7 +190,6 @@
       const video = document.getElementById('cameraVideo');
       
       try {
-        // スマホのアウトカメラ（環境カメラ）を優先的に要求
         videoStream = await navigator.mediaDevices.getUserMedia({ 
           video: { facingMode: 'environment' },
           audio: false
@@ -189,7 +205,6 @@
     function closeCamera() {
       const modal = document.getElementById('cameraModal');
       if (videoStream) {
-        // カメラのストリームを停止してリソースを開放
         videoStream.getTracks().forEach(track => track.stop());
         videoStream = null;
       }
@@ -204,14 +219,10 @@
       const canvas = document.getElementById('cameraCanvas');
       const ctx = canvas.getContext('2d');
       
-      // ビデオの実際の解像度に合わせてキャンバスサイズを設定
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      
-      // 現在のフレームをキャンバスに描画
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // キャンバスの画像をJPEG形式のBlob（ファイルデータ）に変換
       canvas.toBlob((blob) => {
         if (!blob) return;
         
@@ -219,7 +230,6 @@
         const file = new File([blob], fileName, { type: 'image/jpeg' });
         photoCounter++;
         
-        // 指定された配列に画像を追加し、画面にバッジを表示
         if (currentCameraTarget === 'answer') {
           answerFilesArray.push(file);
           addBadge('answerFileList', fileName);
@@ -228,13 +238,11 @@
           addBadge('studentFileList', fileName);
         }
 
-        // 撮影したことがわかるように一瞬画面を暗くする（シャッターエフェクト）
         video.style.opacity = '0.3';
         setTimeout(() => video.style.opacity = '1', 150);
         
-      }, 'image/jpeg', 0.9); // 画質0.9で生成
+      }, 'image/jpeg', 0.9);
     });
-
 
     // --- 画像をBase64形式に変換する関数 ---
     function fileToBase64(file) {
@@ -252,8 +260,17 @@
     // --- 採点開始ボタンの処理 ---
     document.getElementById('gradeBtn').addEventListener('click', async () => {
       const apiKey = document.getElementById('apiKey').value.trim();
+      const shouldSave = document.getElementById('saveApiKeyCheck').checked;
 
       if (!apiKey) { alert('APIキーを入力してください。'); return; }
+
+      // --- 【新規】APIキーのキャッシュ保存・削除の判定 ---
+      if (shouldSave) {
+        localStorage.setItem('gemini_api_key', apiKey);
+      } else {
+        localStorage.removeItem('gemini_api_key');
+      }
+
       if (answerFilesArray.length === 0) { alert('模範解答の画像をアップロードまたは撮影してください。'); return; }
       if (studentFilesArray.length === 0) { alert('生徒の回答の画像をアップロードまたは撮影してください。'); return; }
 
@@ -276,7 +293,7 @@
           
           ルール:
           - あっている場合: 問題番号と正解のみを出力。
-          - 間違っている場合: 問題番号、正解、生徒の回答、および間違えた理由の解説を出力。
+          - 間壊っている場合: 問題番号、正解、生徒の回答、および間違えた理由の解説を出力。
 
           フォーマット例:
           [
