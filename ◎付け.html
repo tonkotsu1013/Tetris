@@ -55,14 +55,38 @@
     .incorrect h3 { color: #d93025; margin-top: 0; }
     .detail { margin: 5px 0; font-size: 0.95rem; }
 
-    /* カメラ用モーダルのスタイル */
-    .camera-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; flex-direction: column; }
-    .camera-content { background: white; padding: 15px; border-radius: 8px; text-align: center; max-width: 95%; width: 500px; }
-    #cameraVideo { width: 100%; max-height: 60vh; background-color: #000; border-radius: 4px; object-fit: cover; transition: opacity 0.1s; }
-    .camera-controls { margin-top: 15px; display: flex; gap: 10px; justify-content: center; }
-    .capture-btn { background-color: #ff9800; }
+    /* カメラ用モーダルのスタイル（画面いっぱいに変更） */
+    .camera-modal { 
+      display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
+      background: #000; z-index: 1000; flex-direction: column; 
+    }
+    .camera-content { 
+      width: 100%; height: 100%; display: flex; flex-direction: column; position: relative; 
+    }
+    .camera-header {
+      position: absolute; top: 0; left: 0; width: 100%; padding: 15px; box-sizing: border-box;
+      background: rgba(0,0,0,0.6); display: flex; justify-content: space-between; align-items: center; z-index: 10;
+    }
+    .camera-header h3 { margin: 0; color: white; font-size: 1.2rem; }
+    .camera-select { padding: 8px; font-size: 1rem; border-radius: 4px; max-width: 250px; }
+    
+    #cameraVideo { 
+      width: 100%; height: 100%; object-fit: contain; background-color: #000; transition: opacity 0.1s; 
+    }
+    
+    .camera-controls { 
+      position: absolute; bottom: 30px; left: 0; width: 100%; 
+      display: flex; gap: 20px; justify-content: center; z-index: 10; 
+    }
+    .capture-btn { 
+      background-color: #ff9800; width: auto; padding: 15px 40px; font-size: 1.2rem; 
+      border-radius: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
+    }
     .capture-btn:hover { background-color: #e68a00; }
-    .close-btn { background-color: #7f8c8d; }
+    .close-btn { 
+      background-color: #7f8c8d; width: auto; padding: 15px 25px; font-size: 1rem; 
+      border-radius: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
+    }
     .close-btn:hover { background-color: #6c7a7d; }
   </style>
 </head>
@@ -107,8 +131,12 @@
 
   <div id="cameraModal" class="camera-modal">
     <div class="camera-content">
-      <h3 style="margin-top: 0; margin-bottom: 10px;">プリントを撮影</h3>
-      <p style="font-size: 0.85rem; color: #666; margin-top: 0;">連続で何枚でも撮影できます</p>
+      <div class="camera-header">
+        <h3 id="cameraModalTitle">プリントを撮影</h3>
+        <select id="cameraSelect" class="camera-select">
+          <option value="">カメラを読み込み中...</option>
+        </select>
+      </div>
       <video id="cameraVideo" autoplay playsinline></video>
       <canvas id="cameraCanvas" style="display: none;"></canvas>
       <div class="camera-controls">
@@ -122,7 +150,6 @@
     let answerFilesArray = [];
     let studentFilesArray = [];
 
-    // --- 【新規】ページ読み込み時にキャッシュからAPIキーを復元 ---
     window.addEventListener('DOMContentLoaded', () => {
       const savedKey = localStorage.getItem('gemini_api_key');
       if (savedKey) {
@@ -131,7 +158,6 @@
       }
     });
 
-    // --- ファイルバッジ作成用の共通関数 ---
     function addBadge(listId, fileName) {
       const fileList = document.getElementById(listId);
       const badge = document.createElement('div');
@@ -140,7 +166,6 @@
       fileList.appendChild(badge);
     }
 
-    // --- ドラッグ＆ドロップのセットアップ関数 ---
     function setupDropZone(zoneId, inputId, listId, fileArray) {
       const dropZone = document.getElementById(zoneId);
       const fileInput = document.getElementById(inputId);
@@ -179,28 +204,86 @@
     setupDropZone('answerDropZone', 'answerInput', 'answerFileList', answerFilesArray);
     setupDropZone('studentDropZone', 'studentInput', 'studentFileList', studentFilesArray);
 
-    // --- カメラ撮影機能 ---
     let currentCameraTarget = null;
     let videoStream = null;
     let photoCounter = 1;
+    let availableCameras = [];
 
-    async function openCamera(target) {
-      currentCameraTarget = target;
-      const modal = document.getElementById('cameraModal');
-      const video = document.getElementById('cameraVideo');
-      
+    // カメラの一覧を取得してセレクトボックスに追加する関数
+    async function updateCameraList() {
       try {
-        videoStream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'environment' },
-          audio: false
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        availableCameras = devices.filter(device => device.kind === 'videoinput');
+        
+        const select = document.getElementById('cameraSelect');
+        select.innerHTML = ''; 
+        
+        availableCameras.forEach((camera, index) => {
+          const option = document.createElement('option');
+          option.value = camera.deviceId;
+          option.text = camera.label || `カメラ ${index + 1}`; 
+          select.appendChild(option);
         });
+      } catch (err) {
+        console.error("デバイスの取得に失敗しました:", err);
+      }
+    }
+
+    // 指定したデバイスIDのカメラを起動する関数
+    async function startStream(deviceId = null) {
+      if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+      }
+      
+      const constraints = {
+        video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment' },
+        audio: false
+      };
+
+      try {
+        videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+        const video = document.getElementById('cameraVideo');
         video.srcObject = videoStream;
-        modal.style.display = 'flex';
+        
+        // 初回起動時、またはカメラリストが空の場合はリストを更新する
+        if (availableCameras.length === 0 || !availableCameras[0].label) {
+            await updateCameraList();
+            
+            // 現在アクティブなトラックのデバイスIDをセレクトボックスに反映させる
+            const activeTrack = videoStream.getVideoTracks()[0];
+            const select = document.getElementById('cameraSelect');
+            if (activeTrack && activeTrack.getSettings) {
+                const settings = activeTrack.getSettings();
+                if (settings.deviceId) {
+                    select.value = settings.deviceId;
+                }
+            }
+        }
       } catch (err) {
         console.error("カメラエラー:", err);
         alert('カメラを起動できませんでした。ブラウザのカメラ許可設定を確認してください。');
       }
     }
+
+    async function openCamera(target) {
+      currentCameraTarget = target;
+      const modal = document.getElementById('cameraModal');
+      const modalTitle = document.getElementById('cameraModalTitle');
+      
+      if (target === 'answer') {
+        modalTitle.textContent = '📄 模範解答を撮影';
+      } else {
+        modalTitle.textContent = '✍️ 生徒の回答を撮影';
+      }
+
+      modal.style.display = 'flex';
+      await startStream();
+    }
+
+    // セレクトボックスの選択が変更されたら、該当のカメラに切り替える
+    document.getElementById('cameraSelect').addEventListener('change', (e) => {
+      startStream(e.target.value);
+    });
 
     function closeCamera() {
       const modal = document.getElementById('cameraModal');
@@ -209,11 +292,13 @@
         videoStream = null;
       }
       modal.style.display = 'none';
+      
+      availableCameras = []; 
+      document.getElementById('cameraSelect').innerHTML = '<option value="">カメラを読み込み中...</option>';
     }
 
     document.getElementById('closeCameraBtn').addEventListener('click', closeCamera);
 
-    // 撮影ボタンの処理
     document.getElementById('captureBtn').addEventListener('click', () => {
       const video = document.getElementById('cameraVideo');
       const canvas = document.getElementById('cameraCanvas');
@@ -244,7 +329,6 @@
       }, 'image/jpeg', 0.9);
     });
 
-    // --- 画像をBase64形式に変換する関数 ---
     function fileToBase64(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -257,14 +341,12 @@
       });
     }
 
-    // --- 採点開始ボタンの処理 ---
     document.getElementById('gradeBtn').addEventListener('click', async () => {
       const apiKey = document.getElementById('apiKey').value.trim();
       const shouldSave = document.getElementById('saveApiKeyCheck').checked;
 
       if (!apiKey) { alert('APIキーを入力してください。'); return; }
 
-      // --- 【新規】APIキーのキャッシュ保存・削除の判定 ---
       if (shouldSave) {
         localStorage.setItem('gemini_api_key', apiKey);
       } else {
