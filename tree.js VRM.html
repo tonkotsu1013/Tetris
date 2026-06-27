@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Three.js VRM Viewer</title>
+    <title>VRM Viewer</title>
     <style>body { margin: 0; overflow: hidden; }</style>
 </head>
 <body>
@@ -11,77 +11,60 @@
         "imports": {
             "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
             "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-            "@pixiv/three-vrm": "https://unpkg.com/@pixiv/three-vrm@3.0.0/lib/three-vrm.module.js"
+            "@pixiv/three-vrm": "https://unpkg.com/@pixiv/three-vrm@2.4.0/lib/three-vrm.module.js"
         }
     }
     </script>
+
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-        import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+        import { VRM, VRMUtils } from '@pixiv/three-vrm';
 
-        // シーン設定
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(30, window.innerWidth/window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 1.5, 2);
+        const camera = new THREE.PerspectiveCamera(30, window.innerWidth/window.innerHeight, 0.1, 20);
+        camera.position.set(0, 1.2, 3);
+
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        const controls = new OrbitControls(camera, renderer.domElement);
         const light = new THREE.DirectionalLight(0xffffff, 1);
         light.position.set(1, 1, 1);
-        scene.add(light);
-        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-
-        // ローダー設定
-        const loader = new GLTFLoader();
-        loader.register((parser) => new VRMLoaderPlugin(parser));
+        scene.add(light, new THREE.AmbientLight(0xffffff, 0.5));
 
         let currentVrm = null;
-        let mixer = null;
+        const loader = new GLTFLoader();
 
-        // 【ここを変更】モデルのパス
+        // VRM読み込み
         loader.load('ayame_v1.1.vrm', (gltf) => {
-            const vrm = gltf.userData.vrm;
-            currentVrm = vrm;
-            scene.add(vrm.scene);
-            
-            // アニメーション設定
-            mixer = new THREE.AnimationMixer(vrm.scene);
-            loadAnimation('Walking.fbx'); // 【ここを変更】アニメーションパス
+            VRM.from(gltf).then((vrm) => {
+                scene.add(vrm.scene);
+                currentVrm = vrm;
+                // コンソールで表情名を確認して、 setValue('名前', 1) で指定
+                console.log("利用可能な表情:", Object.keys(vrm.expressionManager.expressions));
+            });
         });
 
-        function loadAnimation(url) {
-            new FBXLoader().load(url, (fbx) => {
-                // MixamoのモーションをVRMの骨格に適用する処理が必要です
-                // ※本来は "vrm-mixamo-retarget" ライブラリの使用を強く推奨します
-                const action = mixer.clipAction(fbx.animations[0]);
-                action.play();
-            });
-        }
+        // キーボード操作でカメラ移動
+        window.addEventListener('keydown', (e) => {
+            const step = 0.1;
+            if (e.key === 'ArrowUp') camera.position.y += step;
+            if (e.key === 'ArrowDown') camera.position.y -= step;
+            if (e.key === 'ArrowLeft') camera.position.x -= step;
+            if (e.key === 'ArrowRight') camera.position.x += step;
+            if (e.key === 'w') camera.position.z -= step; // 前進
+            if (e.key === 's') camera.position.z += step; // 後退
+        });
 
-        // 【表情制御】0~18の数字で表情を変える例
-        function setExpression(index) {
-            if(!currentVrm) return;
-            const expressionManager = currentVrm.expressionManager;
-            // 表情名はVRMによって異なりますが、presetを使います
-            // 例: 'happy', 'neutral', 'angry' など
-            expressionManager.setValue('2', 1.0); // 0.0〜1.0で調整
-            expressionManager.update();
-        }
-
+        const clock = new THREE.Clock();
         function animate() {
             requestAnimationFrame(animate);
-            if (mixer) mixer.update(0.016);
-            controls.update();
+            const delta = clock.getDelta();
+            if (currentVrm) currentVrm.update(delta);
             renderer.render(scene, camera);
         }
         animate();
-
-        console.log("利用可能な表情:", Object.keys(vrm.expressionManager.expressions));
     </script>
 </body>
 </html>
