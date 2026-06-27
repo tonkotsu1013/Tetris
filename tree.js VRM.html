@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>VRM Three.js Viewer</title>
+    <style>body { margin: 0; overflow: hidden; }</style>
+</head>
+<body>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "@pixiv/three-vrm": "https://unpkg.com/@pixiv/three-vrm@3.0.0/lib/three-vrm.module.js"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+        import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
+        import { FBXLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/FBXLoader.js';
+
+        // シーン設定
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 1.5, 3);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+        scene.add(new THREE.DirectionalLight(0xffffff, 2));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+        let currentVRM = null;
+
+        // 1. VRMの読み込み
+        const loader = new GLTFLoader();
+        loader.register((parser) => new VRMLoaderPlugin(parser));
+        
+        // ★ここを書き換える: 'model.vrm'を自分のファイル名に
+        loader.load('ayame_v1.1.vrm', (gltf) => {
+            const vrm = gltf.userData.vrm;
+            scene.add(vrm.scene);
+            currentVRM = vrm;
+            
+            // 表情リストを出力（コンソールで確認用）
+            console.log("利用可能な表情:", Object.keys(vrm.expressionManager.expressions));
+            
+            // 例: 表情を変える方法（'Joy'という表情がある場合）
+            // vrm.expressionManager.setValue('Joy', 1.0);
+        });
+
+        // 2. アニメーション（Mixamo）の読み込みと適用
+        // ★ここを書き換える: 'animation.fbx'を自分のアニメファイル名に
+        const fbxLoader = new FBXLoader();
+        fbxLoader.load('animation.fbx', (fbx) => {
+            console.log("アニメーション読み込み完了", fbx.animations);
+            // ここでMixamoのアニメーションをVRMのスケルトンに適用する処理が必要です
+            // 複雑なリターゲティングが必要なため、通常は「VRM Animation」形式を推奨します
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (currentVRM) currentVRM.update(0.016);
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
