@@ -16,7 +16,7 @@
   font-family: "Noto Sans JP", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
 }
 html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#02121b 70%);color:var(--white);-webkit-font-smoothing:antialiased;overflow:hidden;}
-.app{height:100%;display:flex;align-items:flex-start;justify-content:center;padding:28px 8px 110px;box-sizing:border-box;gap:10px;}
+.app{height:100%;display:flex;align-items:flex-start;justify-content:center;padding:28px 18px 110px;box-sizing:border-box}
 .container{width:1280px;max-width:100%;overflow: visible;display:flex;gap:18px;align-items:start;justify-content:center; flex-wrap: nowrap;}
 .boardCard{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:12px;border-radius:12px;box-shadow:0 12px 50px rgba(0,0,0,0.7);width:520px;position:relative; flex-shrink: 0;}
 .boardHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
@@ -128,20 +128,7 @@ function updateLangUI() {
 </script>
 
 <div class="app">
-  <!-- 左: 全キャラ画像 -->
-  <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;align-self:flex-start;padding-top:28px;">
-    <div style="font-size:9px;color:rgba(255,255,255,0.4);text-align:center;font-weight:700;letter-spacing:1px;margin-bottom:2px;">CHARS</div>
-    <img src="fubuki.png"  alt="フブキ"  title="白上フブキ"  width="48" height="48" style="border-radius:6px;object-fit:contain;background:rgba(0,188,212,0.15);border:1px solid rgba(0,188,212,0.3);"  onerror="this.style.display='none'">
-    <img src="suisei.png"  alt="すいせい" title="星町すいせい" width="48" height="48" style="border-radius:6px;object-fit:contain;background:rgba(59,89,152,0.15);border:1px solid rgba(59,89,152,0.3);"   onerror="this.style.display='none'">
-    <img src="flair.png"   alt="フレア"  title="不知火フレア" width="48" height="48" style="border-radius:6px;object-fit:contain;background:rgba(255,140,0,0.15);border:1px solid rgba(255,140,0,0.3);"   onerror="this.style.display='none'">
-    <img src="matsuri.png" alt="まつり"  title="夏色まつり"   width="48" height="48" style="border-radius:6px;object-fit:contain;background:rgba(240,208,80,0.15);border:1px solid rgba(240,208,80,0.3);"  onerror="this.style.display='none'">
-    <img src="iroha.png"   alt="いろは"  title="風間いろは"   width="48" height="48" style="border-radius:6px;object-fit:contain;background:rgba(46,125,50,0.15);border:1px solid rgba(46,125,50,0.3);"    onerror="this.style.display='none'">
-    <img src="okayu.png"   alt="おかゆ"  title="猫又おかゆ"   width="48" height="48" style="border-radius:6px;object-fit:contain;background:rgba(155,89,182,0.15);border:1px solid rgba(155,89,182,0.3);" onerror="this.style.display='none'">
-    <img src="ayame.png"   alt="あやめ"  title="百鬼あやめ"   width="48" height="48" style="border-radius:6px;object-fit:contain;background:rgba(192,57,43,0.15);border:1px solid rgba(192,57,43,0.3);"   onerror="this.style.display='none'">
-  </div>
-
   <div class="sharedControls" id="sharedControls" style="display:none;">
-    <img src="hololive.png" alt="hololive" width="160" height="45" style="max-width:100%;height:auto;display:block;margin:0 auto 8px;" onerror="this.style.display='none'">
     <button id="startBtn" class="bigBtn" data-i18n="start">ゲーム開始</button>
     <button id="pauseBtn" class="btn" data-i18n="pause">一時停止</button>
     <button id="restartBtn" class="btn secondary" data-i18n="title">タイトルへ</button>
@@ -259,20 +246,9 @@ function updateLangUI() {
       </div>
     </div>
   </div>
+</div>
 
-  <!-- 右: 全ミノ画像 -->
-  <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;align-self:flex-start;padding-top:28px;">
-    <div style="font-size:9px;color:rgba(255,255,255,0.4);text-align:center;font-weight:700;letter-spacing:1px;margin-bottom:2px;">MINOS</div>
-    <img src="mino_I.png" alt="I" title="I-ミノ" width="48" height="48" style="border-radius:6px;object-fit:contain;background:rgba(0,188,212,0.15);border:1px solid rgba(0,188,212,0.3);"  onerror="this.style.display='none'">
-    <img src="mino_J.png" alt="J" title="J-ミノ" width="48" height="48" style="border-radius:6px;object-fit:contain;background:rgba(59,89,152,0.15);border:1px solid rgba(59,89,152,0.3);"  onerror="this.style.display='none'">
-    <img src="mino_L.png" alt="L" title="L-ミノ" width="48" height="48" style="border-radius:6px;object-fit:contain;background:rgba(255,140,0,0.15);border:1px solid rgba(255,140,0,0.3);"  onerror="this.style.display='none'">
-    <img src="mino_O.png" alt="O" title="O-ミノ" width="48" height="48" style="border-radius:6px;object-fit:contain;background:rgba(240,208,80,0.15);border:1px solid rgba(240,208,80,0.3);" onerror="this.style.display='none'">
-    <img src="mino_S.png" alt="S" title="S-ミノ" width="48" height="48" style="border-radius:6px;object-fit:contain;background:rgba(46,125,50,0.15);border:1px solid rgba(46,125,50,0.3);"   onerror="this.style.display='none'">
-    <img src="mino_T.png" alt="T" title="T-ミノ" width="48" height="48" style="border-radius:6px;object-fit:contain;background:rgba(155,89,182,0.15);border:1px solid rgba(155,89,182,0.3);" onerror="this.style.display='none'">
-    <img src="mino_Z.png" alt="Z" title="Z-ミノ" width="48" height="48" style="border-radius:6px;object-fit:contain;background:rgba(192,57,43,0.15);border:1px solid rgba(192,57,43,0.3);"  onerror="this.style.display='none'">
-  </div>
-
-</div> class="overlay show">
+<div id="titleOverlay" class="overlay show">
   <div class="overlayCard" style="max-width:960px;width:95%;">
     <!-- 3カラムレイアウト: キャラ画像 | 中央メニュー | ミノ画像 -->
     <div style="display:flex;gap:16px;align-items:flex-start;">
