@@ -249,90 +249,126 @@ function updateLangUI() {
 </div>
 
 <div id="titleOverlay" class="overlay show">
-  <div class="overlayCard">
-    <div style="text-align:center">
-      <div class="titleBig" style="font-size:26px;letter-spacing:2px">🌸 ホロライブ TETRIS 🌸</div>
-      <div style="margin-top:4px;color:var(--muted);font-size:12px">ぷよぷよ + テトリス × ホロライブ 完全版</div>
-      <div id="charSelectSummary" style="margin-top:8px;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;">
-        <div id="p1CharBadge" style="display:none;background:rgba(255,255,255,0.05);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;">P1: —</div>
-        <div id="p2CharBadge" style="display:none;background:rgba(255,255,255,0.05);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;">P2: —</div>
-      </div>
-      <div style="margin-top:8px;">
-        <button id="charSelectOpenBtn" class="btn" style="padding:8px 20px;font-size:13px;background:linear-gradient(90deg,rgba(255,110,180,0.3),rgba(106,163,255,0.3));border-color:rgba(255,110,180,0.5);">🎭 キャラクター選択</button>
-      </div>
-      
-      <div style="margin-top:8px;">
-        <button id="langBtn" class="btn secondary" style="padding:4px 8px; font-size:12px;">🌐 EN / JA</button>
+  <div class="overlayCard" style="max-width:960px;width:95%;">
+    <!-- 3カラムレイアウト: キャラ画像 | 中央メニュー | ミノ画像 -->
+    <div style="display:flex;gap:16px;align-items:flex-start;">
+
+      <!-- 左: 全キャラ画像 -->
+      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+        <div style="font-size:10px;color:var(--muted);text-align:center;font-weight:700;letter-spacing:1px;margin-bottom:2px;">CHARACTERS</div>
+        <img src="fubuki.png"  alt="フブキ"  title="白上フブキ"  width="56" height="56" style="border-radius:8px;object-fit:contain;background:rgba(0,188,212,0.15);border:1px solid rgba(0,188,212,0.3);"  onerror="this.style.display='none'">
+        <img src="suisei.png"  alt="すいせい" title="星町すいせい" width="56" height="56" style="border-radius:8px;object-fit:contain;background:rgba(59,89,152,0.15);border:1px solid rgba(59,89,152,0.3);"   onerror="this.style.display='none'">
+        <img src="flair.png"   alt="フレア"  title="不知火フレア" width="56" height="56" style="border-radius:8px;object-fit:contain;background:rgba(255,140,0,0.15);border:1px solid rgba(255,140,0,0.3);"   onerror="this.style.display='none'">
+        <img src="matsuri.png" alt="まつり"  title="夏色まつり"   width="56" height="56" style="border-radius:8px;object-fit:contain;background:rgba(240,208,80,0.15);border:1px solid rgba(240,208,80,0.3);"  onerror="this.style.display='none'">
+        <img src="iroha.png"   alt="いろは"  title="風間いろは"   width="56" height="56" style="border-radius:8px;object-fit:contain;background:rgba(46,125,50,0.15);border:1px solid rgba(46,125,50,0.3);"    onerror="this.style.display='none'">
+        <img src="okayu.png"   alt="おかゆ"  title="猫又おかゆ"   width="56" height="56" style="border-radius:8px;object-fit:contain;background:rgba(155,89,182,0.15);border:1px solid rgba(155,89,182,0.3);" onerror="this.style.display='none'">
+        <img src="ayame.png"   alt="あやめ"  title="百鬼あやめ"   width="56" height="56" style="border-radius:8px;object-fit:contain;background:rgba(192,57,43,0.15);border:1px solid rgba(192,57,43,0.3);"   onerror="this.style.display='none'">
       </div>
 
-      <div style="margin-top:16px;display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap;">
-        <select id="titleModeSelect" style="padding:8px;border-radius:8px;color:#000;">
-          <optgroup label="── TETRIS ──">
-            <option value="marathon">Marathon</option>
-            <option value="free_marathon">Free Marathon</option>
-            <option value="time">Time Attack</option>
-            <option value="ultra">Ultra (3 Min)</option>
-            <option value="master">Master</option>
-            <option value="purify">Purify</option>
-            <option value="vs_local">VS Tetris (2P Local)</option>
-            <option value="vs_ai">VS Tetris (1P vs AI)</option>
-          </optgroup>
-          <optgroup label="── PUYO PUYO ──">
-            <option value="puyo_marathon">Puyo Marathon</option>
-            <option value="puyo_free_marathon">Puyo Free Marathon</option>
-            <option value="puyo_vs_local">VS Puyo (2P Local)</option>
-            <option value="puyo_vs_ai">VS Puyo (1P vs AI)</option>
-          </optgroup>
-          <optgroup label="── PUYO TETRIS ──">
-            <option value="puyotet_vs_local">PuyoTet VS (2P Local)</option>
-            <option value="puyotet_vs_ai">PuyoTet VS (1P vs AI)</option>
-          </optgroup>
-        </select>
-        <select id="titleSubMode" style="padding:8px;border-radius:8px;color:#000;display:none;">
-          <option value="1">1 Line</option>
-          <option value="20">20 Lines</option>
-          <option value="50" selected>50 Lines</option>
-          <option value="100">100 Lines</option>
-          <option value="150">150 Lines</option>
-          <option value="200">200 Lines</option>
-          <option value="500">500 Lines</option>
-        </select>
-        <select id="titleAILvl" style="padding:8px;border-radius:8px;color:#000;display:none;">
-          <option value="1">AI Lvl 1</option>
-          <option value="2">AI Lvl 2</option>
-          <option value="3">AI Lvl 3</option>
-          <option value="4">AI Lvl 4</option>
-          <option value="5" selected>AI Lvl 5</option>
-          <option value="6">AI Lvl 6</option>
-          <option value="7">AI Lvl 7</option>
-          <option value="8">AI Lvl 8</option>
-          <option value="9">AI Lvl 9</option>
-          <option value="pro">AI Pro</option>
-        </select>
-        <div id="puyotetPlayerSelect" style="display:none; background:rgba(255,255,255,0.05); border-radius:10px; padding:10px 14px; border:1px solid rgba(255,255,255,0.1);">
-          <div style="font-size:12px; color:var(--muted); margin-bottom:8px; text-align:center; font-weight:700;">Choose Game Type per Player</div>
-          <div style="display:flex; gap:16px; align-items:center; justify-content:center;">
-            <div style="text-align:center;">
-              <div style="font-size:12px; color:var(--accent2); font-weight:800; margin-bottom:4px;">P1</div>
-              <select id="p1TypeSelect" class="playerTypeSelect" style="color:#000; padding:4px; border-radius:4px;">
-                <option value="tetris">🟦 Tetris</option>
-                <option value="puyo">🔴 Puyo</option>
-              </select>
-            </div>
-            <div style="font-size:18px; color:var(--muted);">VS</div>
-            <div style="text-align:center;">
-              <div style="font-size:12px; color:#ff6b6b; font-weight:800; margin-bottom:4px;">P2</div>
-              <select id="p2TypeSelect" class="playerTypeSelect" style="color:#000; padding:4px; border-radius:4px;">
-                <option value="tetris">🟦 Tetris</option>
-                <option value="puyo" selected>🔴 Puyo</option>
-              </select>
+      <!-- 中央: タイトル＋メニュー -->
+      <div style="flex:1;text-align:center;min-width:0;">
+        <!-- hololive.png ロゴ -->
+        <div style="margin-bottom:8px;">
+          <img src="hololive.png" alt="hololive" width="421" height="119" style="max-width:100%;height:auto;display:block;margin:0 auto;" onerror="this.style.display='none'">
+        </div>
+
+        <div class="titleBig" style="font-size:22px;letter-spacing:2px;">🌸 ホロライブ TETRIS 🌸</div>
+        <div style="margin-top:4px;color:var(--muted);font-size:11px;">ぷよぷよ + テトリス × ホロライブ 完全版</div>
+
+        <div id="charSelectSummary" style="margin-top:8px;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;">
+          <div id="p1CharBadge" style="display:none;background:rgba(255,255,255,0.05);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;">P1: —</div>
+          <div id="p2CharBadge" style="display:none;background:rgba(255,255,255,0.05);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;">P2: —</div>
+        </div>
+        <div style="margin-top:8px;">
+          <button id="charSelectOpenBtn" class="btn" style="padding:8px 20px;font-size:13px;background:linear-gradient(90deg,rgba(255,110,180,0.3),rgba(106,163,255,0.3));border-color:rgba(255,110,180,0.5);">🎭 キャラクター選択</button>
+        </div>
+        <div style="margin-top:6px;">
+          <button id="langBtn" class="btn secondary" style="padding:4px 8px;font-size:12px;">🌐 EN / JA</button>
+        </div>
+
+        <!-- サブメニュー（少し下げる） -->
+        <div style="margin-top:24px;display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap;">
+          <select id="titleModeSelect" style="padding:8px;border-radius:8px;color:#000;">
+            <optgroup label="── TETRIS ──">
+              <option value="marathon">Marathon</option>
+              <option value="free_marathon">Free Marathon</option>
+              <option value="time">Time Attack</option>
+              <option value="ultra">Ultra (3 Min)</option>
+              <option value="master">Master</option>
+              <option value="purify">Purify</option>
+              <option value="vs_local">VS Tetris (2P Local)</option>
+              <option value="vs_ai">VS Tetris (1P vs AI)</option>
+            </optgroup>
+            <optgroup label="── PUYO PUYO ──">
+              <option value="puyo_marathon">Puyo Marathon</option>
+              <option value="puyo_free_marathon">Puyo Free Marathon</option>
+              <option value="puyo_vs_local">VS Puyo (2P Local)</option>
+              <option value="puyo_vs_ai">VS Puyo (1P vs AI)</option>
+            </optgroup>
+            <optgroup label="── PUYO TETRIS ──">
+              <option value="puyotet_vs_local">PuyoTet VS (2P Local)</option>
+              <option value="puyotet_vs_ai">PuyoTet VS (1P vs AI)</option>
+            </optgroup>
+          </select>
+          <select id="titleSubMode" style="padding:8px;border-radius:8px;color:#000;display:none;">
+            <option value="1">1 Line</option>
+            <option value="20">20 Lines</option>
+            <option value="50" selected>50 Lines</option>
+            <option value="100">100 Lines</option>
+            <option value="150">150 Lines</option>
+            <option value="200">200 Lines</option>
+            <option value="500">500 Lines</option>
+          </select>
+          <select id="titleAILvl" style="padding:8px;border-radius:8px;color:#000;display:none;">
+            <option value="1">AI Lvl 1</option>
+            <option value="2">AI Lvl 2</option>
+            <option value="3">AI Lvl 3</option>
+            <option value="4">AI Lvl 4</option>
+            <option value="5" selected>AI Lvl 5</option>
+            <option value="6">AI Lvl 6</option>
+            <option value="7">AI Lvl 7</option>
+            <option value="8">AI Lvl 8</option>
+            <option value="9">AI Lvl 9</option>
+            <option value="pro">AI Pro</option>
+          </select>
+          <div id="puyotetPlayerSelect" style="display:none;background:rgba(255,255,255,0.05);border-radius:10px;padding:10px 14px;border:1px solid rgba(255,255,255,0.1);">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-align:center;font-weight:700;">Choose Game Type per Player</div>
+            <div style="display:flex;gap:16px;align-items:center;justify-content:center;">
+              <div style="text-align:center;">
+                <div style="font-size:12px;color:var(--accent2);font-weight:800;margin-bottom:4px;">P1</div>
+                <select id="p1TypeSelect" class="playerTypeSelect" style="color:#000;padding:4px;border-radius:4px;">
+                  <option value="tetris">🟦 Tetris</option>
+                  <option value="puyo">🔴 Puyo</option>
+                </select>
+              </div>
+              <div style="font-size:18px;color:var(--muted);">VS</div>
+              <div style="text-align:center;">
+                <div style="font-size:12px;color:#ff6b6b;font-weight:800;margin-bottom:4px;">P2</div>
+                <select id="p2TypeSelect" class="playerTypeSelect" style="color:#000;padding:4px;border-radius:4px;">
+                  <option value="tetris">🟦 Tetris</option>
+                  <option value="puyo" selected>🔴 Puyo</option>
+                </select>
+              </div>
             </div>
           </div>
+          <button id="titleStart" class="bigBtn" data-i18n="start">ゲーム開始</button>
+          <button id="titleResumeBtn" class="bigBtn" style="display:none" data-i18n="resume">再開</button>
+          <button id="titleOptionsBtn" class="btn secondary" data-i18n="options">設定</button>
         </div>
-        <button id="titleStart" class="bigBtn" data-i18n="start">ゲーム開始</button>
-        <button id="titleResumeBtn" class="bigBtn" style="display:none" data-i18n="resume">再開</button>
-        <button id="titleOptionsBtn" class="btn secondary" data-i18n="options">設定</button>
       </div>
+
+      <!-- 右: 全ミノ画像 -->
+      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+        <div style="font-size:10px;color:var(--muted);text-align:center;font-weight:700;letter-spacing:1px;margin-bottom:2px;">MINOS</div>
+        <img src="mino_I.png" alt="I" title="I-ミノ" width="56" height="56" style="border-radius:8px;object-fit:contain;background:rgba(0,188,212,0.15);border:1px solid rgba(0,188,212,0.3);"  onerror="this.style.display='none'">
+        <img src="mino_J.png" alt="J" title="J-ミノ" width="56" height="56" style="border-radius:8px;object-fit:contain;background:rgba(59,89,152,0.15);border:1px solid rgba(59,89,152,0.3);"  onerror="this.style.display='none'">
+        <img src="mino_L.png" alt="L" title="L-ミノ" width="56" height="56" style="border-radius:8px;object-fit:contain;background:rgba(255,140,0,0.15);border:1px solid rgba(255,140,0,0.3);"  onerror="this.style.display='none'">
+        <img src="mino_O.png" alt="O" title="O-ミノ" width="56" height="56" style="border-radius:8px;object-fit:contain;background:rgba(240,208,80,0.15);border:1px solid rgba(240,208,80,0.3);" onerror="this.style.display='none'">
+        <img src="mino_S.png" alt="S" title="S-ミノ" width="56" height="56" style="border-radius:8px;object-fit:contain;background:rgba(46,125,50,0.15);border:1px solid rgba(46,125,50,0.3);"   onerror="this.style.display='none'">
+        <img src="mino_T.png" alt="T" title="T-ミノ" width="56" height="56" style="border-radius:8px;object-fit:contain;background:rgba(155,89,182,0.15);border:1px solid rgba(155,89,182,0.3);" onerror="this.style.display='none'">
+        <img src="mino_Z.png" alt="Z" title="Z-ミノ" width="56" height="56" style="border-radius:8px;object-fit:contain;background:rgba(192,57,43,0.15);border:1px solid rgba(192,57,43,0.3);"  onerror="this.style.display='none'">
+      </div>
+
     </div>
   </div>
 </div>
