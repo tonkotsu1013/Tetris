@@ -64,7 +64,7 @@ html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#0212
 .charCard:hover { transform:translateY(-4px); box-shadow:0 8px 24px rgba(255,255,255,0.1); border-color:rgba(255,255,255,0.3); }
 .charCard.selected { border-width:3px; box-shadow:0 0 20px var(--char-color, rgba(255,255,255,0.5)); }
 .charCard.selected::after { content:'checkmark'; position:absolute; top:4px; right:6px; font-size:14px; font-weight:900; color:var(--char-color); }
-.charImg { width:72px; height:72px; object-fit:contain; image-rendering:pixelated; display:block; margin:0 auto 6px; border-radius:8px; background:rgba(0,0,0,0.3); }
+.charImg { width:72px; height:72px; object-fit:contain; image-rendering:auto; display:block; margin:0 auto 6px; border-radius:8px; background:rgba(0,0,0,0.3); }
 .charImgFallback { width:72px; height:72px; display:flex; align-items:center; justify-content:center; margin:0 auto 6px; border-radius:8px; font-size:32px; background:rgba(0,0,0,0.3); }
 .charName { font-size:11px; font-weight:700; color:#fff; line-height:1.3; }
 .charSubname { font-size:10px; color:rgba(255,255,255,0.5); margin-top:2px; }
@@ -904,7 +904,8 @@ function drawBoardFor(p, ctx, holdCtx, nextCtx, centerDOM, pgDOM, garbageDomId){
       ctx.stroke();
   }
 
-  for(let r=0;r<ROWS;r++) { for(let c=0;c<COLS;c++){ const v = p.board[r][c]; if(v) drawBlock(ctx, v, c*TILE, r*TILE, TILE, 1); } }
+  // ミノ画像がある場合は連結グループを一枚の画像でまとめて描画
+  drawBoardWithConnectedMino(ctx, p.board, TILE);
   
   if (p.clearFlash && now() < p.clearFlash.expire && !seekingReplay) {
       const elapsed = p.clearFlash.duration - (p.clearFlash.expire - now());
@@ -916,19 +917,11 @@ function drawBoardFor(p, ctx, holdCtx, nextCtx, centerDOM, pgDOM, garbageDomId){
   if(p.current && SETTINGS.ghost && !p.actionLock){
     let off=0; while(!collision(p.board, p.current.row+off+1, p.current.col, p.current.shape)) off++;
     const gr = p.current.row + off;
-    for(let r=0;r<p.current.shape.length;r++) {
-      for(let c=0;c<p.current.shape[0].length;c++) {
-        if(p.current.shape[r][c]) drawBlock(ctx, p.current.color, (p.current.col+c)*TILE, (gr+r)*TILE, TILE, 0.40);
-      }
-    }
+    drawPieceWithConnectedMino(ctx, p.current, TILE, 0.40, gr);
   }
   
   if(p.current && !p.actionLock){
-    for(let r=0;r<p.current.shape.length;r++) {
-      for(let c=0;c<p.current.shape[0].length;c++) {
-        if(p.current.shape[r][c]) drawBlock(ctx, p.current.color, (p.current.col+c)*TILE, (p.current.row+r)*TILE, TILE, 1);
-      }
-    }
+    drawPieceWithConnectedMino(ctx, p.current, TILE, 1);
   }
   
   if(!SETTINGS.lightweight) {
@@ -942,7 +935,22 @@ function drawBoardFor(p, ctx, holdCtx, nextCtx, centerDOM, pgDOM, garbageDomId){
     holdCtx.clearRect(0,0,holdCtx.canvas.width,holdCtx.canvas.height);
     if(p.hold){ 
       const s = 22; const ox = (holdCtx.canvas.width - p.hold.shape[0].length * s) / 2; const oy = (holdCtx.canvas.height - p.hold.shape.length * s) / 2;
-      for(let r=0;r<p.hold.shape.length;r++) { for(let c=0;c<p.hold.shape[0].length;c++) { if(p.hold.shape[r][c]) drawBlock(holdCtx, p.hold.color, ox + c*s, oy + r*s, s, 1); } }
+      // ホールドも連結ミノ画像で描画
+      const holdImg = getMinoImageForType(p.hold.color);
+      if(holdImg && holdImg.complete && holdImg.naturalWidth > 0) {
+        const cells = [];
+        for(let r=0;r<p.hold.shape.length;r++) { for(let c=0;c<p.hold.shape[0].length;c++) { if(p.hold.shape[r][c]) cells.push([r,c]); } }
+        if(cells.length > 0) {
+          let minR=Infinity,maxR=-Infinity,minC=Infinity,maxC=-Infinity;
+          for(const [r,c] of cells){if(r<minR)minR=r;if(r>maxR)maxR=r;if(c<minC)minC=c;if(c>maxC)maxC=c;}
+          const gx=ox+minC*s,gy=oy+minR*s,gw=(maxC-minC+1)*s,gh=(maxR-minR+1)*s;
+          holdCtx.save();holdCtx.imageSmoothingEnabled=true;holdCtx.imageSmoothingQuality='high';
+          holdCtx.beginPath();for(const[r,c]of cells)holdCtx.rect(ox+c*s,oy+r*s,s,s);
+          holdCtx.clip();holdCtx.drawImage(holdImg,gx,gy,gw,gh);holdCtx.restore();
+        }
+      } else {
+        for(let r=0;r<p.hold.shape.length;r++) { for(let c=0;c<p.hold.shape[0].length;c++) { if(p.hold.shape[r][c]) drawBlock(holdCtx, p.hold.color, ox + c*s, oy + r*s, s, 1); } }
+      }
     }
   }
   if(nextCtx){
@@ -952,7 +960,21 @@ function drawBoardFor(p, ctx, holdCtx, nextCtx, centerDOM, pgDOM, garbageDomId){
       for(let i=0;i<p.next.length;i++){
         const piece = p.next[i]; const w = piece.shape[0].length * psize, h = piece.shape.length * psize;
         const ox = (nextCtx.canvas.width - w)/2, oy = i*slotH + (slotH - h)/2;
-        for(let r=0;r<piece.shape.length;r++) { for(let c=0;c<piece.shape[0].length;c++) { if(piece.shape[r][c]) drawBlock(nextCtx, piece.color, ox+c*psize, oy+r*psize, psize, 1); } }
+        const nImg = getMinoImageForType(piece.color);
+        if(nImg && nImg.complete && nImg.naturalWidth > 0) {
+          const cells = [];
+          for(let r=0;r<piece.shape.length;r++){for(let c=0;c<piece.shape[0].length;c++){if(piece.shape[r][c])cells.push([r,c]);}}
+          if(cells.length>0){
+            let minR=Infinity,maxR=-Infinity,minC=Infinity,maxC=-Infinity;
+            for(const[r,c]of cells){if(r<minR)minR=r;if(r>maxR)maxR=r;if(c<minC)minC=c;if(c>maxC)maxC=c;}
+            const gx=ox+minC*psize,gy=oy+minR*psize,gw=(maxC-minC+1)*psize,gh=(maxR-minR+1)*psize;
+            nextCtx.save();nextCtx.imageSmoothingEnabled=true;nextCtx.imageSmoothingQuality='high';
+            nextCtx.beginPath();for(const[r,c]of cells)nextCtx.rect(ox+c*psize,oy+r*psize,psize,psize);
+            nextCtx.clip();nextCtx.drawImage(nImg,gx,gy,gw,gh);nextCtx.restore();
+          }
+        } else {
+          for(let r=0;r<piece.shape.length;r++) { for(let c=0;c<piece.shape[0].length;c++) { if(piece.shape[r][c]) drawBlock(nextCtx, piece.color, ox+c*psize, oy+r*psize, psize, 1); } }
+        }
       }
     }
   }
@@ -4294,22 +4316,21 @@ const _origDrawBlock = window.drawBlock || null;
 
 // 現在ゲーム中のP1/P2に応じたミノ画像を返す
 function getMinoImageForType(minoType) {
-  // ミノ画像が読み込まれていればそれを使用
   const img = minoImages[minoType];
   if(img && img.complete && img.naturalWidth > 0) return img;
   return null;
 }
 
-// drawBlockを拡張（ミノ画像対応）
+// drawBlockを拡張（ミノ画像対応）- 個別ブロック描画（画像なし時のフォールバック用）
 window.drawBlock = function(ctx, color, x, y, size, alpha = 1) {
-  // colorがミノタイプ文字('I','O','T',...)かチェック
-  const minoType = color; // colorはミノタイプ名
-  const img = getMinoImageForType(minoType);
+  const img = getMinoImageForType(color);
   if(img) {
     ctx.save();
     ctx.globalAlpha = alpha;
+    // image-rendering: pixelatedを避けるため、smoothingを有効化
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(img, x, y, size, size);
-    // ゴースト用の透明オーバーレイ
     if(alpha < 0.8) {
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
       ctx.fillRect(x, y, size, size);
@@ -4317,11 +4338,118 @@ window.drawBlock = function(ctx, color, x, y, size, alpha = 1) {
     ctx.restore();
     return;
   }
-  // 画像なければオリジナルの描画
   if(_origDrawBlock) {
     _origDrawBlock(ctx, color, x, y, size, alpha);
   }
 };
+
+/* ---------- つながったミノを一枚の画像でまとめて描画 ---------- */
+// ボード上の連結グループを検出し、グループ全体に画像を引き延ばして描画する
+function drawBoardWithConnectedMino(ctx, board, tile) {
+  const rows = board.length, cols = board[0].length;
+  const visited = Array.from({length: rows}, () => new Array(cols).fill(false));
+
+  function floodFill(sr, sc, color) {
+    const group = [];
+    const stack = [[sr, sc]];
+    while(stack.length > 0) {
+      const [r, c] = stack.pop();
+      if(r < 0 || r >= rows || c < 0 || c >= cols) continue;
+      if(visited[r][c]) continue;
+      if(board[r][c] !== color) continue;
+      visited[r][c] = true;
+      group.push([r, c]);
+      stack.push([r-1,c],[r+1,c],[r,c-1],[r,c+1]);
+    }
+    return group;
+  }
+
+  for(let r = 0; r < rows; r++) {
+    for(let c = 0; c < cols; c++) {
+      if(!board[r][c] || visited[r][c]) continue;
+      const color = board[r][c];
+      const img = getMinoImageForType(color);
+      if(!img) {
+        // 画像なし: 通常描画
+        drawBlock(ctx, color, c*tile, r*tile, tile, 1);
+        visited[r][c] = true;
+        continue;
+      }
+      // 連結グループを取得
+      const group = floodFill(r, c, color);
+      // グループのバウンディングボックス
+      let minR = rows, maxR = 0, minC = cols, maxC = 0;
+      for(const [gr, gc] of group) {
+        if(gr < minR) minR = gr; if(gr > maxR) maxR = gr;
+        if(gc < minC) minC = gc; if(gc > maxC) maxC = gc;
+      }
+      // グループ全体の領域に画像を引き延ばして描画（クリッピングで各セルのみ表示）
+      const gx = minC * tile, gy = minR * tile;
+      const gw = (maxC - minC + 1) * tile, gh = (maxR - minR + 1) * tile;
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      // グループのセルだけをクリップパスに
+      ctx.beginPath();
+      for(const [gr, gc] of group) {
+        ctx.rect(gc*tile, gr*tile, tile, tile);
+      }
+      ctx.clip();
+      ctx.drawImage(img, gx, gy, gw, gh);
+      ctx.restore();
+    }
+  }
+}
+
+// 現在のピース（アクティブ or ゴースト）を連結画像で描画
+function drawPieceWithConnectedMino(ctx, piece, tileSize, alpha, ghostRow) {
+  const img = getMinoImageForType(piece.color);
+  if(!img) {
+    // 画像なし: 通常描画
+    const row = (ghostRow !== undefined) ? ghostRow : piece.row;
+    for(let r=0; r<piece.shape.length; r++) {
+      for(let c=0; c<piece.shape[0].length; c++) {
+        if(piece.shape[r][c]) drawBlock(ctx, piece.color, (piece.col+c)*tileSize, (row+r)*tileSize, tileSize, alpha);
+      }
+    }
+    return;
+  }
+  // ピースのセルリスト
+  const row = (ghostRow !== undefined) ? ghostRow : piece.row;
+  const cells = [];
+  for(let r=0; r<piece.shape.length; r++) {
+    for(let c=0; c<piece.shape[0].length; c++) {
+      if(piece.shape[r][c]) cells.push([row+r, piece.col+c]);
+    }
+  }
+  if(cells.length === 0) return;
+  // バウンディングボックス
+  let minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
+  for(const [r,c] of cells) {
+    if(r<minR) minR=r; if(r>maxR) maxR=r;
+    if(c<minC) minC=c; if(c>maxC) maxC=c;
+  }
+  const gx = minC * tileSize, gy = minR * tileSize;
+  const gw = (maxC - minC + 1) * tileSize, gh = (maxR - minR + 1) * tileSize;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.beginPath();
+  for(const [r,c] of cells) {
+    ctx.rect(c*tileSize, r*tileSize, tileSize, tileSize);
+  }
+  ctx.clip();
+  ctx.drawImage(img, gx, gy, gw, gh);
+  if(alpha < 0.8) {
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = 'rgba(0,0,0,1)';
+    for(const [r,c] of cells) {
+      ctx.fillRect(c*tileSize, r*tileSize, tileSize, tileSize);
+    }
+  }
+  ctx.restore();
+}
 
 /* ---------- エフェクトシステム ---------- */
 const effectOverlay = document.getElementById('holoEffectOverlay');
