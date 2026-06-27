@@ -51,7 +51,7 @@
             
             // アニメーション設定
             mixer = new THREE.AnimationMixer(vrm.scene);
-            loadAnimation('wolking.fbx'); // 【ここを変更】アニメーションパス
+            loadAnimation('Walking.fbx'); // 【ここを変更】アニメーションパス
         });
 
         function loadAnimation(url) {
@@ -69,7 +69,7 @@
             const expressionManager = currentVrm.expressionManager;
             // 表情名はVRMによって異なりますが、presetを使います
             // 例: 'happy', 'neutral', 'angry' など
-            expressionManager.setValue('happy', 1.0); // 0.0〜1.0で調整
+            expressionManager.setValue('2', 1.0); // 0.0〜1.0で調整
             expressionManager.update();
         }
 
