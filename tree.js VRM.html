@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
     <meta charset="UTF-8">
-    <title>VRM Viewer</title>
+    <title>Three.js VRM Viewer</title>
     <style>body { margin: 0; overflow: hidden; }</style>
 </head>
 <body>
@@ -11,21 +11,21 @@
         "imports": {
             "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
             "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-            "@pixiv/three-vrm": "https://unpkg.com/@pixiv/three-vrm@2.4.0/lib/three-vrm.module.js"
+            "@pixiv/three-vrm": "https://unpkg.com/@pixiv/three-vrm@3.0.0/lib/three-vrm.module.js"
         }
     }
     </script>
-
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { VRM, VRMUtils } from '@pixiv/three-vrm';
+        import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
-        // 1. 基本設定
+        // シーン設定
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 20);
-        camera.position.set(0, 1.5, 3);
+        const camera = new THREE.PerspectiveCamera(30, window.innerWidth/window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 1.5, 2);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
@@ -33,49 +33,49 @@
         const controls = new OrbitControls(camera, renderer.domElement);
         const light = new THREE.DirectionalLight(0xffffff, 1);
         light.position.set(1, 1, 1);
-        scene.add(light, new THREE.AmbientLight(0xffffff, 0.5));
+        scene.add(light);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-        // 2. VRM読み込み
+        // ローダー設定
         const loader = new GLTFLoader();
+        loader.register((parser) => new VRMLoaderPlugin(parser));
+
         let currentVrm = null;
+        let mixer = null;
 
-        loader.load(
-            'ayame_v1.1.vrm', // 【ここにVRMファイル名を入れる】
-            (gltf) => {
-                VRMUtils.removeUnnecessaryJoints(gltf.scene);
-                VRM.from(gltf).then((vrm) => {
-                    scene.add(vrm.scene);
-                    currentVrm = vrm;
-                    
-                    // 表情の確認（コンソールで確認可能）
-                    console.log("表情プリセット一覧:", vrm.expressionManager.expressions);
-                    
-                    // 3. 表情の変更テスト (0~1で設定)
-                    // 名前はモデルによりますが、一般的なものは 'happy', 'neutral' など
-                    vrm.expressionManager.setValue('1', 1.0); 
-                });
-            },
-            (progress) => console.log('Loading...', (progress.loaded / progress.total) * 100 + '%'),
-            (error) => console.error(error)
-        );
+        // 【ここを変更】モデルのパス
+        loader.load('ayame_v1.1.vrm', (gltf) => {
+            const vrm = gltf.userData.vrm;
+            currentVrm = vrm;
+            scene.add(vrm.scene);
+            
+            // アニメーション設定
+            mixer = new THREE.AnimationMixer(vrm.scene);
+            loadAnimation('wolking.fbx'); // 【ここを変更】アニメーションパス
+        });
 
-        // 4. アニメーション (MixamoからエクスポートしたFBXを読み込む想定)
-        // ※実際にはFBXを一度gltfに変換するか、THREE.FBXLoaderを使用します
-        function playAnimation(clip) {
-            const mixer = new THREE.AnimationMixer(currentVrm.scene);
-            const action = mixer.clipAction(clip);
-            action.play();
-            return mixer;
+        function loadAnimation(url) {
+            new FBXLoader().load(url, (fbx) => {
+                // MixamoのモーションをVRMの骨格に適用する処理が必要です
+                // ※本来は "vrm-mixamo-retarget" ライブラリの使用を強く推奨します
+                const action = mixer.clipAction(fbx.animations[0]);
+                action.play();
+            });
         }
 
-        // 5. レンダリングループ
-        const clock = new THREE.Clock();
+        // 【表情制御】0~18の数字で表情を変える例
+        function setExpression(index) {
+            if(!currentVrm) return;
+            const expressionManager = currentVrm.expressionManager;
+            // 表情名はVRMによって異なりますが、presetを使います
+            // 例: 'happy', 'neutral', 'angry' など
+            expressionManager.setValue('happy', 1.0); // 0.0〜1.0で調整
+            expressionManager.update();
+        }
+
         function animate() {
             requestAnimationFrame(animate);
-            const deltaTime = clock.getDelta();
-            if (currentVrm) {
-                currentVrm.update(deltaTime);
-            }
+            if (mixer) mixer.update(0.016);
             controls.update();
             renderer.render(scene, camera);
         }
