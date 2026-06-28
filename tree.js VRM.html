@@ -86,8 +86,8 @@ const VRM_FILE = 'ayame_v1.1.vrm';
 
 const FBX_FILES = {
   walk: 'Walking.fbx',
-  // idle: 'Idle.fbx',    // ← 追加例
-  // run:  'Running.fbx', // ← 追加例
+  // idle: 'Idle.fbx',
+  // run:  'Running.fbx',
 };
 
 // =====================================================
@@ -146,34 +146,30 @@ const stateEl = document.getElementById('anim-state');
 // =====================================================
 const gltfLoader = new GLTFLoader();
 gltfLoader.register(parser => new VRMLoaderPlugin(parser));
-
 stateEl.textContent = 'VRM 読み込み中...';
 
 gltfLoader.load(VRM_FILE, gltf => {
   vrm = gltf.userData.vrm;
   VRMUtils.removeUnnecessaryJoints(vrm.scene);
 
-  // VRM0 は正面が逆のため180度回転
-  if (vrm.meta?.metaVersion === '0') vrm.scene.rotation.y = Math.PI;
+  // ★ VRM0の正面補正 — rotateVRM0 が公式の正しいやり方
+  VRMUtils.rotateVRM0(vrm);
 
   scene.add(vrm.scene);
 
-  // 接地（モデル底面をY=0に）
+  // 接地
   const box = new THREE.Box3().setFromObject(vrm.scene);
   vrm.scene.position.y = -box.min.y;
 
-  // カメラターゲットを胸あたりに
-  controls.target.set(0, (box.max.y - box.min.y) * 0.55, 0);
+  // カメラターゲット
+  controls.target.set(0, (box.max.y - box.min.y) * 0.5, 0);
   controls.update();
 
-  stateEl.textContent = 'VRM OK — FBX読み込み中...';
-  console.log('[VRM] 完了. meta version:', vrm.meta?.metaVersion);
-
-  // ボーン名をデバッグ出力
+  console.log('[VRM] 完了. meta:', vrm.meta?.metaVersion);
   debugVRMBones(vrm);
-
   buildExpressionUI(vrm);
   loadAllFBX(vrm);
+  stateEl.textContent = 'VRM OK — FBX読み込み中...';
 
 }, xhr => {
   if (xhr.total) stateEl.textContent = `VRM ${Math.round(xhr.loaded/xhr.total*100)}%`;
@@ -183,16 +179,13 @@ gltfLoader.load(VRM_FILE, gltf => {
 });
 
 // =====================================================
-// VRMのボーン名をコンソールに出力（デバッグ用）
+// デバッグ: VRMボーン一覧をコンソールに出力
 // =====================================================
 function debugVRMBones(vrm) {
-  console.log('[VRM] ヒューマノイドボーン一覧:');
-  const bones = vrm.humanoid.humanBones;
-  Object.entries(bones).forEach(([key, val]) => {
-    // VRM2: val は { node: Object3D }
-    // VRM1: val は Object3D 直接
+  console.log('[VRM] ボーン一覧:');
+  Object.entries(vrm.humanoid.humanBones).forEach(([key, val]) => {
     const node = val?.node ?? val;
-    if (node) console.log(`  ${key} → THREE node: "${node.name}"`);
+    if (node) console.log(`  ${key} → "${node.name}"`);
   });
 }
 
@@ -207,17 +200,15 @@ function buildExpressionUI(vrm) {
   const names = new Set(['happy','angry','sad','relaxed','surprised',
     'aa','ih','ou','ee','oh','blink','blinkLeft','blinkRight',
     'lookUp','lookDown','lookLeft','lookRight','neutral']);
-
   if (mgr.expressionMap)  Object.keys(mgr.expressionMap).forEach(n => names.add(n));
   if (mgr._expressions)   Object.keys(mgr._expressions).forEach(n => names.add(n));
 
   const valid = [...names].filter(n => {
     try { return mgr.getExpression(n) != null; } catch { return false; }
   });
-
   console.log('[VRM] 表情:', valid);
-  el.innerHTML = '';
 
+  el.innerHTML = '';
   const resetBtn = document.createElement('button');
   resetBtn.className = 'expr-btn';
   resetBtn.textContent = '😐 リセット';
@@ -245,61 +236,83 @@ function buildExpressionUI(vrm) {
 
 // =====================================================
 // Mixamo → VRM ボーン変換テーブル
+//
+// ログから判明したこのVRMのボーン構造:
+//   leftThumbMetacarpal  = J_Bip_L_Thumb1  ← Thumb1が追加で必要
+//   leftThumbProximal    = J_Bip_L_Thumb2
+//   leftThumbDistal      = J_Bip_L_Thumb3
+// Mixamo側:
+//   Thumb1 = Metacarpal, Thumb2 = Proximal, Thumb3 = Distal
 // =====================================================
 const MIXAMO_TO_VRM = {
+  // 体幹
   mixamorigHips:             'hips',
   mixamorigSpine:            'spine',
   mixamorigSpine1:           'chest',
   mixamorigSpine2:           'upperChest',
   mixamorigNeck:             'neck',
   mixamorigHead:             'head',
+  // 左腕
   mixamorigLeftShoulder:     'leftShoulder',
   mixamorigLeftArm:          'leftUpperArm',
   mixamorigLeftForeArm:      'leftLowerArm',
   mixamorigLeftHand:         'leftHand',
+  // 右腕
   mixamorigRightShoulder:    'rightShoulder',
   mixamorigRightArm:         'rightUpperArm',
   mixamorigRightForeArm:     'rightLowerArm',
   mixamorigRightHand:        'rightHand',
+  // 左脚
   mixamorigLeftUpLeg:        'leftUpperLeg',
   mixamorigLeftLeg:          'leftLowerLeg',
   mixamorigLeftFoot:         'leftFoot',
   mixamorigLeftToeBase:      'leftToes',
+  // 右脚
   mixamorigRightUpLeg:       'rightUpperLeg',
   mixamorigRightLeg:         'rightLowerLeg',
   mixamorigRightFoot:        'rightFoot',
   mixamorigRightToeBase:     'rightToes',
-  // 指（4番は末端ボーンなのでスキップ）
-  mixamorigLeftHandThumb1:   'leftThumbProximal',
-  mixamorigLeftHandThumb2:   'leftThumbIntermediate',
-  mixamorigLeftHandThumb3:   'leftThumbDistal',
+  // ★ 左親指: Thumb1→Metacarpal, Thumb2→Proximal, Thumb3→Distal
+  mixamorigLeftHandThumb1:   'leftThumbMetacarpal',
+  mixamorigLeftHandThumb2:   'leftThumbProximal',
+  mixamorigLeftHandThumb3:   'leftThumbIntermediate',  // 存在しないVRMもある
+  // ★ 右親指
+  mixamorigRightHandThumb1:  'rightThumbMetacarpal',
+  mixamorigRightHandThumb2:  'rightThumbProximal',
+  mixamorigRightHandThumb3:  'rightThumbIntermediate', // 存在しないVRMもある
+  // 左人差し指
   mixamorigLeftHandIndex1:   'leftIndexProximal',
   mixamorigLeftHandIndex2:   'leftIndexIntermediate',
   mixamorigLeftHandIndex3:   'leftIndexDistal',
-  mixamorigLeftHandMiddle1:  'leftMiddleProximal',
-  mixamorigLeftHandMiddle2:  'leftMiddleIntermediate',
-  mixamorigLeftHandMiddle3:  'leftMiddleDistal',
-  mixamorigLeftHandRing1:    'leftRingProximal',
-  mixamorigLeftHandRing2:    'leftRingIntermediate',
-  mixamorigLeftHandRing3:    'leftRingDistal',
-  mixamorigLeftHandPinky1:   'leftLittleProximal',
-  mixamorigLeftHandPinky2:   'leftLittleIntermediate',
-  mixamorigLeftHandPinky3:   'leftLittleDistal',
-  mixamorigRightHandThumb1:  'rightThumbProximal',
-  mixamorigRightHandThumb2:  'rightThumbIntermediate',
-  mixamorigRightHandThumb3:  'rightThumbDistal',
+  // 右人差し指
   mixamorigRightHandIndex1:  'rightIndexProximal',
   mixamorigRightHandIndex2:  'rightIndexIntermediate',
   mixamorigRightHandIndex3:  'rightIndexDistal',
+  // 左中指
+  mixamorigLeftHandMiddle1:  'leftMiddleProximal',
+  mixamorigLeftHandMiddle2:  'leftMiddleIntermediate',
+  mixamorigLeftHandMiddle3:  'leftMiddleDistal',
+  // 右中指
   mixamorigRightHandMiddle1: 'rightMiddleProximal',
   mixamorigRightHandMiddle2: 'rightMiddleIntermediate',
   mixamorigRightHandMiddle3: 'rightMiddleDistal',
+  // 左薬指
+  mixamorigLeftHandRing1:    'leftRingProximal',
+  mixamorigLeftHandRing2:    'leftRingIntermediate',
+  mixamorigLeftHandRing3:    'leftRingDistal',
+  // 右薬指
   mixamorigRightHandRing1:   'rightRingProximal',
   mixamorigRightHandRing2:   'rightRingIntermediate',
   mixamorigRightHandRing3:   'rightRingDistal',
+  // 左小指
+  mixamorigLeftHandPinky1:   'leftLittleProximal',
+  mixamorigLeftHandPinky2:   'leftLittleIntermediate',
+  mixamorigLeftHandPinky3:   'leftLittleDistal',
+  // 右小指
   mixamorigRightHandPinky1:  'rightLittleProximal',
   mixamorigRightHandPinky2:  'rightLittleIntermediate',
   mixamorigRightHandPinky3:  'rightLittleDistal',
+  // ★ 末端ボーン (Thumb4, Index4 等) は VRM に存在しないので省略
 };
 
 // =====================================================
@@ -312,27 +325,28 @@ function loadAllFBX(vrm) {
 
   entries.forEach(([key, file]) => {
     fbxLoader.load(file, fbx => {
-      console.log(`[FBX] ${file} loaded. clips: ${fbx.animations.length}`);
+      console.log(`[FBX] ${file} clips: ${fbx.animations.length}`);
 
-      // FBXボーン名確認
-      const fbxBoneNames = new Set();
-      fbx.traverse(o => { if (o.isBone) fbxBoneNames.add(o.name); });
-      console.log('[FBX] ユニークボーン:', [...fbxBoneNames]);
+      // ★ clips が複数ある場合、最も長いものがアニメ本体
+      //    (index[0] はバインドポーズの場合がある)
+      let bestClip = fbx.animations[0];
+      fbx.animations.forEach(c => {
+        if (c.duration > bestClip.duration) bestClip = c;
+      });
+      console.log(`[FBX] 使用clip: "${bestClip.name}" duration: ${bestClip.duration.toFixed(2)}s`);
 
-      if (fbx.animations[0]) {
-        const clip = retarget(fbx.animations[0], vrm);
-        if (clip) {
-          animations[key] = clip;
-          console.log(`[FBX] ${key} 変換OK: ${clip.tracks.length} tracks`);
-        } else {
-          console.warn(`[FBX] ${key} 変換失敗`);
-        }
+      const clip = retarget(bestClip, vrm);
+      if (clip) {
+        animations[key] = clip;
+        console.log(`[FBX] ${key} OK: ${clip.tracks.length} tracks`);
+      } else {
+        console.warn(`[FBX] ${key} 変換失敗`);
       }
       finish();
     }, xhr => {
       if (xhr.total) stateEl.textContent = `FBX ${Math.round(xhr.loaded/xhr.total*100)}%`;
     }, err => {
-      console.error(`[FBX] ${file} エラー:`, err);
+      console.error(`[FBX] ${file}:`, err);
       stateEl.textContent = `❌ FBX失敗: ${file}`;
       finish();
     });
@@ -341,7 +355,7 @@ function loadAllFBX(vrm) {
       done++;
       if (done < entries.length) return;
       mixer = new THREE.AnimationMixer(vrm.scene);
-      console.log('[MIXER] 作成完了. animations:', Object.keys(animations));
+      console.log('[MIXER] 完了. animations:', Object.keys(animations));
       stateEl.textContent = '✓ 準備完了  Space=再生/停止';
       if (animations.walk) playAnim('walk');
     }
@@ -349,66 +363,74 @@ function loadAllFBX(vrm) {
 }
 
 // =====================================================
-// リターゲット
-//
-// 【重要】 位置(position)トラックは Hips だけ
-//   しかも「その場アニメ」にするため
-//   XZ移動を0にして Y のみ残す
+// リターゲット: FBXクリップ → VRMボーンに付け替え
 // =====================================================
 function retarget(clip, vrm) {
   const humanBones = vrm.humanoid.humanBones;
   const newTracks  = [];
 
-  // VRM2: humanBones[key].node  /  VRM1: humanBones[key] が直接ノード
   function getNode(key) {
     const b = humanBones[key];
     if (!b) return null;
-    return b.node ?? b; // VRM2 は .node, VRM1 は直接
+    return b.node ?? b;
   }
 
   clip.tracks.forEach(track => {
-    // track.name 例: "mixamorigHips.quaternion"
-    const dot      = track.name.lastIndexOf('.');
-    const fbxName  = track.name.slice(0, dot);
-    const prop     = track.name.slice(dot + 1);
+    const dot     = track.name.lastIndexOf('.');
+    const fbxName = track.name.slice(0, dot);
+    const prop    = track.name.slice(dot + 1);
 
     const vrmKey  = MIXAMO_TO_VRM[fbxName];
-    if (!vrmKey) return;
+    if (!vrmKey) return; // 変換テーブルにないボーンはスキップ
 
     const vrmNode = getNode(vrmKey);
-    if (!vrmNode) {
-      console.warn(`[retarget] VRMノードなし: ${vrmKey} (from ${fbxName})`);
-      return;
-    }
+    if (!vrmNode) return; // VRMにないボーンはスキップ（警告なし）
 
     const newName = `${vrmNode.name}.${prop}`;
 
     if (prop === 'quaternion') {
-      // 回転トラック — そのままコピー
-      newTracks.push(new THREE.QuaternionKeyframeTrack(
-        newName, track.times, track.values.slice()
-      ));
+      // ★ VRM0 の場合、回転を補正する必要がある
+      //    rotateVRM0 でシーン全体を回しているので
+      //    Hips の quaternion だけ逆回転を打ち消す
+      if (fbxName === 'mixamorigHips') {
+        // Y軸180度回転の逆クォータニオン
+        const inv = new THREE.Quaternion().setFromAxisAngle(
+          new THREE.Vector3(0, 1, 0), Math.PI
+        );
+        const corrected = new Float32Array(track.values.length);
+        const q = new THREE.Quaternion();
+        for (let i = 0; i < track.values.length; i += 4) {
+          q.set(track.values[i], track.values[i+1], track.values[i+2], track.values[i+3]);
+          q.premultiply(inv);
+          corrected[i]   = q.x;
+          corrected[i+1] = q.y;
+          corrected[i+2] = q.z;
+          corrected[i+3] = q.w;
+        }
+        newTracks.push(new THREE.QuaternionKeyframeTrack(newName, track.times, corrected));
+      } else {
+        newTracks.push(new THREE.QuaternionKeyframeTrack(
+          newName, track.times, track.values.slice()
+        ));
+      }
 
     } else if (prop === 'position' && fbxName === 'mixamorigHips') {
-      // 【腰の位置】
-      // FBX は cm 単位 → 0.01 倍で m に変換
-      // XZ を 0 にして「その場」アニメにする
+      // Hipsの位置: cm→m変換、XZ固定でその場アニメ
       const vals = new Float32Array(track.values.length);
       for (let i = 0; i < track.values.length; i += 3) {
-        vals[i]   = 0;                        // X: その場固定
-        vals[i+1] = track.values[i+1] * 0.01; // Y: 上下はキープ
-        vals[i+2] = 0;                        // Z: その場固定
+        vals[i]   = 0;
+        vals[i+1] = track.values[i+1] * 0.01;
+        vals[i+2] = 0;
       }
       newTracks.push(new THREE.VectorKeyframeTrack(newName, track.times, vals));
     }
-    // position (Hips以外) は無視
   });
 
   if (!newTracks.length) {
-    console.error('[retarget] トラック0件 — ボーン名不一致の可能性');
+    console.error('[retarget] 0 tracks — ボーン名不一致の可能性');
     return null;
   }
-  return new THREE.AnimationClip('anim', clip.duration, newTracks);
+  return new THREE.AnimationClip('anim_' + clip.name, clip.duration, newTracks);
 }
 
 // =====================================================
@@ -416,7 +438,7 @@ function retarget(clip, vrm) {
 // =====================================================
 function playAnim(key) {
   if (!mixer || !animations[key]) {
-    console.warn('アニメなし:', key, Object.keys(animations));
+    console.warn('アニメなし:', key);
     stateEl.textContent = `アニメなし: ${key}`;
     return;
   }
@@ -450,14 +472,13 @@ window.addEventListener('keydown', e => {
       camera.position.set(0, 1.2, 3.0);
       controls.target.set(0, 0.9, 0);
       controls.update(); break;
-    // ← アニメ追加時はここに追加
+    // ← アニメ追加例:
     // case '1': playAnim('idle'); break;
     // case '2': playAnim('run');  break;
   }
 });
 window.addEventListener('keyup', e => { delete keys[e.key]; });
 
-// 矢印キー / WS でカメラ操作
 function handleKeyCamera() {
   const sph = new THREE.Spherical().setFromVector3(
     camera.position.clone().sub(controls.target)
