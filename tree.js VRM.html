@@ -129,7 +129,11 @@ gltfLoader.register(parser => new VRMLoaderPlugin(parser));
 gltfLoader.load(VRM_FILE, gltf => {
   vrm = gltf.userData.vrm;
   VRMUtils.removeUnnecessaryJoints(vrm.scene);
-  VRMUtils.rotateVRM0(vrm);   // VRM0の正面補正
+  // VRM0: rotateVRM0の代わりにscene自体をY180回転
+  // (rotateVRM0はボーンを直接回すのでFBXアニメと干渉する)
+  if (vrm.meta?.metaVersion === '0') {
+    vrm.scene.rotation.y = Math.PI;
+  }
   scene.add(vrm.scene);
 
   // 接地
@@ -329,9 +333,25 @@ function retarget(clip, vrm) {
     const newName = `${node.uuid}.${prop}`;
 
     if (prop === 'quaternion') {
-      newTracks.push(new THREE.QuaternionKeyframeTrack(
-        newName, track.times, track.values.slice()
-      ));
+      // ★ VRM0 Y180補正:
+      // vrm.scene.rotation.y = PIにしているので
+      // ルートボーン(Hips)の回転だけY180を打ち消す
+      // 他のボーンは親から継承するので補正不要
+      if (fbxName === 'mixamorigHips') {
+        const corrected = new Float32Array(track.values.length);
+        const q   = new THREE.Quaternion();
+        const inv = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0));
+        for (let i = 0; i < track.values.length; i += 4) {
+          q.set(track.values[i], track.values[i+1], track.values[i+2], track.values[i+3]);
+          q.premultiply(inv);
+          corrected[i]=q.x; corrected[i+1]=q.y; corrected[i+2]=q.z; corrected[i+3]=q.w;
+        }
+        newTracks.push(new THREE.QuaternionKeyframeTrack(newName, track.times, corrected));
+      } else {
+        newTracks.push(new THREE.QuaternionKeyframeTrack(
+          newName, track.times, track.values.slice()
+        ));
+      }
     } else if (prop === 'position' && fbxName === 'mixamorigHips') {
       // Hipsの位置: cm→m、XZ固定でその場アニメ
       const vals = new Float32Array(track.values.length);
