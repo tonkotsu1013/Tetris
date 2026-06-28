@@ -1,70 +1,72 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
     <title>VRM Viewer</title>
     <style>body { margin: 0; overflow: hidden; }</style>
 </head>
 <body>
     <script type="importmap">
     {
-        "imports": {
-            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-            "@pixiv/three-vrm": "https://unpkg.com/@pixiv/three-vrm@2.4.0/lib/three-vrm.module.js"
-        }
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+        "@pixiv/three-vrm": "https://unpkg.com/@pixiv/three-vrm@3.0.0/lib/three-vrm.module.js"
+      }
     }
     </script>
-
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { VRM, VRMUtils } from '@pixiv/three-vrm';
 
+        // --- シーン構築 ---
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(30, window.innerWidth/window.innerHeight, 0.1, 20);
-        camera.position.set(0, 1.2, 3);
-
+        const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 20);
+        camera.position.set(0, 1.5, 3);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        const light = new THREE.DirectionalLight(0xffffff, 1);
+        const controls = new OrbitControls(camera, renderer.domElement);
+        const light = new THREE.DirectionalLight(0xffffff, 3);
         light.position.set(1, 1, 1);
-        scene.add(light, new THREE.AmbientLight(0xffffff, 0.5));
+        scene.add(light);
 
+        // --- VRMとアニメーションの読み込み ---
         let currentVrm = null;
         const loader = new GLTFLoader();
 
-        // VRM読み込み
+        // 1. VRMモデルの読み込み
         loader.load('ayame_v1.1.vrm', (gltf) => {
+            VRMUtils.removeUnnecessaryJoints(gltf.scene);
             VRM.from(gltf).then((vrm) => {
-                scene.add(vrm.scene);
                 currentVrm = vrm;
-                // コンソールで表情名を確認して、 setValue('名前', 1) で指定
-                console.log("利用可能な表情:", Object.keys(vrm.expressionManager.expressions));
+                scene.add(vrm.scene);
+                
+                // 表情の確認用（デバッグログ）
+                console.log("表情プリセット:", vrm.expressionManager.expressionNames);
+                // 例: vrm.expressionManager.setValue('happy', 1.0); // 表情変更方法
+
+                // 2. アニメーションの読み込み
+                loader.load('Walking.fbx', (fbx) => {
+                    const mixer = new THREE.AnimationMixer(vrm.scene);
+                    const action = mixer.clipAction(fbx.animations[0]);
+                    action.play();
+                    
+                    // レンダリングループ内でmixer.updateを呼ぶ
+                    const clock = new THREE.Clock();
+                    function animate() {
+                        requestAnimationFrame(animate);
+                        mixer.update(clock.getDelta());
+                        controls.update();
+                        renderer.render(scene, camera);
+                    }
+                    animate();
+                });
             });
         });
-
-        // キーボード操作でカメラ移動
-        window.addEventListener('keydown', (e) => {
-            const step = 0.1;
-            if (e.key === 'ArrowUp') camera.position.y += step;
-            if (e.key === 'ArrowDown') camera.position.y -= step;
-            if (e.key === 'ArrowLeft') camera.position.x -= step;
-            if (e.key === 'ArrowRight') camera.position.x += step;
-            if (e.key === 'w') camera.position.z -= step; // 前進
-            if (e.key === 's') camera.position.z += step; // 後退
-        });
-
-        const clock = new THREE.Clock();
-        function animate() {
-            requestAnimationFrame(animate);
-            const delta = clock.getDelta();
-            if (currentVrm) currentVrm.update(delta);
-            renderer.render(scene, camera);
-        }
-        animate();
     </script>
 </body>
 </html>
