@@ -62,7 +62,7 @@
             // vrm.expressionManager.setValue('happy', 1.0);
 
             // 4. アニメーションの読み込み
-            loader.load('walking.fbx', (fbx) => {
+            loader.load('Walking.fbx', (fbx) => {
                 const mixer = new THREE.AnimationMixer(vrm.scene);
                 const action = mixer.clipAction(fbx.animations[0]);
                 action.play();
