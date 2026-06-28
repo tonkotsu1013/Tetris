@@ -53,7 +53,7 @@
 
 <div id="expressions">
   <h3>😊 表情一覧</h3>
-  <div id="expr-list">VRM読み込み後に表示...</div>
+  <div id="expr-list">VRM読み込み後...</div>
 </div>
 
 <div id="anim-state">読み込み中...</div>
@@ -61,10 +61,10 @@
 <script type="importmap">
 {
   "imports": {
-    "three":                    "https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.module.js",
-    "three/addons/":            "https://cdn.jsdelivr.net/npm/three@0.163.0/examples/jsm/",
-    "@pixiv/three-vrm":         "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@2.1.2/lib/three-vrm.module.js",
-    "@pixiv/three-vrm-core":    "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-core@2.1.2/lib/three-vrm-core.module.js",
+    "three":             "https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.module.js",
+    "three/addons/":     "https://cdn.jsdelivr.net/npm/three@0.163.0/examples/jsm/",
+    "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@2.1.2/lib/three-vrm.module.js",
+    "@pixiv/three-vrm-core": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-core@2.1.2/lib/three-vrm-core.module.js",
     "@pixiv/three-vrm-materials-v0-compat": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-materials-v0-compat@2.1.2/lib/three-vrm-materials-v0-compat.module.js",
     "@pixiv/three-vrm-node-constraint": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-node-constraint@2.1.2/lib/three-vrm-node-constraint.module.js",
     "@pixiv/three-vrm-springbone": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-springbone@2.1.2/lib/three-vrm-springbone.module.js"
@@ -82,32 +82,29 @@ import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 // =====================================================
 // 【ファイル名の設定】ここだけ変える
 // =====================================================
-const VRM_FILE  = 'ayame_v1.1.vrm';
+const VRM_FILE = 'ayame_v1.1.vrm';
 
-// ← Mixamoからダウンロードしたアニメを追加する場所
 const FBX_FILES = {
-  walk:  'Walking.fbx',
-  // idle:  'Idle.fbx',      // 追加例
-  // run:   'Running.fbx',   // 追加例
-  // jump:  'Jump.fbx',      // 追加例
+  walk: 'Walking.fbx',
+  // idle: 'Idle.fbx',    // ← 追加例
+  // run:  'Running.fbx', // ← 追加例
 };
 
 // =====================================================
-// シーン初期化
+// Three.js 初期化
 // =====================================================
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.outputColorSpace = THREE.SRGBColorSpace; // r150+ の書き方
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1a1a2e);
-scene.fog = new THREE.FogExp2(0x1a1a2e, 0.04);
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 100);
-camera.position.set(0, 1.3, 3.2);
+camera.position.set(0, 1.2, 3.0);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 0.9, 0);
@@ -118,19 +115,17 @@ controls.maxDistance = 12;
 controls.update();
 
 // ライト
-scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+scene.add(new THREE.AmbientLight(0xffffff, 0.8));
 const dir = new THREE.DirectionalLight(0xffffff, 1.2);
 dir.position.set(2, 4, 3);
 dir.castShadow = true;
 scene.add(dir);
-const fill = new THREE.DirectionalLight(0x8899ff, 0.35);
-fill.position.set(-2, 1, -1);
-scene.add(fill);
+scene.add(Object.assign(new THREE.DirectionalLight(0x8899ff, 0.4), { position: new THREE.Vector3(-2,1,-1) }));
 
-// 床 + グリッド
+// 床
 const floor = new THREE.Mesh(
   new THREE.CircleGeometry(5, 64),
-  new THREE.MeshStandardMaterial({ color: 0x1e1e3a, roughness: 0.9 })
+  new THREE.MeshStandardMaterial({ color: 0x1e1e3a })
 );
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
@@ -140,12 +135,9 @@ scene.add(new THREE.GridHelper(10, 20, 0x334488, 0x223366));
 // =====================================================
 // 状態
 // =====================================================
-let vrm        = null;
-let mixer      = null;
-let animations = {};
-let currentAction = null;
-const clock    = new THREE.Clock();
-const stateEl  = document.getElementById('anim-state');
+let vrm = null, mixer = null, animations = {}, currentAction = null;
+const clock   = new THREE.Clock();
+const stateEl = document.getElementById('anim-state');
 
 // =====================================================
 // VRM 読み込み
@@ -155,99 +147,91 @@ gltfLoader.register(parser => new VRMLoaderPlugin(parser));
 
 stateEl.textContent = 'VRM 読み込み中...';
 
-gltfLoader.load(
-  VRM_FILE,
-  gltf => {
-    vrm = gltf.userData.vrm;
-    VRMUtils.removeUnnecessaryJoints(vrm.scene);
+gltfLoader.load(VRM_FILE, gltf => {
+  vrm = gltf.userData.vrm;
+  VRMUtils.removeUnnecessaryJoints(vrm.scene);
 
-    // VRM0 は Y180 回転が必要な場合がある
-    if (vrm.meta?.metaVersion === '0') {
-      vrm.scene.rotation.y = Math.PI;
-    }
+  // VRM0 は正面が逆のため180度回転
+  if (vrm.meta?.metaVersion === '0') vrm.scene.rotation.y = Math.PI;
 
-    scene.add(vrm.scene);
+  scene.add(vrm.scene);
 
-    // 接地
-    const box = new THREE.Box3().setFromObject(vrm.scene);
-    vrm.scene.position.y = -box.min.y;
+  // 接地（モデル底面をY=0に）
+  const box = new THREE.Box3().setFromObject(vrm.scene);
+  vrm.scene.position.y = -box.min.y;
 
-    // カメラターゲットをモデル中心に
-    const center = box.getCenter(new THREE.Vector3());
-    controls.target.set(0, center.y - box.min.y, 0);
-    controls.update();
+  // カメラターゲットを胸あたりに
+  controls.target.set(0, (box.max.y - box.min.y) * 0.55, 0);
+  controls.update();
 
-    stateEl.textContent = 'VRM 読み込み完了 ✓';
-    console.log('[VRM] 読み込み完了');
+  stateEl.textContent = 'VRM OK — FBX読み込み中...';
+  console.log('[VRM] 完了. meta version:', vrm.meta?.metaVersion);
 
-    // 表情一覧を表示
-    buildExpressionUI(vrm);
+  // ボーン名をデバッグ出力
+  debugVRMBones(vrm);
 
-    // FBX アニメ読み込み
-    loadAllFBX(vrm);
-  },
-  xhr => {
-    if (xhr.total) stateEl.textContent = `VRM ${Math.round(xhr.loaded/xhr.total*100)}%`;
-  },
-  err => {
-    console.error('[VRM] エラー:', err);
-    stateEl.textContent = '❌ VRM 読み込み失敗 — ファイル名・場所を確認してください';
-  }
-);
+  buildExpressionUI(vrm);
+  loadAllFBX(vrm);
+
+}, xhr => {
+  if (xhr.total) stateEl.textContent = `VRM ${Math.round(xhr.loaded/xhr.total*100)}%`;
+}, err => {
+  console.error('[VRM] エラー:', err);
+  stateEl.textContent = '❌ VRM 読み込み失敗';
+});
 
 // =====================================================
-// 表情 UI 構築
+// VRMのボーン名をコンソールに出力（デバッグ用）
+// =====================================================
+function debugVRMBones(vrm) {
+  console.log('[VRM] ヒューマノイドボーン一覧:');
+  const bones = vrm.humanoid.humanBones;
+  Object.entries(bones).forEach(([key, val]) => {
+    // VRM2: val は { node: Object3D }
+    // VRM1: val は Object3D 直接
+    const node = val?.node ?? val;
+    if (node) console.log(`  ${key} → THREE node: "${node.name}"`);
+  });
+}
+
+// =====================================================
+// 表情 UI
 // =====================================================
 function buildExpressionUI(vrm) {
   const mgr = vrm.expressionManager;
   const el  = document.getElementById('expr-list');
   if (!mgr) { el.textContent = '表情なし'; return; }
 
-  // VRM2: expressionMap から取得
-  // VRM1/0: _expressions から取得（内部プロパティ）
-  const names = new Set();
+  const names = new Set(['happy','angry','sad','relaxed','surprised',
+    'aa','ih','ou','ee','oh','blink','blinkLeft','blinkRight',
+    'lookUp','lookDown','lookLeft','lookRight','neutral']);
 
-  // 標準プリセット
-  ['happy','angry','sad','relaxed','surprised',
-   'aa','ih','ou','ee','oh',
-   'blink','blinkLeft','blinkRight',
-   'lookUp','lookDown','lookLeft','lookRight',
-   'neutral'].forEach(n => names.add(n));
+  if (mgr.expressionMap)  Object.keys(mgr.expressionMap).forEach(n => names.add(n));
+  if (mgr._expressions)   Object.keys(mgr._expressions).forEach(n => names.add(n));
 
-  // モデル固有の表情を追加
-  if (mgr.expressionMap) {
-    Object.keys(mgr.expressionMap).forEach(n => names.add(n));
-  }
-  if (mgr._expressions) {
-    Object.keys(mgr._expressions).forEach(n => names.add(n));
-  }
-
-  // 実際に存在するものだけ残す
-  const validNames = [...names].filter(n => {
+  const valid = [...names].filter(n => {
     try { return mgr.getExpression(n) != null; } catch { return false; }
   });
 
-  console.log('[VRM] 表情一覧:', validNames);
-
+  console.log('[VRM] 表情:', valid);
   el.innerHTML = '';
 
-  // リセットボタン
   const resetBtn = document.createElement('button');
   resetBtn.className = 'expr-btn';
   resetBtn.textContent = '😐 リセット';
   resetBtn.onclick = () => {
-    validNames.forEach(n => { try { mgr.setValue(n, 0); } catch {} });
+    valid.forEach(n => { try { mgr.setValue(n, 0); } catch {} });
     mgr.update(0);
     document.querySelectorAll('.expr-btn').forEach(b => b.classList.remove('active'));
   };
   el.appendChild(resetBtn);
 
-  validNames.forEach(name => {
+  valid.forEach(name => {
     const btn = document.createElement('button');
     btn.className = 'expr-btn';
     btn.textContent = name;
     btn.onclick = () => {
-      validNames.forEach(n => { try { mgr.setValue(n, 0); } catch {} });
+      valid.forEach(n => { try { mgr.setValue(n, 0); } catch {} });
       try { mgr.setValue(name, 1.0); } catch {}
       mgr.update(0);
       document.querySelectorAll('.expr-btn').forEach(b => b.classList.remove('active'));
@@ -258,149 +242,171 @@ function buildExpressionUI(vrm) {
 }
 
 // =====================================================
-// Mixamo ボーン → VRM ボーン 変換テーブル
-// （インストール不要・このテーブルで翻訳します）
+// Mixamo → VRM ボーン変換テーブル
 // =====================================================
 const MIXAMO_TO_VRM = {
-  mixamorigHips:            'hips',
-  mixamorigSpine:           'spine',
-  mixamorigSpine1:          'chest',
-  mixamorigSpine2:          'upperChest',
-  mixamorigNeck:            'neck',
-  mixamorigHead:            'head',
-  mixamorigLeftShoulder:    'leftShoulder',
-  mixamorigLeftArm:         'leftUpperArm',
-  mixamorigLeftForeArm:     'leftLowerArm',
-  mixamorigLeftHand:        'leftHand',
-  mixamorigRightShoulder:   'rightShoulder',
-  mixamorigRightArm:        'rightUpperArm',
-  mixamorigRightForeArm:    'rightLowerArm',
-  mixamorigRightHand:       'rightHand',
-  mixamorigLeftUpLeg:       'leftUpperLeg',
-  mixamorigLeftLeg:         'leftLowerLeg',
-  mixamorigLeftFoot:        'leftFoot',
-  mixamorigLeftToeBase:     'leftToes',
-  mixamorigRightUpLeg:      'rightUpperLeg',
-  mixamorigRightLeg:        'rightLowerLeg',
-  mixamorigRightFoot:       'rightFoot',
-  mixamorigRightToeBase:    'rightToes',
-  // 指
-  mixamorigLeftHandThumb1:  'leftThumbProximal',
-  mixamorigLeftHandThumb2:  'leftThumbIntermediate',
-  mixamorigLeftHandThumb3:  'leftThumbDistal',
-  mixamorigLeftHandIndex1:  'leftIndexProximal',
-  mixamorigLeftHandIndex2:  'leftIndexIntermediate',
-  mixamorigLeftHandIndex3:  'leftIndexDistal',
-  mixamorigLeftHandMiddle1: 'leftMiddleProximal',
-  mixamorigLeftHandMiddle2: 'leftMiddleIntermediate',
-  mixamorigLeftHandMiddle3: 'leftMiddleDistal',
-  mixamorigLeftHandRing1:   'leftRingProximal',
-  mixamorigLeftHandRing2:   'leftRingIntermediate',
-  mixamorigLeftHandRing3:   'leftRingDistal',
-  mixamorigLeftHandPinky1:  'leftLittleProximal',
-  mixamorigLeftHandPinky2:  'leftLittleIntermediate',
-  mixamorigLeftHandPinky3:  'leftLittleDistal',
-  mixamorigRightHandThumb1: 'rightThumbProximal',
-  mixamorigRightHandThumb2: 'rightThumbIntermediate',
-  mixamorigRightHandThumb3: 'rightThumbDistal',
-  mixamorigRightHandIndex1: 'rightIndexProximal',
-  mixamorigRightHandIndex2: 'rightIndexIntermediate',
-  mixamorigRightHandIndex3: 'rightIndexDistal',
-  mixamorigRightHandMiddle1:'rightMiddleProximal',
-  mixamorigRightHandMiddle2:'rightMiddleIntermediate',
-  mixamorigRightHandMiddle3:'rightMiddleDistal',
-  mixamorigRightHandRing1:  'rightRingProximal',
-  mixamorigRightHandRing2:  'rightRingIntermediate',
-  mixamorigRightHandRing3:  'rightRingDistal',
-  mixamorigRightHandPinky1: 'rightLittleProximal',
-  mixamorigRightHandPinky2: 'rightLittleIntermediate',
-  mixamorigRightHandPinky3: 'rightLittleDistal',
+  mixamorigHips:             'hips',
+  mixamorigSpine:            'spine',
+  mixamorigSpine1:           'chest',
+  mixamorigSpine2:           'upperChest',
+  mixamorigNeck:             'neck',
+  mixamorigHead:             'head',
+  mixamorigLeftShoulder:     'leftShoulder',
+  mixamorigLeftArm:          'leftUpperArm',
+  mixamorigLeftForeArm:      'leftLowerArm',
+  mixamorigLeftHand:         'leftHand',
+  mixamorigRightShoulder:    'rightShoulder',
+  mixamorigRightArm:         'rightUpperArm',
+  mixamorigRightForeArm:     'rightLowerArm',
+  mixamorigRightHand:        'rightHand',
+  mixamorigLeftUpLeg:        'leftUpperLeg',
+  mixamorigLeftLeg:          'leftLowerLeg',
+  mixamorigLeftFoot:         'leftFoot',
+  mixamorigLeftToeBase:      'leftToes',
+  mixamorigRightUpLeg:       'rightUpperLeg',
+  mixamorigRightLeg:         'rightLowerLeg',
+  mixamorigRightFoot:        'rightFoot',
+  mixamorigRightToeBase:     'rightToes',
+  // 指（4番は末端ボーンなのでスキップ）
+  mixamorigLeftHandThumb1:   'leftThumbProximal',
+  mixamorigLeftHandThumb2:   'leftThumbIntermediate',
+  mixamorigLeftHandThumb3:   'leftThumbDistal',
+  mixamorigLeftHandIndex1:   'leftIndexProximal',
+  mixamorigLeftHandIndex2:   'leftIndexIntermediate',
+  mixamorigLeftHandIndex3:   'leftIndexDistal',
+  mixamorigLeftHandMiddle1:  'leftMiddleProximal',
+  mixamorigLeftHandMiddle2:  'leftMiddleIntermediate',
+  mixamorigLeftHandMiddle3:  'leftMiddleDistal',
+  mixamorigLeftHandRing1:    'leftRingProximal',
+  mixamorigLeftHandRing2:    'leftRingIntermediate',
+  mixamorigLeftHandRing3:    'leftRingDistal',
+  mixamorigLeftHandPinky1:   'leftLittleProximal',
+  mixamorigLeftHandPinky2:   'leftLittleIntermediate',
+  mixamorigLeftHandPinky3:   'leftLittleDistal',
+  mixamorigRightHandThumb1:  'rightThumbProximal',
+  mixamorigRightHandThumb2:  'rightThumbIntermediate',
+  mixamorigRightHandThumb3:  'rightThumbDistal',
+  mixamorigRightHandIndex1:  'rightIndexProximal',
+  mixamorigRightHandIndex2:  'rightIndexIntermediate',
+  mixamorigRightHandIndex3:  'rightIndexDistal',
+  mixamorigRightHandMiddle1: 'rightMiddleProximal',
+  mixamorigRightHandMiddle2: 'rightMiddleIntermediate',
+  mixamorigRightHandMiddle3: 'rightMiddleDistal',
+  mixamorigRightHandRing1:   'rightRingProximal',
+  mixamorigRightHandRing2:   'rightRingIntermediate',
+  mixamorigRightHandRing3:   'rightRingDistal',
+  mixamorigRightHandPinky1:  'rightLittleProximal',
+  mixamorigRightHandPinky2:  'rightLittleIntermediate',
+  mixamorigRightHandPinky3:  'rightLittleDistal',
 };
 
 // =====================================================
-// FBX 読み込み → VRM へリターゲット
+// FBX 読み込み
 // =====================================================
 function loadAllFBX(vrm) {
   const fbxLoader = new FBXLoader();
   const entries   = Object.entries(FBX_FILES);
-  let loaded = 0;
-
-  if (entries.length === 0) {
-    mixer = new THREE.AnimationMixer(vrm.scene);
-    return;
-  }
+  let done = 0;
 
   entries.forEach(([key, file]) => {
-    stateEl.textContent = `FBX 読み込み中: ${file}`;
-    fbxLoader.load(
-      file,
-      fbx => {
-        // コンソールにFBXのボーン名を出力（デバッグ用）
-        console.log(`[FBX] ${file} のボーン一覧:`);
-        fbx.traverse(o => { if (o.isBone) console.log('  ', o.name); });
+    fbxLoader.load(file, fbx => {
+      console.log(`[FBX] ${file} loaded. clips: ${fbx.animations.length}`);
 
-        if (fbx.animations[0]) {
-          const clip = retarget(fbx.animations[0], fbx, vrm);
-          if (clip) { animations[key] = clip; console.log(`[FBX] ${key} 変換完了`); }
-          else console.warn(`[FBX] ${key} 変換失敗 — ボーン名を確認してください`);
+      // FBXボーン名確認
+      const fbxBoneNames = new Set();
+      fbx.traverse(o => { if (o.isBone) fbxBoneNames.add(o.name); });
+      console.log('[FBX] ユニークボーン:', [...fbxBoneNames]);
+
+      if (fbx.animations[0]) {
+        const clip = retarget(fbx.animations[0], vrm);
+        if (clip) {
+          animations[key] = clip;
+          console.log(`[FBX] ${key} 変換OK: ${clip.tracks.length} tracks`);
+        } else {
+          console.warn(`[FBX] ${key} 変換失敗`);
         }
-        onFBXDone();
-      },
-      xhr => {
-        if (xhr.total) stateEl.textContent = `FBX ${Math.round(xhr.loaded/xhr.total*100)}%`;
-      },
-      err => {
-        console.error(`[FBX] ${file} エラー:`, err);
-        stateEl.textContent = `❌ FBX 失敗: ${file}`;
-        onFBXDone();
       }
-    );
+      finish();
+    }, xhr => {
+      if (xhr.total) stateEl.textContent = `FBX ${Math.round(xhr.loaded/xhr.total*100)}%`;
+    }, err => {
+      console.error(`[FBX] ${file} エラー:`, err);
+      stateEl.textContent = `❌ FBX失敗: ${file}`;
+      finish();
+    });
 
-    function onFBXDone() {
-      loaded++;
-      if (loaded < entries.length) return;
+    function finish() {
+      done++;
+      if (done < entries.length) return;
       mixer = new THREE.AnimationMixer(vrm.scene);
-      stateEl.textContent = '準備完了 ✓  Space で再生';
+      console.log('[MIXER] 作成完了. animations:', Object.keys(animations));
+      stateEl.textContent = '✓ 準備完了  Space=再生/停止';
       if (animations.walk) playAnim('walk');
     }
   });
 }
 
 // =====================================================
-// リターゲット処理
-// FBXのクォータニオントラックをVRMのボーン名に付け替えるだけ
+// リターゲット
+//
+// 【重要】 位置(position)トラックは Hips だけ
+//   しかも「その場アニメ」にするため
+//   XZ移動を0にして Y のみ残す
 // =====================================================
-function retarget(clip, fbxRoot, vrm) {
+function retarget(clip, vrm) {
   const humanBones = vrm.humanoid.humanBones;
   const newTracks  = [];
 
-  // FBXのボーン: name → object
-  const fbxBones = {};
-  fbxRoot.traverse(o => { if (o.isBone) fbxBones[o.name] = o; });
+  // VRM2: humanBones[key].node  /  VRM1: humanBones[key] が直接ノード
+  function getNode(key) {
+    const b = humanBones[key];
+    if (!b) return null;
+    return b.node ?? b; // VRM2 は .node, VRM1 は直接
+  }
 
   clip.tracks.forEach(track => {
-    const dotIdx     = track.name.indexOf('.');
-    const fbxName    = track.name.slice(0, dotIdx);
-    const property   = track.name.slice(dotIdx + 1);
-    const vrmBoneKey = MIXAMO_TO_VRM[fbxName];
-    if (!vrmBoneKey) return;
+    // track.name 例: "mixamorigHips.quaternion"
+    const dot      = track.name.lastIndexOf('.');
+    const fbxName  = track.name.slice(0, dot);
+    const prop     = track.name.slice(dot + 1);
 
-    const vrmNode = humanBones[vrmBoneKey]?.node;
-    if (!vrmNode) return;
+    const vrmKey  = MIXAMO_TO_VRM[fbxName];
+    if (!vrmKey) return;
 
-    const newName = `${vrmNode.name}.${property}`;
+    const vrmNode = getNode(vrmKey);
+    if (!vrmNode) {
+      console.warn(`[retarget] VRMノードなし: ${vrmKey} (from ${fbxName})`);
+      return;
+    }
 
-    if (property === 'quaternion') {
-      newTracks.push(new THREE.QuaternionKeyframeTrack(newName, track.times, track.values));
-    } else if (property === 'position' && fbxName === 'mixamorigHips') {
-      // Hipsの位置はスケール調整（FBX=cm → VRM=m）
-      const vals = Float32Array.from(track.values, v => v * 0.01);
+    const newName = `${vrmNode.name}.${prop}`;
+
+    if (prop === 'quaternion') {
+      // 回転トラック — そのままコピー
+      newTracks.push(new THREE.QuaternionKeyframeTrack(
+        newName, track.times, track.values.slice()
+      ));
+
+    } else if (prop === 'position' && fbxName === 'mixamorigHips') {
+      // 【腰の位置】
+      // FBX は cm 単位 → 0.01 倍で m に変換
+      // XZ を 0 にして「その場」アニメにする
+      const vals = new Float32Array(track.values.length);
+      for (let i = 0; i < track.values.length; i += 3) {
+        vals[i]   = 0;                        // X: その場固定
+        vals[i+1] = track.values[i+1] * 0.01; // Y: 上下はキープ
+        vals[i+2] = 0;                        // Z: その場固定
+      }
       newTracks.push(new THREE.VectorKeyframeTrack(newName, track.times, vals));
     }
+    // position (Hips以外) は無視
   });
 
-  if (!newTracks.length) return null;
-  return new THREE.AnimationClip('clip_' + Date.now(), clip.duration, newTracks);
+  if (!newTracks.length) {
+    console.error('[retarget] トラック0件 — ボーン名不一致の可能性');
+    return null;
+  }
+  return new THREE.AnimationClip('anim', clip.duration, newTracks);
 }
 
 // =====================================================
@@ -408,6 +414,7 @@ function retarget(clip, fbxRoot, vrm) {
 // =====================================================
 function playAnim(key) {
   if (!mixer || !animations[key]) {
+    console.warn('アニメなし:', key, Object.keys(animations));
     stateEl.textContent = `アニメなし: ${key}`;
     return;
   }
@@ -417,6 +424,7 @@ function playAnim(key) {
   action.setLoop(THREE.LoopRepeat, Infinity);
   currentAction = action;
   stateEl.textContent = `▶ ${key}`;
+  console.log('[PLAY]', key);
 }
 
 function stopAnim() {
@@ -433,45 +441,44 @@ const keys = {};
 window.addEventListener('keydown', e => {
   keys[e.key] = true;
   switch (e.key) {
-    case 'ArrowLeft': case 'ArrowRight':
-    case 'ArrowUp':   case 'ArrowDown':
-      if (animations.walk && !currentAction) playAnim('walk');
-      e.preventDefault(); break;
     case ' ':
       currentAction ? stopAnim() : playAnim('walk');
       e.preventDefault(); break;
     case 'r': case 'R':
-      camera.position.set(0, 1.3, 3.2);
+      camera.position.set(0, 1.2, 3.0);
       controls.target.set(0, 0.9, 0);
       controls.update(); break;
-    // ← ここにキー追加 例: case '1': playAnim('idle'); break;
+    // ← アニメ追加時はここに追加
+    // case '1': playAnim('idle'); break;
+    // case '2': playAnim('run');  break;
   }
 });
-window.addEventListener('keyup', e => { keys[e.key] = false; });
+window.addEventListener('keyup', e => { delete keys[e.key]; });
 
+// 矢印キー / WS でカメラ操作
 function handleKeyCamera() {
   const sph = new THREE.Spherical().setFromVector3(
     camera.position.clone().sub(controls.target)
   );
-  let changed = false;
-  const rs = 0.03, zs = 0.08;
-  if (keys['ArrowLeft'])  { sph.theta -= rs; changed = true; }
-  if (keys['ArrowRight']) { sph.theta += rs; changed = true; }
-  if (keys['ArrowUp'])    { sph.phi   -= rs; changed = true; }
-  if (keys['ArrowDown'])  { sph.phi   += rs; changed = true; }
-  if (keys['w']||keys['W']) { sph.radius -= zs; changed = true; }
-  if (keys['s']||keys['S']) { sph.radius += zs; changed = true; }
-  if (!changed) return;
-  sph.phi    = Math.max(0.05, Math.min(Math.PI - 0.05, sph.phi));
-  sph.radius = Math.max(0.5, Math.min(12, sph.radius));
+  let moved = false;
+  const r = 0.03, z = 0.07;
+  if (keys['ArrowLeft'])  { sph.theta -= r; moved = true; }
+  if (keys['ArrowRight']) { sph.theta += r; moved = true; }
+  if (keys['ArrowUp'])    { sph.phi   -= r; moved = true; }
+  if (keys['ArrowDown'])  { sph.phi   += r; moved = true; }
+  if (keys['w']||keys['W']) { sph.radius -= z; moved = true; }
+  if (keys['s']||keys['S']) { sph.radius += z; moved = true; }
+  if (!moved) return;
+  sph.phi    = THREE.MathUtils.clamp(sph.phi, 0.05, Math.PI - 0.05);
+  sph.radius = THREE.MathUtils.clamp(sph.radius, 0.5, 12);
   camera.position.setFromSpherical(sph).add(controls.target);
 }
 
 // =====================================================
 // メインループ
 // =====================================================
-(function animate() {
-  requestAnimationFrame(animate);
+(function loop() {
+  requestAnimationFrame(loop);
   const dt = clock.getDelta();
   handleKeyCamera();
   controls.update();
