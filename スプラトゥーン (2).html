@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>3D Cat Shooter - Optimized Perfect Version</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: sans-serif;
+            z-index: 20;
+            cursor: pointer;
+        }
+
+        #startScreen h1 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+
+        #startScreen p {
+            font-size: 1.5rem;
+        }
+
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: sans-serif;
+            font-size: 0.9rem;
+            text-shadow: 1px 1px 2px black;
+            z-index: 10;
+            pointer-events: none;
+            display: none;
+        }
+
+        #hudMessage {
+            position: absolute;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #FFD700;
+            font-family: sans-serif;
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px black;
+            z-index: 15;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #reticle {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+        }
+
+        #reticle::before {
+            content: '';
+            width: 4px;
+            height: 4px;
+            background: white;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="startScreen">
+        <h1>3D ねこシューティング</h1>
+        <p>画面をクリックしてスタート</p>
+    </div>
+    <div id="reticle"></div>
+    <div id="ui">
+        <p>WASD: 移動 | SHIFT: 潜伏 | SPACE: ジャンプ | 左クリック: 射撃 | Eキー: 敵ON/OFF | マウス: 視点</p>
+    </div>
+    <div id="hudMessage"></div>
+
+    <script type="importmap">
+        { 
+            "imports": { 
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            } 
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+
+        // --- シーン設定 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.localClippingEnabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(10, 20, 10);
+        light.castShadow = true;
+        scene.add(light);
+        scene.add(new THREE.AmbientLight(0x606060));
+
+        const stageWorldSize = 70;
+
+        // 床の設定
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(stageWorldSize, stageWorldSize),
+            new THREE.MeshStandardMaterial({ color: 0xC6A664 })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        // --- Canvas Textureによるインクスタンプ方式 ---
+        const INK_CANVAS_SIZE = 1024;
+        const inkCanvas = document.createElement('canvas');
+        inkCanvas.width = INK_CANVAS_SIZE;
+        inkCanvas.height = INK_CANVAS_SIZE;
+        const inkCtx = inkCanvas.getContext('2d', { alpha: true });
+        const inkTexture = new THREE.CanvasTexture(inkCanvas);
+        inkTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        let inkDirty = false;
+
+        // パフォーマンス向上のための衝突判定用データ (512x512に縮小して軽量化)
+        const COLLISION_GRID_SIZE = 512;
+        const inkGrid = new Uint8Array(COLLISION_GRID_SIZE * COLLISION_GRID_SIZE); // 0:なし, 1:Player, 2:Enemy
+
+        const floorInkMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(stageWorldSize, stageWorldSize),
+            new THREE.MeshBasicMaterial({ map: inkTexture, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })
+        );
+        floorInkMesh.rotation.x = -Math.PI / 2;
+        floorInkMesh.position.y = 0.005;
+        scene.add(floorInkMesh);
+
+        // ワールド座標 → キャンバス座標
+        function worldToCanvas(wx, wz) {
+            return [
+                ((wx + stageWorldSize / 2) / stageWorldSize) * INK_CANVAS_SIZE,
+                ((wz + stageWorldSize / 2) / stageWorldSize) * INK_CANVAS_SIZE
+            ];
+        }
+
+        function worldToGrid(wx, wz) {
+            const gx = Math.floor(((wx + stageWorldSize / 2) / stageWorldSize) * COLLISION_GRID_SIZE);
+            const gz = Math.floor(((wz + stageWorldSize / 2) / stageWorldSize) * COLLISION_GRID_SIZE);
+            return [gx, gz];
+        }
+
+        function updateInkGrid(wx, wz, radius, type) {
+            const [gx, gz] = worldToGrid(wx, wz);
+            const gr = (radius / stageWorldSize) * COLLISION_GRID_SIZE;
+            const typeVal = type === 'player' ? 1 : 2;
+
+            const startX = Math.max(0, Math.floor(gx - gr));
+            const endX = Math.min(COLLISION_GRID_SIZE - 1, Math.ceil(gx + gr));
+            const startZ = Math.max(0, Math.floor(gz - gr));
+            const endZ = Math.min(COLLISION_GRID_SIZE - 1, Math.ceil(gz + gr));
+
+            for (let z = startZ; z <= endZ; z++) {
+                for (let x = startX; x <= endX; x++) {
+                    const dx = x - gx;
+                    const dz = z - gz;
+                    if (dx * dx + dz * dz <= gr * gr) {
+                        inkGrid[z * COLLISION_GRID_SIZE + x] = typeVal;
+                    }
+                }
+            }
+        }
+
+        // キャンバスにインクを描画（スタンプ）
+        function drawInkStamp(position, scaleMultiplier, direction, type) {
+            const [cx, cz] = worldToCanvas(position.x, position.z);
+            const r = (0.8 * scaleMultiplier / stageWorldSize) * INK_CANVAS_SIZE;
+            const color = type === 'player' ? 'rgba(0,68,255,0.92)' : 'rgba(255,68,0,0.92)';
+            inkCtx.fillStyle = color;
+
+            // グリッド更新（衝突判定用）
+            updateInkGrid(position.x, position.z, 0.8 * scaleMultiplier, type);
+
+            function fillIrregularCircle(x, y, radius, points = 8, noise = 0.2) {
+                inkCtx.beginPath();
+                for (let i = 0; i <= points; i++) {
+                    const angle = (i / points) * Math.PI * 2;
+                    const off = 1 + (Math.random() - 0.5) * noise;
+                    const px = Math.cos(angle) * radius * off;
+                    const py = Math.sin(angle) * radius * off;
+                    if (i === 0) inkCtx.moveTo(x + px, y + py);
+                    else inkCtx.lineTo(x + px, y + py);
+                }
+                inkCtx.closePath();
+                inkCtx.fill();
+            }
+
+            // メインスプラッター
+            inkCtx.save();
+            inkCtx.translate(cx, cz);
+            if (direction) {
+                // Canvasの座標系に合わせて回転（ZがY、XがX。CanvasはY下向きなので注意）
+                const angle = Math.atan2(direction.z, direction.x);
+                inkCtx.rotate(angle);
+                inkCtx.scale(1.5, 0.85); // 進行方向に伸ばす
+            }
+            fillIrregularCircle(0, 0, r, 12, 0.3);
+            inkCtx.restore();
+
+            // 飛沫 4〜7個（少し多めに、かつ不規則に）
+            const dropletCount = 4 + Math.floor(Math.random() * 4);
+            const baseAngle = direction ? Math.atan2(direction.z, direction.x) : 0;
+            for (let i = 0; i < dropletCount; i++) {
+                const dR = r * (0.1 + Math.random() * 0.3);
+                let ddx, ddy;
+                if (direction) {
+                    const spread = 0.8;
+                    const sa = baseAngle + (Math.random() - 0.5) * spread;
+                    const dist = r * (1.2 + Math.random() * 1.2);
+                    ddx = Math.cos(sa) * dist;
+                    ddy = Math.sin(sa) * dist;
+                } else {
+                    const a = Math.random() * Math.PI * 2;
+                    const dist = r * (0.8 + Math.random() * 0.5);
+                    ddx = Math.cos(a) * dist;
+                    ddy = Math.sin(a) * dist;
+                }
+                fillIrregularCircle(cx + ddx, cz + ddy, dR, 6, 0.4);
+
+                // 飛沫もグリッドに反映
+                const worldDropletPos = {
+                    x: position.x + (ddx / INK_CANVAS_SIZE) * stageWorldSize,
+                    z: position.z + (ddy / INK_CANVAS_SIZE) * stageWorldSize
+                };
+                updateInkGrid(worldDropletPos.x, worldDropletPos.z, (dR / INK_CANVAS_SIZE) * stageWorldSize, type);
+            }
+            inkDirty = true;
+        }
+
+        // キャンバスピクセルでインク判定（O(1)・超高速）
+        function checkFloorInk(pos, type) {
+            const [gx, gz] = worldToGrid(pos.x, pos.z);
+            if (gx < 0 || gx >= COLLISION_GRID_SIZE || gz < 0 || gz >= COLLISION_GRID_SIZE) return false;
+
+            const val = inkGrid[gz * COLLISION_GRID_SIZE + gx];
+            const typeVal = type === 'player' ? 1 : 2;
+            return val === typeVal;
+        }
+
+        // --- 障害物の設定 ---
+        const obstacles = [];
+        const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x888888 });
+
+        function createBox(x, y, z, w, h, d, color = 0x888888) {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mat = new THREE.MeshStandardMaterial({ color: color });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, y, z);
+            mesh.receiveShadow = true;
+            mesh.castShadow = true;
+            scene.add(mesh);
+
+            obstacles.push({
+                mesh: mesh,
+                minX: x - w / 2, maxX: x + w / 2,
+                minY: y - h / 2, maxY: y + h / 2,
+                minZ: z - d / 2, maxZ: z + d / 2
+            });
+        }
+
+        // 180度回転対称（点対称）にオブジェクトを配置するヘルパー
+        function addSymBox(x, y, z, w, h, d, color = 0x888888) {
+            createBox(x, y, z, w, h, d, color);
+            if (x !== 0 || z !== 0) {
+                createBox(-x, y, -z, w, h, d, color);
+            }
+        }
+
+        function addSymSlope(startX, startY, startZ, width, height, depth, steps, color = 0x888888) {
+            const stepH = height / steps;
+            const stepD = depth / steps;
+            for (let i = 0; i < steps; i++) {
+                const sy = startY + stepH * i + stepH / 2;
+                const sz = startZ + stepD * i + stepD / 2;
+                addSymBox(startX, sy, sz, width, stepH, stepD, color);
+            }
+        }
+
+        // --- 金網の設定 ---
+        const grates = [];
+        const grateMaterial = new THREE.MeshStandardMaterial({
+            color: 0x999999, wireframe: true, transparent: true, opacity: 0.6
+        });
+
+        function createGrate(x, y, z, w, h, d) {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mesh = new THREE.Mesh(geo, grateMaterial);
+            mesh.position.set(x, y, z);
+            mesh.receiveShadow = true;
+            mesh.castShadow = true;
+            scene.add(mesh);
+
+            grates.push({
+                mesh: mesh,
+                minX: x - w / 2, maxX: x + w / 2,
+                minY: y - h / 2, maxY: y + h / 2,
+                minZ: z - d / 2, maxZ: z + d / 2
+            });
+        }
+
+        function addSymGrate(x, y, z, w, h, d) {
+            createGrate(x, y, z, w, h, d);
+            if (x !== 0 || z !== 0) {
+                createGrate(-x, y, -z, w, h, d);
+            }
+        }
+
+        // ステージ構成（ヤガラ市場風：点対称レイアウト）
+        const C_BASE = 0x999999;
+        const C_STALL = 0xCC7744;
+        const C_DECK = 0x778899;
+        const C_CRATE = 0xAA8866;
+
+        // 中央広場：大型の足場
+        addSymBox(0, 1.5, 0, 10, 3, 10, C_BASE);
+        addSymBox(0, 3.5, 0, 4, 1, 4, C_BASE); // 中央の塔
+
+        // 中央へのメインアプローチ（スロープ）
+        addSymSlope(0, 0, 10, 6, 1.5, 6, 15, C_BASE); 
+
+        // サイドエリア：一段高いデッキ
+        addSymBox(18, 1, 0, 10, 2, 16, C_DECK);
+        addSymBox(18, 2.5, 4, 6, 1, 6, C_DECK); 
+
+        // 市場の屋台・木箱（点対称に配置）
+        addSymBox(14, 1, 14, 4, 2, 4, C_STALL);
+        addSymBox(18, 2, 14, 3, 4, 3, C_STALL); // 高い屋台
+        addSymBox(24, 0.5, 4, 2, 1, 2, C_CRATE); // 小さな箱
+        addSymBox(24, 0.5, 6, 2, 1, 2, C_CRATE);
+        
+        addSymBox(8, 0.5, 20, 3, 1, 3, C_CRATE);
+        addSymBox(20, 0.5, -12, 4, 1, 4, C_CRATE);
+
+        // 高低差を繋ぐ金網
+        addSymGrate(12, 3.5, 0, 8, 0.2, 6); // サイドデッキと中央を繋ぐ
+        addSymGrate(0, 5, 0, 6, 0.2, 6);   // 中央最上部の金網
+        addSymGrate(22, 2.5, -5, 4, 0.2, 10); // 外周の金網通路
+
+        // 障害物：視線を遮る大きな壁
+        addSymBox(10, 2, -10, 2, 4, 8, C_BASE);
+
+        // --- キャラクター ---
+        const playerGroup = new THREE.Group();
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
+
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1, 0.4), bodyMat);
+        body.position.y = 1;
+        playerGroup.add(body);
+
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.4), bodyMat);
+        head.position.y = 1.7;
+        playerGroup.add(head);
+
+        const earGeo = new THREE.ConeGeometry(0.1, 0.2, 4);
+        const leftEar = new THREE.Mesh(earGeo, bodyMat);
+        leftEar.position.set(0.15, 0.3, 0);
+        const rightEar = new THREE.Mesh(earGeo, bodyMat);
+        rightEar.position.set(-0.15, 0.3, 0);
+        head.add(leftEar, rightEar);
+
+        const tankGroup = new THREE.Group();
+        tankGroup.position.set(-0.5, 1, 0);
+        const tankOuter = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8),
+            new THREE.MeshStandardMaterial({ color: 0x333333, transparent: true, opacity: 0.5 })
+        );
+        const tankLiquid = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.13, 0.13, 0.75, 8),
+            new THREE.MeshStandardMaterial({
+                color: 0x00AAFF, emissive: 0x0044FF, roughness: 0.3, metalness: 0.5
+            })
+        );
+        tankGroup.add(tankOuter, tankLiquid);
+        playerGroup.add(tankGroup);
+
+        const squidModel = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), new THREE.MeshStandardMaterial({ color: 0x0066FF }));
+        squidModel.scale.set(1, 0.5, 1.5);
+        squidModel.position.y = 0.2;
+        squidModel.visible = false;
+        playerGroup.add(squidModel);
+
+        scene.add(playerGroup);
+        // スポーン地点をステージ端に設定
+        playerGroup.position.set(28, 0, 28);
+        playerGroup.rotation.y = Math.PI * 1.25; // 中央を向くように回転
+
+        // --- パラメータ ---
+        let inkAmount = 100;
+        const playerVelocity = new THREE.Vector3();
+        let isGrounded = true;
+        let isClimbing = false;
+        let climbNormal = new THREE.Vector3(); // 登っている面の法線を記録
+        let isSquid = false;
+        let isInInk = false;
+        let pitch = 0;
+
+        const bullets = [];
+        const decoParticles = [];
+
+        // 壁インク（3Dメッシュ、量が少ないため従来方式を維持）
+        const wallInks = [];
+        let globalInkIndex = 0;
+
+        // 壁インク用レイキャスター
+        const _rcHoriz = new THREE.Raycaster();
+
+        function checkInInk(pos, type = 'player') {
+            // 床インク判定: キャンバスピクセル読み取り（超高速O(1)）
+            if (checkFloorInk(pos, type)) return true;
+
+            // 壁インク判定: 3Dレイキャスト（壁のみ）
+            if (wallInks.length > 0) {
+                const wallMeshes = [];
+                for (let i = 0; i < wallInks.length; i++) {
+                    if (wallInks[i].children.length > 0) wallMeshes.push(wallInks[i].children[0]);
+                }
+                const origin = new THREE.Vector3(pos.x, pos.y + 0.5, pos.z);
+                const dirs = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1)];
+                for (const dir of dirs) {
+                    _rcHoriz.set(origin, dir);
+                    _rcHoriz.far = 0.6;
+                    const hits = _rcHoriz.intersectObjects(wallMeshes, false);
+                    if (hits.length > 0) {
+                        const p = hits[0].object.parent;
+                        const hitType = (p && p.userData && p.userData.type === 'enemy') ? 'enemy' : 'player';
+                        if (hitType === type) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        const inkMaterial = new THREE.MeshBasicMaterial({
+            color: 0x0044FF,
+            transparent: true,
+            opacity: 0.9,
+            polygonOffset: true,
+            depthWrite: true,
+            polygonOffsetFactor: -4,
+            polygonOffsetUnits: -4
+        });
+
+        const enemyInkMaterial = new THREE.MeshBasicMaterial({
+            color: 0xFF4400,
+            transparent: true,
+            opacity: 0.9,
+            polygonOffset: true,
+            depthWrite: true,
+            polygonOffsetFactor: -4,
+            polygonOffsetUnits: -4
+        });
+
+        // --- 敵キャラクター ---
+        const enemies = [];
+        const enemyBodyMat = new THREE.MeshStandardMaterial({ color: 0x883333 });
+
+        function createEnemy(x, z) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1, 0.4), enemyBodyMat);
+            body.position.y = 1;
+            group.add(body);
+
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.4), enemyBodyMat);
+            head.position.y = 1.7;
+            group.add(head);
+
+            const earGeo = new THREE.ConeGeometry(0.1, 0.2, 4);
+            const leftEar = new THREE.Mesh(earGeo, enemyBodyMat);
+            leftEar.position.set(0.15, 0.3, 0);
+            const rightEar = new THREE.Mesh(earGeo, enemyBodyMat);
+            rightEar.position.set(-0.15, 0.3, 0);
+            head.add(leftEar, rightEar);
+
+            const squidModel = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), new THREE.MeshStandardMaterial({ color: 0xFF4400 }));
+            squidModel.scale.set(1, 0.5, 1.5);
+            squidModel.position.y = 0.2;
+            squidModel.visible = false;
+            group.add(squidModel);
+
+            scene.add(group);
+
+            enemies.push({
+                group: group,
+                body: body,
+                head: head,
+                squidModel: squidModel,
+                inkAmount: 100,
+                state: 'patrol', // patrol, shoot, hide
+                stateTimer: 0,
+                targetPos: new THREE.Vector3(x, 0, z),
+                velocity: new THREE.Vector3(),
+                isSquid: false,
+                lastShootTime: 0
+            });
+        }
+
+        createEnemy(-28, -28); // プレイヤーと対角線上の端
+        createEnemy(-25, -15); 
+        createEnemy(-15, -25);
+
+
+        const keys = {};
+        let isShooting = false;
+        let shootCount = 0;
+        let lastShootTime = 0;
+        const shootInterval = 200;
+
+        let enemiesEnabled = true;
+        const hudMessage = document.getElementById('hudMessage');
+        let hudTimeout = null;
+        function showHUDMessage(text) {
+            hudMessage.textContent = text;
+            hudMessage.style.opacity = 1;
+            if (hudTimeout) clearTimeout(hudTimeout);
+            hudTimeout = setTimeout(() => {
+                hudMessage.style.opacity = 0;
+            }, 2000);
+        }
+
+        const reticleEl = document.getElementById('reticle');
+
+        function updateReticle() {
+            let simPos = new THREE.Vector3().copy(playerGroup.position);
+            simPos.y += 1.3;
+
+            const direction = new THREE.Vector3(0, 0, -1);
+            const shotPitch = pitch - 0.05;
+            direction.applyAxisAngle(new THREE.Vector3(1, 0, 0), shotPitch);
+            direction.applyQuaternion(playerGroup.quaternion);
+
+            let simVel = direction.multiplyScalar(0.85);
+
+            const stepBeforeDrop = 8;
+            for (let i = 0; i < stepBeforeDrop; i++) {
+                simVel.y -= 0.002;
+                simPos.add(simVel);
+                if (simPos.y <= 0) {
+                    simPos.y = 0;
+                    break;
+                }
+            }
+
+            const vector = simPos.project(camera);
+            if (vector.z > 1) {
+                reticleEl.style.display = 'none';
+                return;
+            }
+
+            reticleEl.style.display = 'flex';
+            const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
+
+            reticleEl.style.left = `${x}px`;
+            reticleEl.style.top = `${y}px`;
+            reticleEl.style.transform = `translate(-50%, -50%)`;
+        }
+
+        function createInkSplash(position, scaleMultiplier = 1.0, direction = null, normal = null, hitObject = null, type = 'player') {
+            const limit = stageWorldSize / 2;
+            if (Math.abs(position.x) > limit || Math.abs(position.z) > limit) return;
+
+            if (normal) {
+                // --- 壁インク: 従来の3Dメッシュ方式 ---
+                const size = 0.8 * scaleMultiplier;
+                const baseMat = type === 'player' ? inkMaterial : enemyInkMaterial;
+                const matKey = 'inkMaterial_' + type;
+                if (!hitObject.userData[matKey]) {
+                    const bbox = new THREE.Box3().setFromObject(hitObject);
+                    const epsilon = 0.1;
+                    const planes = [
+                        new THREE.Plane(new THREE.Vector3(1, 0, 0), -bbox.min.x + epsilon),
+                        new THREE.Plane(new THREE.Vector3(-1, 0, 0), bbox.max.x + epsilon),
+                        new THREE.Plane(new THREE.Vector3(0, 1, 0), -bbox.min.y + epsilon),
+                        new THREE.Plane(new THREE.Vector3(0, -1, 0), bbox.max.y + epsilon),
+                        new THREE.Plane(new THREE.Vector3(0, 0, 1), -bbox.min.z + epsilon),
+                        new THREE.Plane(new THREE.Vector3(0, 0, -1), bbox.max.z + epsilon)
+                    ];
+                    const mat = baseMat.clone();
+                    mat.clippingPlanes = planes;
+                    mat.depthWrite = false;
+                    hitObject.userData[matKey] = mat;
+                }
+                const wallMat = hitObject.userData[matKey];
+                globalInkIndex++;
+                const splashGroup = new THREE.Group();
+                splashGroup.userData.type = type;
+                const mainSplatter = new THREE.Mesh(new THREE.CircleGeometry(size, 8), wallMat);
+                mainSplatter.renderOrder = globalInkIndex;
+                mainSplatter.updateMatrix(); mainSplatter.matrixAutoUpdate = false;
+                splashGroup.add(mainSplatter);
+                splashGroup.position.copy(position).add(normal.clone().multiplyScalar(0.01));
+                splashGroup.lookAt(position.clone().add(normal));
+                splashGroup.updateMatrixWorld(true);
+                scene.add(splashGroup);
+                wallInks.push(splashGroup);
+            } else {
+                // --- 床インク: Canvasスタンプ方式（ドローコール0） ---
+                drawInkStamp(position, scaleMultiplier, direction, type);
+            }
+        }
+
+        // マージ処理はいったん削除
+
+        function fireBullet(shooterGroup, pitchVal, type = 'player') {
+            if (type === 'player') {
+                if (inkAmount <= 5 || isSquid) return;
+                inkAmount -= 4;
+                shootCount++;
+
+                if (shootCount % 3 === 0) {
+                    const footPos = new THREE.Vector3(shooterGroup.position.x, 0, shooterGroup.position.z);
+                    createInkSplash(footPos, 1.4, null, null, null, type);
+                }
+            }
+
+            const bulletGeometry = new THREE.SphereGeometry(0.18, 8, 8);
+            const mat = type === 'player' ? inkMaterial : enemyInkMaterial;
+            const bullet = new THREE.Mesh(bulletGeometry, mat);
+
+            bullet.position.copy(shooterGroup.position).y += 1.3;
+
+            const direction = new THREE.Vector3(0, 0, -1);
+            const shotPitch = pitchVal - 0.05;
+            direction.applyAxisAngle(new THREE.Vector3(1, 0, 0), shotPitch);
+            direction.applyQuaternion(shooterGroup.quaternion);
+
+            if (type === 'enemy') {
+                const spread = 0.02; // エイム精度を上げてしっかり狙ってくるように
+                direction.x += (Math.random() - 0.5) * spread;
+                direction.y += (Math.random() - 0.5) * spread;
+                direction.z += (Math.random() - 0.5) * spread;
+                direction.normalize();
+            }
+
+            const bulletSpeed = 0.85;
+            const velocity = direction.clone().multiplyScalar(bulletSpeed);
+
+            bullet.lookAt(bullet.position.clone().add(velocity));
+            bullet.scale.set(0.7, 0.7, 1.8);
+
+            bullet.userData = {
+                velocity: velocity,
+                lastTrailTime: performance.now(),
+                lastParticleTime: performance.now(),
+                dirVec: new THREE.Vector3(direction.x, 0, direction.z).normalize(),
+                life: 0,
+                type: type
+            };
+            scene.add(bullet);
+            bullets.push(bullet);
+        }
+
+        // --- 入力系 ---
+        window.onkeydown = (e) => {
+            keys[e.code] = true;
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') isSquid = true;
+            if (e.code === 'KeyE') {
+                enemiesEnabled = !enemiesEnabled;
+                showHUDMessage("敵: " + (enemiesEnabled ? "ON" : "OFF"));
+            }
+        };
+        window.onkeyup = (e) => {
+            keys[e.code] = false;
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') isSquid = false;
+        };
+        window.onmousedown = () => isShooting = true;
+        window.onmouseup = () => isShooting = false;
+
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement) {
+                playerGroup.rotation.y -= e.movementX * 0.003;
+                pitch -= e.movementY * 0.003;
+                pitch = Math.max(-1.2, Math.min(0.2, pitch));
+            }
+        });
+        let gameStarted = false;
+        const startScreen = document.getElementById('startScreen');
+        const uiEl = document.getElementById('ui');
+        startScreen.addEventListener('click', () => {
+            startScreen.style.display = 'none';
+            uiEl.style.display = 'block';
+            gameStarted = true;
+            renderer.domElement.requestPointerLock();
+        });
+
+        renderer.domElement.onclick = () => {
+            if (gameStarted) renderer.domElement.requestPointerLock();
+        };
+
+        const DEADZONE = 0.2;
+        function getGamepadInput() {
+            const gamepads = navigator.getGamepads();
+            return gamepads[0];
+        }
+
+        // --- メインループ ---
+        function animate(time) {
+            requestAnimationFrame(animate);
+            if (!gameStarted) return;
+
+            const gp = getGamepadInput();
+
+            const zlPressed = gp ? gp.buttons[6].pressed : false;
+            isSquid = keys['ShiftLeft'] || keys['ShiftRight'] || zlPressed;
+
+            // 3D化された強力なインク判定
+            isInInk = checkInInk(playerGroup.position, 'player');
+
+            // --- 敵AIの更新 ---
+            enemies.forEach(enemy => {
+                if (!enemiesEnabled) {
+                    enemy.group.visible = false;
+                    return;
+                }
+                enemy.group.visible = true;
+
+                enemy.stateTimer -= 16;
+
+                const distToPlayer = enemy.group.position.distanceTo(playerGroup.position);
+                const attackRange = 25; // 射程圏内を広げて遠くからでも狙ってくるようにする
+                const canSeePlayer = distToPlayer < attackRange;
+
+                enemy.isSquid = false;
+                let currentSpeed = 0.08;
+
+                if (enemy.state === 'patrol') {
+                    const dir = enemy.targetPos.clone().sub(enemy.group.position);
+                    dir.y = 0;
+                    if (dir.length() < 1 || enemy.stateTimer <= 0) {
+                        enemy.targetPos.set(
+                            enemy.group.position.x + (Math.random() - 0.5) * 15,
+                            0,
+                            enemy.group.position.z + (Math.random() - 0.5) * 15
+                        );
+                        enemy.targetPos.x = Math.max(-stageWorldSize / 2, Math.min(stageWorldSize / 2, enemy.targetPos.x));
+                        enemy.targetPos.z = Math.max(-stageWorldSize / 2, Math.min(stageWorldSize / 2, enemy.targetPos.z));
+                        enemy.stateTimer = 2000 + Math.random() * 2000;
+                    } else {
+                        dir.normalize();
+                        enemy.group.position.add(dir.multiplyScalar(currentSpeed));
+                        const lookTarget = enemy.group.position.clone().add(dir);
+                        enemy.group.lookAt(lookTarget);
+
+                        enemy.inkAmount -= 0.5;
+                        if (time - enemy.lastShootTime > 400 && enemy.inkAmount > 10) {
+                            fireBullet(enemy.group, 0.1, 'enemy');
+                            enemy.lastShootTime = time;
+                        }
+                    }
+
+                    if (enemy.inkAmount <= 10) {
+                        enemy.state = 'hide';
+                        // 隠れる前に足元を塗る
+                        createInkSplash(new THREE.Vector3(enemy.group.position.x, 0, enemy.group.position.z), 1.5, null, null, null, 'enemy');
+                        enemy.stateTimer = 3000;
+                    } else if (canSeePlayer) {
+                        enemy.state = 'shoot';
+                        enemy.stateTimer = 5000; // 射撃状態を長く維持して好戦的にする
+                    }
+                } else if (enemy.state === 'hide') {
+                    enemy.isSquid = true;
+                    if (checkInInk(enemy.group.position, 'enemy')) {
+                        enemy.inkAmount += 2.0; // インクの上なら高速回復
+                    } else {
+                        // 少しだけ回復しやすく（光線判定緩和と合わせて回復力アップ）
+                        enemy.inkAmount += 0.5;
+                    }
+                    if (enemy.inkAmount >= 100) {
+                        enemy.state = 'patrol';
+                        enemy.inkAmount = 100;
+                        enemy.stateTimer = 2000;
+                    }
+                } else if (enemy.state === 'shoot') {
+                    const dirToPlayer = playerGroup.position.clone().sub(enemy.group.position);
+                    dirToPlayer.y = 0;
+                    if (dirToPlayer.length() > 0.1) {
+                        const lookTarget = enemy.group.position.clone().add(dirToPlayer);
+                        enemy.group.lookAt(lookTarget);
+                    }
+
+                    enemy.inkAmount -= 1.0;
+                    if (time - enemy.lastShootTime > 400 && enemy.inkAmount > 10) {
+                        const dirToPlayerFull = playerGroup.position.clone().sub(enemy.group.position);
+                        const distXZ = Math.sqrt(dirToPlayerFull.x ** 2 + dirToPlayerFull.z ** 2);
+                        // 正確にプレイヤーを狙う。飛距離を出すためにほんの少しだけ上を向く
+                        const enemyPitch = Math.atan2(dirToPlayerFull.y, distXZ) - 0.02;
+                        fireBullet(enemy.group, -enemyPitch, 'enemy');
+                        enemy.lastShootTime = time;
+                    }
+
+                    if (enemy.inkAmount <= 10 || enemy.stateTimer <= 0 || !canSeePlayer) {
+                        enemy.state = enemy.inkAmount <= 10 ? 'hide' : 'patrol';
+                        enemy.stateTimer = 2000;
+                    }
+                }
+
+                if (enemy.isSquid) {
+                    enemy.body.visible = enemy.head.visible = false;
+                    enemy.squidModel.visible = !checkInInk(enemy.group.position, 'enemy');
+                } else {
+                    enemy.body.visible = enemy.head.visible = true;
+                    enemy.squidModel.visible = false;
+                }
+            });
+
+            let baseSpeed = 0.13;
+            let currentSpeed = baseSpeed;
+
+            if (isSquid) {
+                body.visible = head.visible = false;
+                squidModel.visible = !isInInk; // インク外ならイカ姿が見える
+                tankGroup.position.y = 0.3;
+                if (isInInk) {
+                    currentSpeed = baseSpeed * 1.8;
+                    inkAmount = Math.min(100, inkAmount + 0.8);
+                } else {
+                    currentSpeed = baseSpeed * 0.6;
+                    inkAmount = Math.min(100, inkAmount + 0.1);
+                }
+            } else {
+                body.visible = head.visible = true;
+                squidModel.visible = false;
+                tankGroup.position.y = 1.0;
+                inkAmount = Math.min(100, inkAmount + 0.05);
+            }
+
+            const moveVec = new THREE.Vector3();
+            let lx = gp ? (Math.abs(gp.axes[0]) > DEADZONE ? gp.axes[0] : 0) : 0;
+            let lz = gp ? (Math.abs(gp.axes[1]) > DEADZONE ? gp.axes[1] : 0) : 0;
+
+            if (keys['KeyW'] || keys['ArrowUp']) lz = -1;
+            if (keys['KeyS'] || keys['ArrowDown']) lz = 1;
+            if (keys['KeyA'] || keys['ArrowLeft']) lx = -1;
+            if (keys['KeyD'] || keys['ArrowRight']) lx = 1;
+
+            moveVec.set(lx, 0, lz);
+            if (moveVec.length() > 0) {
+                moveVec.normalize().multiplyScalar(currentSpeed);
+                playerGroup.translateX(moveVec.x);
+                playerGroup.translateZ(moveVec.z);
+            }
+
+            // --- 重力とジャンプの計算 ---
+            const bPressed = gp ? gp.buttons[0].pressed : false;
+            const jumpRequested = keys['Space'] || bPressed;
+
+            if (jumpRequested && (isGrounded || isClimbing)) {
+                playerVelocity.y = 0.22; // 少し高めに調整
+                isGrounded = false;
+                isClimbing = false;
+            } else if (!isGrounded && !isClimbing) {
+                playerVelocity.y -= 0.012; // 重力
+            }
+
+            let nextY = playerGroup.position.y + playerVelocity.y;
+
+            isGrounded = false;
+            isClimbing = false; // 毎フレームリセット
+
+            if (nextY <= 0) {
+                nextY = 0;
+                playerVelocity.y = 0;
+                isGrounded = true;
+            }
+
+            // --- 障害物との衝突判定 ---
+            obstacles.forEach(box => {
+                const p = playerGroup.position;
+                const r = 0.4;
+
+                // 境界線上の接触も許容する
+                const inX = p.x + r >= box.minX && p.x - r <= box.maxX;
+                const inZ = p.z + r >= box.minZ && p.z - r <= box.maxZ;
+
+                if (inX && inZ) {
+                    // 上に乗る（落下時のみ判定）
+                    if (p.y >= box.maxY - 0.2 && nextY <= box.maxY && playerVelocity.y <= 0) {
+                        nextY = box.maxY;
+                        playerVelocity.y = 0;
+                        isGrounded = true;
+                    }
+                    // 側面にぶつかる
+                    else if (nextY < box.maxY && nextY + 2 > box.minY) {
+                        // ステップアップ（0.51以下の段差なら自動で歩いて登れる）
+                        if (!isClimbing && box.maxY - playerGroup.position.y <= 0.51) {
+                            nextY = box.maxY;
+                            isGrounded = true;
+                            playerVelocity.y = 0;
+                        } else {
+                            const dx1 = Math.abs(p.x + r - box.minX);
+                            const dx2 = Math.abs(p.x - r - box.maxX);
+                            const dz1 = Math.abs(p.z + r - box.minZ);
+                            const dz2 = Math.abs(p.z - r - box.maxZ);
+                            const min = Math.min(dx1, dx2, dz1, dz2);
+
+                            // 壁登り処理
+                            if (isSquid && isInInk) {
+                                // 衝突面を正確に特定
+                                const dists = [dx1, dx2, dz1, dz2];
+                                const minIdx = dists.indexOf(min);
+                                
+                                // 法線方向の決定
+                                if (minIdx === 0) climbNormal.set(-1, 0, 0);      // minX側
+                                else if (minIdx === 1) climbNormal.set(1, 0, 0);   // maxX側
+                                else if (minIdx === 2) climbNormal.set(0, 0, -1);  // minZ側
+                                else if (minIdx === 3) climbNormal.set(0, 0, 1);   // maxZ側
+
+                                if (lz < 0) { // 前入力で登る
+                                    nextY += currentSpeed * 0.5;
+                                    playerVelocity.y = 0;
+                                    isClimbing = true;
+                                } else if (lz > 0) { // 後ろ入力で降りる
+                                    nextY -= currentSpeed * 0.5;
+                                    playerVelocity.y = 0;
+                                    isClimbing = true;
+                                } else {
+                                    // 入力なし時はゆっくりずり落ちる
+                                    playerVelocity.y = -0.005;
+                                    nextY = playerGroup.position.y + playerVelocity.y;
+                                    isClimbing = true;
+                                }
+
+                                // 登り切った時の押し出し判定（さらにスムーズに）
+                                if (nextY > box.maxY - 0.05) {
+                                    nextY = box.maxY;
+                                    const pushIn = 0.8; 
+                                    p.x -= climbNormal.x * pushIn;
+                                    p.z -= climbNormal.z * pushIn;
+                                    
+                                    // 登りきった時に少し前方に勢いをつける
+                                    playerVelocity.y = 0.05; 
+                                    isGrounded = true;
+                                    isClimbing = false;
+                                }
+                            }
+
+                            // めり込み防止の押し出し
+                            if (nextY < box.maxY) {
+                                const margin = isClimbing ? 0.01 : 0;
+                                if (min === dx1) p.x = box.minX - r + margin;
+                                else if (min === dx2) p.x = box.maxX + r - margin;
+                                else if (min === dz1) p.z = box.minZ - r + margin;
+                                else if (min === dz2) p.z = box.maxZ + r - margin;
+                            }
+                        }
+                    }
+                }
+            });
+
+            // --- 金網との衝突判定 ---
+            grates.forEach(grate => {
+                const p = playerGroup.position;
+                const r = 0.4;
+                const inX = p.x + r >= grate.minX && p.x - r <= grate.maxX;
+                const inZ = p.z + r >= grate.minZ && p.z - r <= grate.maxZ;
+
+                if (!isSquid && inX && inZ) {
+                    // 上に乗る（落下時のみ判定）
+                    if (p.y >= grate.maxY - 0.2 && nextY <= grate.maxY && playerVelocity.y <= 0) {
+                        nextY = grate.maxY;
+                        playerVelocity.y = 0;
+                        isGrounded = true;
+                    }
+                }
+            });
+
+            // 最終的なY座標の適用
+            playerGroup.position.y = nextY;
+
+            // 場外制限
+            const limit = stageWorldSize / 2 - 0.5;
+            playerGroup.position.x = Math.max(-limit, Math.min(limit, playerGroup.position.x));
+            playerGroup.position.z = Math.max(-limit, Math.min(limit, playerGroup.position.z));
+
+            if (gp) {
+                const rx = Math.abs(gp.axes[2]) > DEADZONE ? gp.axes[2] : 0;
+                const ry = Math.abs(gp.axes[3]) > DEADZONE ? gp.axes[3] : 0;
+                playerGroup.rotation.y -= rx * 0.05;
+                pitch -= ry * 0.04;
+                pitch = Math.max(-1.5, Math.min(0.6, pitch));
+            }
+
+
+            const zrPressed = gp ? gp.buttons[7].pressed : false;
+            isShooting = (gp && zrPressed) || (!gp && isShooting);
+
+            if (isShooting && time - lastShootTime > shootInterval) {
+                fireBullet(playerGroup, pitch, 'player');
+                lastShootTime = time;
+            }
+
+            // 弾丸の更新
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                b.userData.life++;
+
+                if (!b.userData.lastTrailPos) {
+                    b.userData.lastTrailPos = b.position.clone();
+                    b.userData.nextTrailDist = 0.05 + Math.random() * 0.10;
+                }
+
+                let gravity = 0.002;
+                if (b.userData.life > 8) {
+                    gravity = 0.012 + Math.pow((b.userData.life - 15) * 0.05, 2);
+                }
+                b.userData.velocity.y -= gravity;
+                if (b.userData.life > 15) {
+                    b.userData.velocity.x *= 0.96;
+                    b.userData.velocity.z *= 0.96;
+                }
+
+                const moveDistance = b.userData.velocity.length();
+                const moveDir = b.userData.velocity.clone().normalize();
+                const raycaster = new THREE.Raycaster(b.position, moveDir);
+
+                const obstacleMeshes = obstacles.map(obs => obs.mesh);
+                const intersects = raycaster.intersectObjects(obstacleMeshes);
+
+                // 壁との衝突判定
+                if (intersects.length > 0 && intersects[0].distance <= moveDistance) {
+                    const hit = intersects[0];
+                    createInkSplash(hit.point, 1.4, null, hit.normal, hit.object, b.userData.type);
+
+                    scene.remove(b);
+                    b.geometry.dispose();
+                    bullets.splice(i, 1);
+                    continue;
+                }
+
+                b.position.add(b.userData.velocity);
+
+                const now = performance.now();
+                if (b.userData.type === 'player' && now - b.userData.lastParticleTime > 20) {
+                    const pSize = 0.05 + Math.random() * 0.1;
+                    const pGeo = new THREE.BoxGeometry(pSize, pSize, pSize * 5);
+                    const pMat = b.userData.type === 'player' ? inkMaterial : enemyInkMaterial;
+                    const pMesh = new THREE.Mesh(pGeo, pMat);
+
+                    pMesh.position.copy(b.position);
+                    pMesh.lookAt(b.position.clone().add(b.userData.velocity));
+
+                    pMesh.userData = {
+                        velocity: new THREE.Vector3((Math.random() - 0.5) * 0.05, (Math.random() - 0.5) * 0.05, (Math.random() - 0.5) * 0.05),
+                        life: 1.0
+                    };
+                    scene.add(pMesh);
+                    decoParticles.push(pMesh);
+                    b.userData.lastParticleTime = now;
+                }
+
+                const distFromLast = b.position.distanceTo(b.userData.lastTrailPos);
+                if (distFromLast > b.userData.nextTrailDist && b.position.y > 0) {
+                    const trailPos = new THREE.Vector3(b.position.x, 0, b.position.z);
+                    createInkSplash(trailPos, 0.7, b.userData.dirVec, null, null, b.userData.type);
+
+                    b.userData.lastTrailPos.copy(b.position);
+                    b.userData.nextTrailDist = 0.5 + Math.random() * 0.8; // 間隔を短くして連続性を出す
+                }
+
+                if (b.position.y <= 0) {
+                    b.position.y = 0;
+                    createInkSplash(b.position, 1.6, b.userData.dirVec, null, null, b.userData.type);
+                    scene.remove(b);
+                    b.geometry.dispose();
+                    bullets.splice(i, 1);
+                }
+            }
+
+            for (let i = decoParticles.length - 1; i >= 0; i--) {
+                const p = decoParticles[i];
+                p.position.add(p.userData.velocity);
+                p.userData.velocity.y -= 0.005;
+                p.userData.life -= 0.05;
+
+                p.scale.setScalar(p.userData.life);
+
+                if (p.userData.life <= 0) {
+                    scene.remove(p);
+                    p.geometry.dispose();
+                    decoParticles.splice(i, 1);
+                }
+            }
+
+            tankLiquid.scale.y = inkAmount / 100;
+            tankLiquid.position.y = (inkAmount / 100 - 1) * 0.375;
+
+            // イカ状態時はカメラを少し下げる演出
+            const targetCameraY = isSquid ? 1.8 : 3.0;
+            const relativeCameraOffset = new THREE.Vector3(0, targetCameraY, 6);
+            relativeCameraOffset.applyAxisAngle(new THREE.Vector3(1, 0, 0), pitch * 0.5);
+            const cameraOffset = relativeCameraOffset.applyMatrix4(playerGroup.matrixWorld);
+
+            camera.position.lerp(cameraOffset, 0.15);
+            camera.lookAt(playerGroup.position.x, playerGroup.position.y + (isSquid ? 0.5 : 1.0), playerGroup.position.z);
+
+            updateReticle();
+
+            // インクが更新された時のみテクスチャをGPUへ転送（毎フレーム転送しない）
+            if (inkDirty) { inkTexture.needsUpdate = true; inkDirty = false; }
+
+            renderer.render(scene, camera);
+        }
+
+        animate(0);
+        window.onresize = () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        };
+    </script>
+</body>
+
+</html>

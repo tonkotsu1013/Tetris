@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Jump Diver - Optimized</title>
+    <style>
+        body { 
+            margin: 0; overflow: hidden; background-color: #050510; 
+            font-family: 'Courier New', Courier, monospace; color: #fff;
+            user-select: none; touch-action: none;
+        }
+        canvas { display: block; width: 100vw; height: 100vh; }
+        #hud {
+            position: absolute; top: 15px; left: 15px; pointer-events: none; z-index: 10;
+            text-shadow: 0 0 5px #0ff, 0 0 10px #0ff; font-weight: bold; font-size: 18px; line-height: 1.6;
+        }
+        .text-neon-pink { color: #f0f; text-shadow: 0 0 5px #f0f, 0 0 10px #f0f; }
+        .text-neon-yellow { color: #ff0; text-shadow: 0 0 5px #ff0, 0 0 10px #ff0; }
+        .screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: rgba(5, 5, 16, 0.9); z-index: 20; backdrop-filter: blur(8px);
+        }
+        .hidden { display: none !important; }
+        h1 { font-size: 36px; color: #0ff; text-shadow: 0 0 10px #0ff, 0 0 20px #0ff; margin-bottom: 20px; text-align: center; }
+        .settings-box {
+            background: rgba(0, 255, 255, 0.05); border: 1px solid #0ff; padding: 20px;
+            border-radius: 8px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; width: 320px;
+        }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; }
+        select { background: #000; color: #0ff; border: 1px solid #0ff; padding: 4px; font-family: inherit; cursor: pointer; }
+        button {
+            background: transparent; color: #f0f; border: 2px solid #f0f; padding: 12px 30px;
+            font-size: 18px; font-weight: bold; font-family: inherit; cursor: pointer;
+            box-shadow: 0 0 10px #f0f inset, 0 0 10px #f0f; border-radius: 4px; transition: 0.2s;
+        }
+        button:hover { background: #f0f; color: #000; }
+        #ranking-board { text-align: center; font-size: 14px; color: #0ff; margin-top: 10px; border-top: 1px solid #0ff; padding-top: 10px; width: 100%; line-height: 1.4; }
+    </style>
+</head>
+<body>
+    <div id="hud" class="hidden">
+        <span id="lbl-score">SCORE:</span> <span id="ui-score">0</span><br>
+        <span id="lbl-level">LEVEL:</span> <span id="ui-level">1</span><br>
+        <span id="lbl-life">LIFE:</span> <span id="ui-life" class="text-neon-pink"></span><br>
+        <span id="ui-status" class="text-neon-yellow"></span>
+    </div>
+
+    <div id="start-screen" class="screen">
+        <h1 id="title-text">NEON JUMP DIVER</h1>
+        <div class="settings-box">
+            <div class="setting-row">
+                <label id="lbl-lang">Language:</label>
+                <select id="lang-select">
+                    <option value="ja">日本語</option>
+                    <option value="en" selected>English</option>
+                </select>
+            </div>
+            <div class="setting-row">
+                <label id="lbl-set-life">Start Life (1-9):</label>
+                <select id="initial-life">
+                    <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option>
+                    <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+                    <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+                </select>
+            </div>
+            <div class="setting-row">
+                <label id="lbl-set-level">Start Level (1-10):</label>
+                <select id="initial-level">
+                    <option value="1" selected>1</option><option value="2">2</option><option value="3">3</option>
+                    <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+                    <option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
+                </select>
+            </div>
+            <div id="ranking-board"></div>
+        </div>
+        <button id="start-btn">SYSTEM START</button>
+    </div>
+
+    <div id="gameover-screen" class="screen hidden">
+        <h1 id="gameover-title" class="text-neon-pink">SYSTEM CRASHED</h1>
+        <p><span id="lbl-final-score">FINAL SCORE:</span> <span id="final-score">0</span></p>
+        <button id="back-title-btn">REBOOT SYSTEM</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx, bgmInterval;
+
+        const TEXTS = {
+            ja: { title: "ネオン・ジャンプ・ダイバー", lang: "言語:", setLife: "初期ライフ (1-9):", setLevel: "初期レベル (1-10):", startBtn: "システム起動", hudScore: "スコア:", hudLevel: "レベル:", hudLife: "ライフ:", statusInv: "★ 無敵状態 ★", rankingTitle: "-- 記録保持者 --", rankingNoData: "記録なし", gameover: "システム大破", finalScore: "最終スコア:", backBtn: "タイトルへ戻る" },
+            en: { title: "NEON JUMP DIVER", lang: "Language:", setLife: "Start Life (1-9):", setLevel: "Start Level (1-10):", startBtn: "SYSTEM START", hudScore: "SCORE:", hudLevel: "LEVEL:", hudLife: "LIFE:", statusInv: "★ HYPER MODE ★", rankingTitle: "-- TOP AGENTS --", rankingNoData: "NO DATA", gameover: "SYSTEM CRASHED", finalScore: "FINAL SCORE:", backBtn: "BACK TO TITLE" }
+        };
+
+        let currentLang = 'en', state = 'START', score = 0, level = 1, life = 3, frame = 0, baseSpeed = 4, pipeGap = 200;
+        const player = { x: 80, y: 0, radius: 12, dy: 0, gravity: 0.25, jumpPower: -5.5, invulnTimer: 0, starTimer: 0 };
+        let pipes = [], items = [], stars = [], particles = [];
+        let lastPipeTop = null;
+
+        function initAudio() { if (!audioCtx) audioCtx = new AudioContext(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+            if (type === 'jump') { osc.frequency.setValueAtTime(350, now); osc.frequency.exponentialRampToValueAtTime(700, now + 0.1); gain.gain.setValueAtTime(0.1, now); osc.start(); osc.stop(now + 0.1); }
+            if (type === 'damage') { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(100, now); gain.gain.setValueAtTime(0.15, now); osc.start(); osc.stop(now + 0.2); }
+            if (type === 'item') { osc.frequency.setValueAtTime(500, now); osc.frequency.setValueAtTime(1000, now + 0.1); gain.gain.setValueAtTime(0.1, now); osc.start(); osc.stop(now + 0.2); }
+        }
+
+        function startBGM() {
+            if (bgmInterval) clearInterval(bgmInterval);
+            const notes = [110, 110, 146, 110, 164, 110, 130, 146];
+            let i = 0;
+            bgmInterval = setInterval(() => {
+                if (state !== 'PLAYING') return;
+                const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+                osc.type = 'sawtooth'; osc.frequency.value = notes[i];
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+                i = (i + 1) % notes.length;
+            }, 200);
+        }
+
+        function saveRanking(s) {
+            let ranks = JSON.parse(localStorage.getItem("neon_ranks_v2") || "[]");
+            ranks.push(s); ranks.sort((a,b) => b-a);
+            localStorage.setItem("neon_ranks_v2", JSON.stringify(ranks.slice(0, 5)));
+            updateRankingUI();
+        }
+
+        function updateRankingUI() {
+            const ranks = JSON.parse(localStorage.getItem("neon_ranks_v2") || "[]");
+            const t = TEXTS[currentLang];
+            let h = `<div>${t.rankingTitle}</div>`;
+            if (ranks.length === 0) h += `<div>${t.rankingNoData}</div>`;
+            ranks.forEach((r, i) => h += `<div>#${i+1}: ${r} PTS</div>`);
+            document.getElementById("ranking-board").innerHTML = h;
+        }
+
+        function updateLangUI() {
+            const t = TEXTS[currentLang];
+            document.getElementById("title-text").innerText = t.title;
+            document.getElementById("lbl-lang").innerText = t.lang;
+            document.getElementById("lbl-set-life").innerText = t.setLife;
+            document.getElementById("lbl-set-level").innerText = t.setLevel;
+            document.getElementById("start-btn").innerText = t.startBtn;
+            document.getElementById("lbl-score").innerText = t.hudScore;
+            document.getElementById("lbl-level").innerText = t.hudLevel;
+            document.getElementById("lbl-life").innerText = t.hudLife;
+            document.getElementById("gameover-title").innerText = t.gameover;
+            document.getElementById("lbl-final-score").innerText = t.finalScore;
+            document.getElementById("back-title-btn").innerText = t.backBtn;
+            updateRankingUI();
+        }
+
+        function spawnPipe() {
+            const minH = 80;
+            const gap = pipeGap;
+            const availableHeight = canvas.height - gap - minH * 2;
+            
+            let h;
+            if (lastPipeTop === null) {
+                h = Math.random() * availableHeight + minH;
+            } else {
+                // 前の穴の位置から離れすぎないように制限 (最大150pxの変動)
+                const maxShift = 150;
+                let targetMin = Math.max(minH, lastPipeTop - maxShift);
+                let targetMax = Math.min(minH + availableHeight, lastPipeTop + maxShift);
+                h = Math.random() * (targetMax - targetMin) + targetMin;
+            }
+            
+            lastPipeTop = h;
+            pipes.push({ x: canvas.width, top: h, gap: gap, passed: false, hit: false });
+            
+            // アイテム生成 (隙間の中でランダムな高さ)
+            if (Math.random() > 0.6) {
+                const itemY = h + Math.random() * (gap - 40) + 20;
+                items.push({ x: canvas.width + 25, y: itemY, type: Math.random() > 0.85 ? 'star' : 'score' });
+            }
+        }
+
+        function startGame() {
+            initAudio();
+            life = parseInt(document.getElementById("initial-life").value);
+            level = parseInt(document.getElementById("initial-level").value);
+            score = 0; frame = 0; lastPipeTop = null;
+            baseSpeed = 3.5 + level * 0.5; 
+            pipeGap = Math.max(130, 230 - level * 10);
+            player.y = canvas.height / 2; player.dy = 0; player.invulnTimer = 0; player.starTimer = 0;
+            pipes = []; items = []; particles = [];
+            document.getElementById("start-screen").classList.add("hidden");
+            document.getElementById("gameover-screen").classList.add("hidden");
+            document.getElementById("hud").classList.remove("hidden");
+            state = 'PLAYING'; startBGM();
+        }
+
+        function endGame() {
+            state = 'GAMEOVER_ANIM'; playSound('damage');
+            for(let i=0; i<30; i++) particles.push({ x: player.x, y: player.y, vx: (Math.random()-0.5)*12, vy: (Math.random()-0.5)*12, life: 60 });
+            setTimeout(() => {
+                state = 'GAMEOVER';
+                document.getElementById("final-score").innerText = score;
+                document.getElementById("gameover-screen").classList.remove("hidden");
+                saveRanking(score);
+            }, 1200);
+        }
+
+        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+        const triggerJump = () => { if(state==='PLAYING'){ player.dy = player.jumpPower; playSound('jump'); } };
+        window.addEventListener('keydown', (e) => { e.preventDefault(); triggerJump(); });
+        canvas.addEventListener('pointerdown', (e) => { triggerJump(); });
+        document.getElementById("start-btn").addEventListener("click", startGame);
+        document.getElementById("back-title-btn").addEventListener("click", () => {
+            document.getElementById("gameover-screen").classList.add("hidden");
+            document.getElementById("start-screen").classList.remove("hidden");
+            state = 'START';
+            updateRankingUI();
+        });
+        document.getElementById("lang-select").addEventListener("change", (e) => { currentLang = e.target.value; updateLangUI(); });
+
+        for(let i=0; i<80; i++) stars.push({ x: Math.random()*2000, y: Math.random()*2000, s: Math.random()*2 });
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        updateLangUI();
+
+        function loop() {
+            ctx.fillStyle = "rgba(5,5,15,0.5)"; ctx.fillRect(0,0,canvas.width,canvas.height);
+            stars.forEach(s => { s.x -= 0.6; if(s.x < 0) s.x = canvas.width; ctx.fillStyle="#fff"; ctx.fillRect(s.x, s.y, s.s, s.s); });
+            
+            if (state === 'PLAYING') {
+                player.dy += player.gravity; player.y += player.dy;
+                if (player.invulnTimer > 0) player.invulnTimer--;
+                if (player.starTimer > 0) player.starTimer--;
+                if (player.y < 0 || player.y > canvas.height) endGame();
+
+                // 柱の生成頻度
+                if (frame % Math.max(45, 100 - level * 4) === 0) spawnPipe();
+                
+                pipes.forEach((p, i) => {
+                    p.x -= baseSpeed;
+                    ctx.shadowBlur = 15; ctx.shadowColor = p.hit ? "#f00" : "#0ff";
+                    ctx.strokeStyle = p.hit ? "#f00" : "#0ff"; ctx.lineWidth = 4;
+                    ctx.strokeRect(p.x, 0, 50, p.top); ctx.strokeRect(p.x, p.top + p.gap, 50, canvas.height);
+                    
+                    if (player.invulnTimer <= 0 && player.starTimer <= 0) {
+                        if (player.x + 8 > p.x && player.x - 8 < p.x + 50 && (player.y - 8 < p.top || player.y + 8 > p.top + p.gap)) {
+                            life--; p.hit = true; player.invulnTimer = 70; playSound('damage');
+                            if (life <= 0) endGame();
+                        }
+                    }
+                    if (!p.passed && p.x + 50 < player.x) { 
+                        p.passed = true; 
+                        if(!p.hit) { 
+                            score++; 
+                            if(score % 10 === 0) { level++; baseSpeed += 0.4; pipeGap = Math.max(120, pipeGap - 8); } 
+                        } 
+                    }
+                    if (p.x < -60) pipes.splice(i, 1);
+                });
+
+                items.forEach((it, i) => {
+                    it.x -= baseSpeed; ctx.fillStyle = it.type === 'star' ? "#ff0" : "#0f0";
+                    ctx.beginPath(); ctx.arc(it.x, it.y, 10, 0, 7); ctx.fill();
+                    if (Math.hypot(player.x - it.x, player.y - it.y) < 30) {
+                        if (it.type === 'star') player.starTimer = 300; else score += 5;
+                        playSound('item'); items.splice(i, 1);
+                    }
+                });
+
+                document.getElementById("ui-score").innerText = score;
+                document.getElementById("ui-level").innerText = level;
+                document.getElementById("ui-life").innerText = "♥".repeat(Math.max(0, life));
+                document.getElementById("ui-status").innerText = player.starTimer > 0 ? TEXTS[currentLang].statusInv : "";
+                
+                ctx.save(); ctx.translate(player.x, player.y);
+                ctx.rotate(player.dy * 0.06); ctx.shadowBlur = 20;
+                ctx.shadowColor = player.starTimer > 0 ? `hsl(${frame*10},100%,50%)` : "#f0f";
+                if (!(player.invulnTimer > 0 && frame % 10 < 5)) {
+                    ctx.fillStyle = "#fff"; ctx.beginPath();
+                    ctx.moveTo(18,0); ctx.lineTo(-12,12); ctx.lineTo(-6,0); ctx.lineTo(-12,-12); ctx.fill();
+                }
+                ctx.restore();
+                frame++;
+            }
+
+            particles.forEach((p, i) => {
+                p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--;
+                ctx.fillStyle = `rgba(0,255,255,${p.life/60})`; ctx.fillRect(p.x, p.y, 4, 4);
+                if(p.life <= 0) particles.splice(i, 1);
+            });
+            ctx.shadowBlur = 0;
+            requestAnimationFrame(loop);
+        }
+        loop();
+    </script>
+</body>
+</html>
