@@ -120,7 +120,9 @@ const dir = new THREE.DirectionalLight(0xffffff, 1.2);
 dir.position.set(2, 4, 3);
 dir.castShadow = true;
 scene.add(dir);
-scene.add(Object.assign(new THREE.DirectionalLight(0x8899ff, 0.4), { position: new THREE.Vector3(-2,1,-1) }));
+const fill = new THREE.DirectionalLight(0x8899ff, 0.4);
+fill.position.set(-2, 1, -1);
+scene.add(fill);
 
 // 床
 const floor = new THREE.Mesh(
