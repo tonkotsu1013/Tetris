@@ -37,8 +37,7 @@
 <div id="info">
   <b>🎮 操作方法</b><br>
   ← → ↑ ↓ : カメラ回転<br>W / S : ズーム<br>
-  マウスドラッグ : 視点回転<br>スクロール : ズーム<br>
-  Space : 停止 / 再生<br>R : カメラリセット
+  マウスドラッグ : 視点<br>Space : 停止/再生<br>R : リセット
 </div>
 <div id="expressions"><h3>😊 表情一覧</h3><div id="expr-list">読み込み中...</div></div>
 <div id="anim-state">読み込み中...</div>
@@ -65,7 +64,7 @@ import { FBXLoader }     from 'three/addons/loaders/FBXLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
 // ===================================================
-// 【ファイル名】ここだけ変える
+// 【ファイル名】
 // ===================================================
 const VRM_FILE = 'ayame_v1.1.vrm';
 const FBX_FILES = {
@@ -86,7 +85,6 @@ document.body.appendChild(renderer.domElement);
 
 const scene  = new THREE.Scene();
 scene.background = new THREE.Color(0x1a1a2e);
-
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.01, 100);
 camera.position.set(0, 1.2, 3.0);
 
@@ -116,7 +114,7 @@ floorMesh.receiveShadow = true;
 scene.add(floorMesh);
 scene.add(new THREE.GridHelper(10, 20, 0x334488, 0x223366));
 
-let vrm = null, mixer = null, animations = {}, currentAction = null;
+let vrm = null;
 const clock   = new THREE.Clock();
 const stateEl = document.getElementById('anim-state');
 
@@ -129,28 +127,21 @@ gltfLoader.register(parser => new VRMLoaderPlugin(parser));
 gltfLoader.load(VRM_FILE, gltf => {
   vrm = gltf.userData.vrm;
   VRMUtils.removeUnnecessaryJoints(vrm.scene);
-  // VRM0: rotateVRM0の代わりにscene自体をY180回転
-  // (rotateVRM0はボーンを直接回すのでFBXアニメと干渉する)
-  if (vrm.meta?.metaVersion === '0') {
-    vrm.scene.rotation.y = Math.PI;
-  }
+  // VRM0: シーンをY180回転（ボーンは触らない）
+  if (vrm.meta?.metaVersion === '0') vrm.scene.rotation.y = Math.PI;
   scene.add(vrm.scene);
 
-  // 接地
   const box = new THREE.Box3().setFromObject(vrm.scene);
   vrm.scene.position.y = -box.min.y;
   controls.target.set(0, (box.max.y - box.min.y) * 0.5, 0);
   controls.update();
 
-  console.log('[VRM] OK. meta:', vrm.meta?.metaVersion);
   buildExpressionUI(vrm);
   loadAllFBX(vrm);
-
-}, xhr => {
-  if (xhr.total) stateEl.textContent = `VRM ${Math.round(xhr.loaded/xhr.total*100)}%`;
-}, err => {
-  console.error('[VRM] error:', err);
-  stateEl.textContent = '❌ VRM 読み込み失敗';
+  stateEl.textContent = 'FBX読み込み中...';
+}, null, err => {
+  console.error('[VRM]', err);
+  stateEl.textContent = '❌ VRM失敗';
 });
 
 // ===================================================
@@ -256,144 +247,112 @@ const MIXAMO_TO_VRM = {
 };
 
 // ===================================================
-// FBX 読み込み
+// FBX 読み込み + 毎フレーム手動ポーズ適用方式
+//
+// AnimationMixerではなく、
+// 毎フレーム FBXのボーン回転を直接VRMボーンに書き込む。
+// これが最も確実な方法。
 // ===================================================
+
+// FBXのボーンを毎フレーム参照するためのマップ
+// { vrmBoneKey: FBXボーンObject3D }
+let fbxBoneMap = {};
+let fbxMixer   = null;  // FBX自身のアニメを動かすミキサー
+let fbxRoot    = null;  // FBXのルートオブジェクト
+
+// VRM0の座標系補正用クォータニオン
+const Y180 = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0));
+const Y180inv = Y180.clone().invert();
+
 function loadAllFBX(vrm) {
   const fbxLoader = new FBXLoader();
   const entries   = Object.entries(FBX_FILES);
-  let done = 0;
+  // まず walk だけ読む（複数対応は後で）
+  const [key, file] = entries[0];
 
-  entries.forEach(([key, file]) => {
-    fbxLoader.load(file, fbx => {
-      // duration が一番長いクリップをアニメ本体として使う
-      let bestClip = fbx.animations[0];
-      fbx.animations.forEach(c => { if (c.duration > bestClip.duration) bestClip = c; });
-      console.log(`[FBX] "${bestClip.name}" dur=${bestClip.duration.toFixed(2)}s tracks=${bestClip.tracks.length}`);
+  fbxLoader.load(file, fbx => {
+    fbxRoot = fbx;
+    fbxRoot.visible = false; // FBXは非表示（ポーズデータだけ使う）
+    scene.add(fbxRoot);
 
-      const clip = retarget(bestClip, vrm);
-      if (clip) {
-        animations[key] = clip;
-        console.log(`[FBX] ${key} OK: ${clip.tracks.length} tracks`);
-        console.log('[FBX] 最初の3トラック:', clip.tracks.slice(0,3).map(t=>t.name));
-      } else {
-        console.warn(`[FBX] ${key} 変換失敗`);
-      }
-      finish();
-    }, null, err => { console.error(err); finish(); });
+    // FBXのボーンをマップ化
+    const tempMap = {};
+    fbxRoot.traverse(o => {
+      if (o.isBone) tempMap[o.name] = o;
+    });
 
-    function finish() {
-      if (++done < entries.length) return;
-      // ★ミキサーのターゲットは vrm.scene ではなくルートオブジェクト
-      mixer = new THREE.AnimationMixer(vrm.scene);
+    // VRMキー → FBXボーン のマップを作る
+    fbxBoneMap = {};
+    Object.entries(MIXAMO_TO_VRM).forEach(([fbxName, vrmKey]) => {
+      if (tempMap[fbxName]) fbxBoneMap[vrmKey] = tempMap[fbxName];
+    });
+    console.log('[FBX] ボーンマップ作成:', Object.keys(fbxBoneMap).length, '件');
 
-      // ミキサーがアニメを解決できるかテスト
-      if (animations.walk) {
-        const testAction = mixer.clipAction(animations.walk);
-        console.log('[MIXER] clipAction作成:', testAction ? 'OK' : 'null');
-        testAction.stop();
-      }
+    // FBX自身のアニメをFBXに対して再生
+    fbxMixer = new THREE.AnimationMixer(fbxRoot);
+    let bestClip = fbx.animations[0];
+    fbx.animations.forEach(c => { if (c.duration > bestClip.duration) bestClip = c; });
+    const action = fbxMixer.clipAction(bestClip);
+    action.play();
+    console.log('[FBX] 再生開始:', bestClip.name, bestClip.duration.toFixed(2)+'s');
 
-      stateEl.textContent = '✓ 準備完了  Space=再生/停止';
-      if (animations.walk) playAnim('walk');
-    }
+    stateEl.textContent = '✓ 再生中  Space=停止/再生';
+  }, null, err => {
+    console.error('[FBX]', err);
+    stateEl.textContent = '❌ FBX失敗';
   });
 }
 
 // ===================================================
-// ★ リターゲット — UUID方式
-//
-// AnimationMixerはトラック名でノードを探すとき
-// "objectName.property" か ".uuid.property" を使う。
-// ノード名が重複したり変換後に変わった場合に備えて
-// UUID方式（"." + uuid + ".property"）で確実にバインド
+// 毎フレーム: FBXのボーン姿勢をVRMに転写
 // ===================================================
-function retarget(clip, vrm) {
+function applyFBXPoseToVRM(vrm) {
+  if (!fbxBoneMap || !vrm) return;
+
   const humanBones = vrm.humanoid.humanBones;
-  const newTracks  = [];
+  const _q = new THREE.Quaternion();
+  const isVRM0 = vrm.meta?.metaVersion === '0';
 
-  function getNode(vrmKey) {
-    const b = humanBones[vrmKey];
-    if (!b) return null;
-    return b.node ?? b;
-  }
-
-  clip.tracks.forEach(track => {
-    const dot     = track.name.lastIndexOf('.');
-    const fbxName = track.name.slice(0, dot);
-    const prop    = track.name.slice(dot + 1);
-
-    const vrmKey  = MIXAMO_TO_VRM[fbxName];
-    if (!vrmKey) return;
-
-    const node = getNode(vrmKey);
+  Object.entries(fbxBoneMap).forEach(([vrmKey, fbxBone]) => {
+    const b    = humanBones[vrmKey];
+    const node = b?.node ?? b;
     if (!node) return;
 
-    // ★ UUID方式: ".uuid.quaternion" 形式でバインド
-    //   これはThree.jsのAnimationMixerが確実に解決できる
-    const newName = `${node.uuid}.${prop}`;
+    // FBXボーンの現在のワールドクォータニオンを取得
+    fbxBone.getWorldQuaternion(_q);
 
-    if (prop === 'quaternion') {
-      // ★ VRM0 Y180補正:
-      // vrm.scene.rotation.y = PIにしているので
-      // ルートボーン(Hips)の回転だけY180を打ち消す
-      // 他のボーンは親から継承するので補正不要
-      if (fbxName === 'mixamorigHips') {
-        const corrected = new Float32Array(track.values.length);
-        const q   = new THREE.Quaternion();
-        const inv = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0));
-        for (let i = 0; i < track.values.length; i += 4) {
-          q.set(track.values[i], track.values[i+1], track.values[i+2], track.values[i+3]);
-          q.premultiply(inv);
-          corrected[i]=q.x; corrected[i+1]=q.y; corrected[i+2]=q.z; corrected[i+3]=q.w;
-        }
-        newTracks.push(new THREE.QuaternionKeyframeTrack(newName, track.times, corrected));
-      } else {
-        newTracks.push(new THREE.QuaternionKeyframeTrack(
-          newName, track.times, track.values.slice()
-        ));
-      }
-    } else if (prop === 'position' && fbxName === 'mixamorigHips') {
-      // Hipsの位置: cm→m、XZ固定でその場アニメ
-      const vals = new Float32Array(track.values.length);
-      for (let i = 0; i < track.values.length; i += 3) {
-        vals[i]   = 0;
-        vals[i+1] = track.values[i+1] * 0.01;
-        vals[i+2] = 0;
-      }
-      newTracks.push(new THREE.VectorKeyframeTrack(newName, track.times, vals));
+    // FBXのワールド回転 → ローカル回転に変換
+    // FBXの親のワールドクォータニオンの逆を掛ける
+    if (fbxBone.parent && fbxBone.parent.isBone) {
+      const parentQ = new THREE.Quaternion();
+      fbxBone.parent.getWorldQuaternion(parentQ);
+      _q.premultiply(parentQ.invert());
     }
-  });
 
-  if (!newTracks.length) {
-    console.error('[retarget] 0 tracks');
-    return null;
-  }
-  return new THREE.AnimationClip('anim', clip.duration, newTracks);
+    // VRM0の場合、Hipsだけ座標系補正
+    if (isVRM0 && vrmKey === 'hips') {
+      _q.premultiply(Y180inv);
+    }
+
+    node.quaternion.copy(_q);
+  });
 }
 
 // ===================================================
 // アニメ制御
 // ===================================================
-function playAnim(key) {
-  if (!mixer || !animations[key]) {
-    console.warn('アニメなし:', key);
-    stateEl.textContent = `アニメなし: ${key}`;
-    return;
-  }
-  if (currentAction) currentAction.fadeOut(0.25);
-  const action = mixer.clipAction(animations[key]);
-  action.reset().fadeIn(0.25).play();
-  action.setLoop(THREE.LoopRepeat, Infinity);
-  currentAction = action;
-  stateEl.textContent = `▶ ${key}`;
-  console.log('[PLAY]', key, 'action.isRunning:', action.isRunning());
-}
+let isPlaying = true;
 
 function stopAnim() {
-  if (!currentAction) return;
-  currentAction.fadeOut(0.25);
-  currentAction = null;
+  if (fbxMixer) fbxMixer.timeScale = 0;
+  isPlaying = false;
   stateEl.textContent = '⏹ 停止';
+}
+
+function resumeAnim() {
+  if (fbxMixer) fbxMixer.timeScale = 1;
+  isPlaying = true;
+  stateEl.textContent = '▶ 再生中';
 }
 
 // ===================================================
@@ -404,15 +363,12 @@ window.addEventListener('keydown', e => {
   keys[e.key] = true;
   switch (e.key) {
     case ' ':
-      currentAction ? stopAnim() : playAnim('walk');
+      isPlaying ? stopAnim() : resumeAnim();
       e.preventDefault(); break;
     case 'r': case 'R':
       camera.position.set(0, 1.2, 3.0);
       controls.target.set(0, 0.9, 0);
       controls.update(); break;
-    // 追加アニメ例:
-    // case '1': playAnim('idle'); break;
-    // case '2': playAnim('run');  break;
   }
 });
 window.addEventListener('keyup', e => { delete keys[e.key]; });
@@ -443,8 +399,18 @@ function handleKeyCamera() {
   const dt = clock.getDelta();
   handleKeyCamera();
   controls.update();
-  if (mixer) mixer.update(dt);
-  if (vrm)   vrm.update(dt);
+
+  // FBXミキサーを更新（FBXのボーンが動く）
+  if (fbxMixer) fbxMixer.update(dt);
+
+  // FBXのポーズをVRMに転写
+  if (vrm && fbxBoneMap && Object.keys(fbxBoneMap).length > 0) {
+    applyFBXPoseToVRM(vrm);
+  }
+
+  // VRMの更新（表情・スプリングボーン等）
+  if (vrm) vrm.update(dt);
+
   renderer.render(scene, camera);
 })();
 
