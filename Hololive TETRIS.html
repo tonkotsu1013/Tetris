@@ -8,37 +8,37 @@
 :root{
   --bg:#071028;
   --panel: rgba(255,255,255,0.03);
-  --accent:#7bd389;
-  --accent2:#6aa3ff;
-  --muted: rgba(255,255,255,0.6);
-  --white:#ffffff;
+  --accent:#1a6e2e;
+  --accent2:#1040a0;
+  --muted: #2a5080;
+  --white:#0a2a5a;
   --tile:30px;
   font-family: "Noto Sans JP", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
 }
-html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#02121b 70%);color:var(--white);-webkit-font-smoothing:antialiased;overflow:hidden;}
-.app{height:100%;display:flex;align-items:flex-start;justify-content:center;padding:28px 18px 110px;box-sizing:border-box}
-.container{width:1280px;max-width:100%;overflow: visible;display:flex;gap:18px;align-items:start;justify-content:center; flex-wrap: nowrap;}
-.boardCard{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:12px;border-radius:12px;box-shadow:0 12px 50px rgba(0,0,0,0.7);width:520px;position:relative; flex-shrink: 0;}
-.boardHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.boardField{display:flex;gap:8px;align-items:flex-start}
-.holdCol{width:110px;text-align:center}
-.holdCanvas{width:110px;height:110px;background:#000;border-radius:8px;border:2px solid rgba(255,255,255,0.04);display:block;margin-bottom:8px}
-.boardCanvas{width:300px;height:600px;background:#000;border-radius:8px;border:2px solid rgba(255,255,255,0.06);display:block;box-shadow: inset 0 6px 18px rgba(0,0,0,0.6)}
-.infoSmall{font-size:12px;color:var(--muted)}
+html,body{height:100%;margin:0;background:linear-gradient(180deg,#b8e8f5,#d6f2fa 70%);color:#0a2a5a;-webkit-font-smoothing:antialiased;overflow:hidden;}
+.app{height:100%;display:flex;align-items:flex-start;justify-content:center;padding:6px 6px 92px;box-sizing:border-box;gap:6px;}
+.container{width:auto;max-width:100%;overflow: visible;display:flex;gap:8px;align-items:start;justify-content:center; flex-wrap: nowrap;}
+.boardCard{background:linear-gradient(180deg, rgba(200,230,250,0.35), rgba(180,220,245,0.25));padding:8px;border-radius:10px;box-shadow:0 8px 30px rgba(0,40,100,0.25);width:auto;position:relative; flex-shrink: 0;color:#0a2a5a}
+.boardHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-size:12px;}
+.boardField{display:flex;gap:4px;align-items:flex-start}
+.holdCol{width:70px;text-align:center;font-size:11px;}
+.holdCanvas{width:56px;height:56px;background:#0a1e3a;border-radius:6px;border:2px solid rgba(255,255,255,0.04);display:block;margin-bottom:4px}
+.boardCanvas{width:200px;height:400px;background:#0a1e3a;border-radius:6px;border:2px solid rgba(255,255,255,0.06);display:block;box-shadow: inset 0 4px 12px rgba(0,0,0,0.6)}
+.infoSmall{font-size:12px;color:#2a5080}
 .controls{display:flex;gap:8px;margin-top:8px;justify-content:center; flex-direction:column;}
-.btn{background:var(--panel);border:1px solid rgba(255,255,255,0.06);padding:10px 12px;border-radius:8px;color:var(--white);cursor:pointer;font-weight:700;transition:all 0.2s ease}
-.bigBtn{padding:10px 16px;border-radius:12px;background:linear-gradient(90deg,var(--accent),var(--accent2));color:#000;border:none;cursor:pointer;font-weight:900;transition:all 0.2s ease}
+.btn{background:rgba(10,60,160,0.10);border:1px solid rgba(10,60,160,0.22);padding:10px 12px;border-radius:8px;color:#0a2a5a;cursor:pointer;font-weight:700;transition:all 0.2s ease}
+.bigBtn{padding:10px 16px;border-radius:12px;background:linear-gradient(90deg,rgba(20,120,60,0.25),rgba(20,80,200,0.25));color:#0a2a5a;border:1px solid rgba(10,60,160,0.3);cursor:pointer;font-weight:900;transition:all 0.2s ease}
 .secondary{background:transparent;border:1px solid rgba(255,255,255,0.06)}
-.nextSmall{width:120px;height:360px;background:#000;border-radius:8px;border:2px solid rgba(255,255,255,0.04);display:block;margin-left:5px;box-sizing:border-box;padding:6px}
-.sharedControls{display:flex;flex-direction:column;gap:12px;width:160px;flex-shrink:0;background:rgba(255,255,255,0.02);padding:12px;border-radius:12px;}
+.nextSmall{width:60px;height:180px;background:#0a1e3a;border-radius:6px;border:2px solid rgba(255,255,255,0.04);display:block;margin-left:3px;box-sizing:border-box;padding:3px}
+.sharedControls{display:flex;flex-direction:column;gap:6px;width:110px;flex-shrink:0;background:rgba(180,220,245,0.3);padding:8px;border-radius:10px;color:#0a2a5a}
 .overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:1000;backdrop-filter: blur(6px)}
 .overlay.show{display:flex}
-.overlayCard{background:linear-gradient(180deg,#071426,#061326);color:#fff;padding:20px;border-radius:14px;width:900px;max-width:95%;box-shadow:0 24px 80px rgba(0,0,0,0.6)}
-.titleBig{font-size:34px;font-weight:900;color:var(--accent2);letter-spacing:2px}
+.overlayCard{background:linear-gradient(180deg,#d8eef8,#c8e4f4);color:#0a2a5a;padding:20px;border-radius:14px;width:900px;max-width:95%;box-shadow:0 12px 40px rgba(0,40,100,0.18)}
+.titleBig{font-size:34px;font-weight:900;color:#0a2a5a;letter-spacing:2px}
 .centerNotice{position:absolute; left:50%; transform:translateX(-50%); top:42%; font-weight:900; font-size:28px; pointer-events:none; z-index:1500; text-shadow:0 8px 24px rgba(0,0,0,0.9);}
-.gameOverCard{width:640px;max-width:95%;padding:26px;border-radius:16px; text-align:center}
-.touchBar{position:fixed;left:0;right:0;bottom:8px;height:84px;display:flex;justify-content:center;z-index:1200;pointer-events:auto}
-.touchPanel{width:100%;max-width:980px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;padding:8px;display:flex;gap:8px;align-items:center;justify-content:space-between;box-shadow:0 12px 40px rgba(0,0,0,0.5)}
+.gameOverCard{width:640px;max-width:95%;padding:26px;border-radius:16px; text-align:center;color:#0a2a5a}
+.touchBar{position:fixed;left:0;right:0;bottom:4px;height:76px;display:flex;justify-content:center;z-index:1200;pointer-events:auto}
+.touchPanel{width:100%;max-width:980px;background:linear-gradient(180deg, rgba(180,220,245,0.85), rgba(160,210,240,0.85));border-radius:12px;padding:8px;display:flex;gap:8px;align-items:center;justify-content:space-between;box-shadow:0 8px 24px rgba(0,40,100,0.2)}
 .touchGroup{display:flex;gap:6px;align-items:center}
 .touchBtn{min-width:48px;height:48px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--white);user-select:none;touch-action:none}
 .noticeSmall{font-weight:900;margin:6px 0;text-align:center;text-transform:uppercase;letter-spacing:1px;font-size:24px;}
@@ -46,8 +46,8 @@ html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#0212
 .garbageIcon.big{width:22px;height:22px;background:#9e9e9e;margin:2px;border-radius:3px}
 
 /* PUYO SPECIFIC STYLES */
-.puyoBoardCanvas { width: 300px; height: 600px; background: #000; border-radius: 12px; border: 2px solid rgba(255,255,255,0.06); display: block; box-shadow: inset 0 6px 18px rgba(0,0,0,0.6); }
-.puyoNextCanvas { width: 80px; height: 200px; background: #000; border-radius: 8px; border: 2px solid rgba(255,255,255,0.04); display: block; }
+.puyoBoardCanvas { width: 200px; height: 400px; background: #0a1e3a; border-radius: 8px; border: 2px solid rgba(255,255,255,0.06); display: block; box-shadow: inset 0 4px 12px rgba(0,0,0,0.6); }
+.puyoNextCanvas { width: 50px; height: 125px; background: #0a1e3a; border-radius: 6px; border: 2px solid rgba(255,255,255,0.04); display: block; }
 .puyoChainDisplay { font-size:28px; font-weight:900; color:#ffeb3b; text-shadow:0 0 20px rgba(255,235,59,0.8); min-height:36px; text-align:center; }
 .gameModeTag { font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700; text-transform:uppercase; letter-spacing:1px; }
 .tagTetris { background:rgba(106,163,255,0.2); color:var(--accent2); border:1px solid rgba(106,163,255,0.3); }
@@ -56,9 +56,9 @@ html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#0212
 /* ====== HOLOLIVE TETRIS STYLES ====== */
 .charSelectOverlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:2000; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); }
 .charSelectOverlay.show { display:flex; }
-.charSelectCard { background:linear-gradient(135deg,#0a0a1a,#1a0a2e,#0a1a2e); border:2px solid rgba(255,255,255,0.15); border-radius:20px; padding:28px; max-width:900px; width:95%; box-shadow:0 0 60px rgba(106,163,255,0.3); }
+.charSelectCard { background:linear-gradient(135deg,#d8eef8,#c8e4f4,#d0eaf6); border:2px solid rgba(10,60,160,0.2); border-radius:20px; padding:28px; max-width:900px; width:95%; box-shadow:0 0 40px rgba(10,60,160,0.15);color:#0a2a5a; }
 .charSelectTitle { font-size:32px; font-weight:900; text-align:center; background:linear-gradient(90deg,#ff6eb4,#6aa3ff,#7bd389); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; letter-spacing:3px; margin-bottom:8px; }
-.charSelectSubtitle { text-align:center; color:rgba(255,255,255,0.5); font-size:13px; margin-bottom:24px; }
+.charSelectSubtitle { text-align:center; color:#2a5080; font-size:13px; margin-bottom:24px; }
 .charGrid { display:grid; grid-template-columns:repeat(7,1fr); gap:12px; margin-bottom:20px; }
 .charCard { background:rgba(255,255,255,0.03); border:2px solid rgba(255,255,255,0.08); border-radius:14px; padding:12px 6px; cursor:pointer; transition:all 0.2s ease; text-align:center; position:relative; overflow:hidden; }
 .charCard:hover { transform:translateY(-4px); box-shadow:0 8px 24px rgba(255,255,255,0.1); border-color:rgba(255,255,255,0.3); }
@@ -128,6 +128,19 @@ function updateLangUI() {
 </script>
 
 <div class="app">
+  <!-- 左: hololive.png（左上）＋全キャラ画像 -->
+  <div id="gameSideLeft" style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;align-self:flex-start;padding-top:0;">
+    <img src="hololive.png" alt="hololive" class="sideLogoImg" width="140" height="40" style="max-width:140px;height:auto;display:block;margin-bottom:6px;" onerror="this.style.display='none'">
+    <div style="font-size:9px;color:rgba(0,0,0,0.45);text-align:center;font-weight:700;letter-spacing:1px;margin-bottom:2px;">CHARACTERS</div>
+    <img src="fubuki.png"  alt="フブキ"  title="白上フブキ"  class="sideCharImg" width="44" height="44" style="border-radius:6px;object-fit:contain;background:rgba(0,188,212,0.15);border:1px solid rgba(0,188,212,0.3);"  onerror="this.style.display='none'">
+    <img src="suisei.png"  alt="すいせい" title="星町すいせい" class="sideCharImg" width="44" height="44" style="border-radius:6px;object-fit:contain;background:rgba(59,89,152,0.15);border:1px solid rgba(59,89,152,0.3);"   onerror="this.style.display='none'">
+    <img src="flair.png"   alt="フレア"  title="不知火フレア" class="sideCharImg" width="44" height="44" style="border-radius:6px;object-fit:contain;background:rgba(255,140,0,0.15);border:1px solid rgba(255,140,0,0.3);"   onerror="this.style.display='none'">
+    <img src="matsuri.png" alt="まつり"  title="夏色まつり"   class="sideCharImg" width="44" height="44" style="border-radius:6px;object-fit:contain;background:rgba(240,208,80,0.15);border:1px solid rgba(240,208,80,0.3);"  onerror="this.style.display='none'">
+    <img src="iroha.png"   alt="いろは"  title="風間いろは"   class="sideCharImg" width="44" height="44" style="border-radius:6px;object-fit:contain;background:rgba(46,125,50,0.15);border:1px solid rgba(46,125,50,0.3);"    onerror="this.style.display='none'">
+    <img src="okayu.png"   alt="おかゆ"  title="猫又おかゆ"   class="sideCharImg" width="44" height="44" style="border-radius:6px;object-fit:contain;background:rgba(155,89,182,0.15);border:1px solid rgba(155,89,182,0.3);" onerror="this.style.display='none'">
+    <img src="ayame.png"   alt="あやめ"  title="百鬼あやめ"   class="sideCharImg" width="44" height="44" style="border-radius:6px;object-fit:contain;background:rgba(192,57,43,0.15);border:1px solid rgba(192,57,43,0.3);"   onerror="this.style.display='none'">
+  </div>
+
   <div class="sharedControls" id="sharedControls" style="display:none;">
     <button id="startBtn" class="bigBtn" data-i18n="start">ゲーム開始</button>
     <button id="pauseBtn" class="btn" data-i18n="pause">一時停止</button>
@@ -147,7 +160,7 @@ function updateLangUI() {
         <div class="holdCol">
           <div class="infoSmall" style="font-size:16px;font-weight:bold;color:var(--accent);margin-bottom:4px;" id="timerP1">00:00.00</div>
           <div style="font-weight:800" data-i18n="hold">Hold</div>
-          <canvas id="holdP1" class="holdCanvas" width="110" height="110"></canvas>
+          <canvas id="holdP1" class="holdCanvas" width="56" height="56"></canvas>
           <div class="infoSmall"><span data-i18n="score">Score</span>: <span id="scoreP1">0</span></div>
           <div class="infoSmall"><span data-i18n="level">Level</span>: <span id="levelP1">0</span></div>
           <div class="infoSmall"><span data-i18n="lines">Lines</span>: <span id="linesP1">0</span></div>
@@ -156,9 +169,9 @@ function updateLangUI() {
         </div>
         <div style="position:relative; display:flex; flex-direction:column; align-items:center; gap:12px;">
           <div style="position:relative; display: flex; gap: 1px;">
-            <canvas id="boardP1" class="boardCanvas" width="300" height="600"></canvas>
+            <canvas id="boardP1" class="boardCanvas" width="200" height="400"></canvas>
             <div style="display: flex; flex-direction: column; gap: 12px; align-items: center;">
-              <canvas id="nextSmallP1" class="nextSmall" width="120" height="360"></canvas>
+              <canvas id="nextSmallP1" class="nextSmall" width="60" height="180"></canvas>
             </div>
           </div>
         </div>
@@ -177,7 +190,7 @@ function updateLangUI() {
         <div class="holdCol">
           <div class="infoSmall" style="font-size:16px;font-weight:bold;color:var(--accent);margin-bottom:4px;" id="timerP2">00:00.00</div>
           <div style="font-weight:800" data-i18n="hold">Hold</div>
-          <canvas id="holdP2" class="holdCanvas" width="110" height="110"></canvas>
+          <canvas id="holdP2" class="holdCanvas" width="56" height="56"></canvas>
           <div class="infoSmall"><span data-i18n="score">Score</span>: <span id="scoreP2">0</span></div>
           <div class="infoSmall"><span data-i18n="level">Level</span>: <span id="levelP2">0</span></div>
           <div class="infoSmall"><span data-i18n="lines">Lines</span>: <span id="linesP2">0</span></div>
@@ -185,8 +198,8 @@ function updateLangUI() {
           <div id="garbageIconsP2" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:2px"></div>
         </div>
         <div style="position:relative; display:flex; align-items:flex-start;">
-          <canvas id="boardP2" class="boardCanvas" width="300" height="600"></canvas>
-          <canvas id="nextSmallP2" class="nextSmall" width="120" height="360"></canvas>
+          <canvas id="boardP2" class="boardCanvas" width="200" height="400"></canvas>
+          <canvas id="nextSmallP2" class="nextSmall" width="60" height="180"></canvas>
         </div>
       </div>
       <div id="centerNoticesP2" class="centerNotice"></div>
@@ -204,7 +217,7 @@ function updateLangUI() {
         <div class="holdCol" style="width:90px;">
           <div class="infoSmall" style="font-size:16px;font-weight:bold;color:var(--accent);margin-bottom:4px;" id="timerPuyoP1">00:00.00</div>
           <div style="font-weight:800; font-size:12px;" data-i18n="next">Next</div>
-          <canvas id="puyoNextP1" class="puyoNextCanvas" width="80" height="200"></canvas>
+          <canvas id="puyoNextP1" class="puyoNextCanvas" width="50" height="125"></canvas>
           <div class="infoSmall" style="margin-top:4px;"><span data-i18n="score">Score</span>: <span id="scorePuyoP1">0</span></div>
           <div class="infoSmall"><span data-i18n="chain">Chain</span>: <span id="chainPuyoP1">0</span></div>
           <div class="infoSmall"><span data-i18n="nuisance">Nuisance</span>: <span id="nuisancePuyoP1">0</span></div>
@@ -212,7 +225,7 @@ function updateLangUI() {
         </div>
         <div style="position:relative; display:flex; flex-direction:column; align-items:center; gap:8px;">
           <div style="position:relative;">
-            <canvas id="puyoBoardP1" class="puyoBoardCanvas" width="300" height="600"></canvas>
+            <canvas id="puyoBoardP1" class="puyoBoardCanvas" width="200" height="400"></canvas>
             <div id="puyoCenterNoticesP1" class="centerNotice"></div>
           </div>
         </div>
@@ -231,7 +244,7 @@ function updateLangUI() {
         <div class="holdCol" style="width:90px;">
           <div class="infoSmall" style="font-size:16px;font-weight:bold;color:var(--accent);margin-bottom:4px;" id="timerPuyoP2">00:00.00</div>
           <div style="font-weight:800; font-size:12px;" data-i18n="next">Next</div>
-          <canvas id="puyoNextP2" class="puyoNextCanvas" width="80" height="200"></canvas>
+          <canvas id="puyoNextP2" class="puyoNextCanvas" width="50" height="125"></canvas>
           <div class="infoSmall" style="margin-top:4px;"><span data-i18n="score">Score</span>: <span id="scorePuyoP2">0</span></div>
           <div class="infoSmall"><span data-i18n="chain">Chain</span>: <span id="chainPuyoP2">0</span></div>
           <div class="infoSmall"><span data-i18n="nuisance">Nuisance</span>: <span id="nuisancePuyoP2">0</span></div>
@@ -239,13 +252,26 @@ function updateLangUI() {
         </div>
         <div style="position:relative; display:flex; flex-direction:column; align-items:center; gap:8px;">
           <div style="position:relative;">
-            <canvas id="puyoBoardP2" class="puyoBoardCanvas" width="300" height="600"></canvas>
+            <canvas id="puyoBoardP2" class="puyoBoardCanvas" width="200" height="400"></canvas>
             <div id="puyoCenterNoticesP2" class="centerNotice"></div>
           </div>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- 右: 全ミノ画像 -->
+  <div id="gameSideRight" style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;align-self:flex-start;padding-top:51px;">
+    <div style="font-size:9px;color:rgba(0,0,0,0.45);text-align:center;font-weight:700;letter-spacing:1px;margin-bottom:2px;">MINOS</div>
+    <img src="mino_I.png" alt="I" title="I-ミノ" class="sideMinoImg" width="44" height="44" style="border-radius:6px;object-fit:contain;background:rgba(0,188,212,0.15);border:1px solid rgba(0,188,212,0.3);"  onerror="this.style.display='none'">
+    <img src="mino_J.png" alt="J" title="J-ミノ" class="sideMinoImg" width="44" height="44" style="border-radius:6px;object-fit:contain;background:rgba(59,89,152,0.15);border:1px solid rgba(59,89,152,0.3);"  onerror="this.style.display='none'">
+    <img src="mino_L.png" alt="L" title="L-ミノ" class="sideMinoImg" width="44" height="44" style="border-radius:6px;object-fit:contain;background:rgba(255,140,0,0.15);border:1px solid rgba(255,140,0,0.3);"  onerror="this.style.display='none'">
+    <img src="mino_O.png" alt="O" title="O-ミノ" class="sideMinoImg" width="44" height="44" style="border-radius:6px;object-fit:contain;background:rgba(240,208,80,0.15);border:1px solid rgba(240,208,80,0.3);" onerror="this.style.display='none'">
+    <img src="mino_S.png" alt="S" title="S-ミノ" class="sideMinoImg" width="44" height="44" style="border-radius:6px;object-fit:contain;background:rgba(46,125,50,0.15);border:1px solid rgba(46,125,50,0.3);"   onerror="this.style.display='none'">
+    <img src="mino_T.png" alt="T" title="T-ミノ" class="sideMinoImg" width="44" height="44" style="border-radius:6px;object-fit:contain;background:rgba(155,89,182,0.15);border:1px solid rgba(155,89,182,0.3);" onerror="this.style.display='none'">
+    <img src="mino_Z.png" alt="Z" title="Z-ミノ" class="sideMinoImg" width="44" height="44" style="border-radius:6px;object-fit:contain;background:rgba(192,57,43,0.15);border:1px solid rgba(192,57,43,0.3);"  onerror="this.style.display='none'">
+  </div>
+
 </div>
 
 <div id="titleOverlay" class="overlay show">
@@ -454,6 +480,7 @@ function updateLangUI() {
           <div style="display:flex; gap: 16px; align-items:center;">
             <label><input id="optGhostChk" type="checkbox"/> Show Ghost Piece</label>
             <label><input id="optLightweight" type="checkbox"/> 軽量化モード (Lightweight)</label>
+            <label><input id="optShowTouch" type="checkbox"/> タッチパネルを表示 (Show Touch Panel)</label>
             <label>Skin:
               <select id="optSkinSel" style="color:#000;"><option value="3d">3D</option><option value="flat">Flat</option><option value="retro">Retro</option></select>
             </label>
@@ -725,10 +752,55 @@ document.getElementById('bgmToggleBtn').addEventListener('click', function() {
 /* =========================
    CONFIG + UTIL + FIXED RNG
    ========================= */
-const TILE = 30, COLS = 10, ROWS = 20;
+let TILE = 30;
+const COLS = 10, ROWS = 20;
 const $ = id => document.getElementById(id);
 const now = () => performance.now();
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
+
+/* ---------- 1P/2Pでレイアウトサイズを切り替え ---------- */
+function applyLayout(is2P) {
+  TILE = is2P ? 24 : 28;
+  const bw = COLS * TILE, bh = ROWS * TILE;
+  ["boardP1","boardP2"].forEach(id => {
+    const c = document.getElementById(id); if(!c) return;
+    c.width = bw; c.height = bh;
+    c.style.width = bw + "px"; c.style.height = bh + "px";
+  });
+  ["puyoBoardP1","puyoBoardP2"].forEach(id => {
+    const c = document.getElementById(id); if(!c) return;
+    c.width = bw; c.height = bh;
+    c.style.width = bw + "px"; c.style.height = bh + "px";
+  });
+  const hSize = is2P ? 68 : 78;
+  ["holdP1","holdP2"].forEach(id => {
+    const c = document.getElementById(id); if(!c) return;
+    c.width = hSize; c.height = hSize;
+    c.style.width = hSize + "px"; c.style.height = hSize + "px";
+  });
+  const nw = is2P ? 72 : 84, nh = is2P ? 216 : 252;
+  ["nextSmallP1","nextSmallP2"].forEach(id => {
+    const c = document.getElementById(id); if(!c) return;
+    c.width = nw; c.height = nh;
+    c.style.width = nw + "px"; c.style.height = nh + "px";
+  });
+  document.querySelectorAll(".holdCol").forEach(el => {
+    el.style.width = (hSize + 12) + "px";
+  });
+  const imgSize = is2P ? 52 : 60;
+  const logoW = is2P ? 140 : 196, logoH = is2P ? 40 : 56;
+  document.querySelectorAll(".sideCharImg, .sideMinoImg").forEach(img => {
+    img.width = imgSize; img.height = imgSize;
+    img.style.width = imgSize + "px"; img.style.height = imgSize + "px";
+  });
+  const logoEl = document.querySelector(".sideLogoImg");
+  if(logoEl){ logoEl.width = logoW; logoEl.height = logoH; logoEl.style.maxWidth = logoW+"px"; }
+  const rightCol = document.getElementById("gameSideRight");
+  if(rightCol) rightCol.style.paddingTop = (logoH + 10) + "px";
+  const leftCol = document.getElementById("gameSideLeft");
+  if(leftCol) leftCol.style.gap = (is2P ? 4 : 6) + "px";
+  if(rightCol) rightCol.style.gap = (is2P ? 4 : 6) + "px";
+}
 
 function formatTime(ms) {
     if(!ms) return "00:00.00";
@@ -819,6 +891,7 @@ const defaultBinds2 = {
 let SETTINGS = {
   ghost: localStorage.getItem('tetris_ghost') !== '0', skin: localStorage.getItem('tetris_skin') || '3d',
   lightweight: localStorage.getItem('tetris_lightweight') === '1',
+  showTouch: localStorage.getItem('tetris_showTouch') !== '0',
   binds1: JSON.parse(localStorage.getItem('tetris_binds1') || JSON.stringify(defaultBinds1)),
   binds2: JSON.parse(localStorage.getItem('tetris_binds2') || JSON.stringify(defaultBinds2)),
   padIndex1: parseInt(localStorage.getItem('tetris_pad1')||'0'), padIndex2: parseInt(localStorage.getItem('tetris_pad2')||'1'),
@@ -930,8 +1003,8 @@ function updateGarbageIcons(player, domId){
 }
 
 function drawBoardFor(p, ctx, holdCtx, nextCtx, centerDOM, pgDOM, garbageDomId){
-  if(!p){ if(ctx){ ctx.fillStyle='#000'; ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height); } return; }
-  ctx.fillStyle='#000'; ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+  if(!p){ if(ctx){ ctx.fillStyle='#0a1e3a'; ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height); } return; }
+  ctx.fillStyle='#0a1e3a'; ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
   
   if(!SETTINGS.lightweight) {
       ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1; ctx.beginPath();
@@ -2149,6 +2222,9 @@ function startGame(modeSelected){
   else if(mode === 'vs_ai'){ p2 = new Player('P2'); p2.rng = new Xorshift(gameSeed + 12345); p2.isAI = true; p2.aiLevel = SETTINGS.aiLevel; $('cardP2').style.display = 'block'; }
   else { $('cardP2').style.display = 'none'; }
 
+  const _is2P_tetris = !!(p2);
+  applyLayout(_is2P_tetris);
+
   $('cardPuyoP1').style.display = 'none';
   $('cardPuyoP2').style.display = 'none';
   $('cardP1').style.display = '';
@@ -2333,9 +2409,17 @@ function buildKeyConfigUI(){
   }
 }
 
+/* タッチパネルの表示/非表示を適用 */
+function applyTouchVisibility() {
+  const tb = document.getElementById('touchBar');
+  if(tb) tb.style.display = SETTINGS.showTouch ? 'flex' : 'none';
+}
+
 function applyOptionsToUI(){
   if($('optGhostChk')) $('optGhostChk').checked = SETTINGS.ghost; if($('optSkinSel')) $('optSkinSel').value = SETTINGS.skin;
   if($('optLightweight')) $('optLightweight').checked = SETTINGS.lightweight;
+  if($('optShowTouch')) $('optShowTouch').checked = SETTINGS.showTouch;
+  applyTouchVisibility();
   if($('optDAS')) $('optDAS').value = SETTINGS.das; if($('optARR')) $('optARR').value = SETTINGS.arr;
   if($('optSoftDAS')) $('optSoftDAS').value = SETTINGS.softDas; if($('optSoftARR')) $('optSoftARR').value = SETTINGS.softArr;
   if($('optRotDAS')) $('optRotDAS').value = SETTINGS.rotDas; if($('optRotARR')) $('optRotARR').value = SETTINGS.rotArr;
@@ -2349,6 +2433,7 @@ buildKeyConfigUI(); applyOptionsToUI(); refreshRankUI(); refreshReplayUI();
 $('optGhostChk').addEventListener('change', ()=>{ SETTINGS.ghost = $('optGhostChk').checked; localStorage.setItem('tetris_ghost', SETTINGS.ghost ? '1' : '0'); });
 $('optLightweight').addEventListener('change', ()=>{ SETTINGS.lightweight = $('optLightweight').checked; localStorage.setItem('tetris_lightweight', SETTINGS.lightweight ? '1' : '0'); });
 $('optSkinSel').addEventListener('change', ()=>{ SETTINGS.skin = $('optSkinSel').value; localStorage.setItem('tetris_skin', SETTINGS.skin); });
+$('optShowTouch').addEventListener('change', ()=>{ SETTINGS.showTouch = $('optShowTouch').checked; localStorage.setItem('tetris_showTouch', SETTINGS.showTouch ? '1' : '0'); applyTouchVisibility(); });
 $('optDAS').addEventListener('change', ()=>{ SETTINGS.das = parseInt($('optDAS').value||150); localStorage.setItem('tetris_das', SETTINGS.das); });
 $('optARR').addEventListener('change', ()=>{ SETTINGS.arr = parseInt($('optARR').value||30); localStorage.setItem('tetris_arr', SETTINGS.arr); });
 $('optSoftDAS').addEventListener('change', ()=>{ SETTINGS.softDas = parseInt($('optSoftDAS').value||50); localStorage.setItem('tetris_softDas', SETTINGS.softDas); });
@@ -2842,7 +2927,8 @@ async function puyoChainLoop(pp) {
         
         if (puyoMode === 'puyo_marathon') {
             const level = Math.floor(pp.score / 2000);
-            pp.dropInterval = Math.max(150, 800 - level * 20);
+            // 緩やかな速度上昇: 最初はゆっくり、高レベルでも急激に速くならない
+            pp.dropInterval = Math.max(220, 800 - level * 8 - Math.floor(level * level * 0.4));
         } else if (puyoMode === 'puyo_free_marathon') {
             pp.dropInterval = 800;
         }
@@ -3208,8 +3294,8 @@ function puyoDrawBoard(pp, ctx, nextCtx) {
 }
 
 function puyoDrawAll() {
-  if(puyoP1) puyoDrawBoard(puyoP1, puyoCtxP1, puyoNctxP1);
-  if(puyoP2) puyoDrawBoard(puyoP2, puyoCtxP2, puyoNctxP2);
+  if(typeof puyoP1 !== 'undefined' && puyoP1) puyoDrawBoard(puyoP1, puyoCtxP1, puyoNctxP1);
+  if(typeof puyoP2 !== 'undefined' && puyoP2) puyoDrawBoard(puyoP2, puyoCtxP2, puyoNctxP2);
 }
 
 function puyoAiTick(pp) {
@@ -3332,6 +3418,8 @@ function puyoStopRepeat(pp, act) {
 function startPuyoGame(modeStr) {
   stopPuyoGame();
   puyoMode = modeStr; puyotetMode = modeStr.startsWith('puyotet_'); puyoRunning = true; puyoPaused = false; puyoLastTime = 0;
+  const _is2P_puyo = (modeStr !== 'puyo_marathon' && modeStr !== 'puyo_free_marathon');
+  applyLayout(_is2P_puyo);
   $('cardP1').style.display = 'none'; $('cardP2').style.display = 'none';
   const seed = gameSeed;
 
@@ -4395,6 +4483,32 @@ function drawImageCover(ctx, img, dx, dy, dw, dh) {
   ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
 }
 
+/* セル1つに立体感オーバーレイを描く（flatスキン時はスキップ） */
+function draw3DCell(ctx, x, y, size) {
+  if(SETTINGS.skin === 'flat') return; // flatスキン時はオーバーレイなし
+  const b = Math.max(1, size * 0.12); // 面取り幅
+  // 上・左: 明るいハイライト
+  ctx.fillStyle = 'rgba(255,255,255,0.30)';
+  ctx.beginPath();
+  ctx.moveTo(x, y); ctx.lineTo(x + size, y);
+  ctx.lineTo(x + size - b, y + b); ctx.lineTo(x + b, y + b);
+  ctx.lineTo(x + b, y + size - b); ctx.lineTo(x, y + size);
+  ctx.closePath(); ctx.fill();
+  // 下・右: 暗いシャドウ
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.beginPath();
+  ctx.moveTo(x + size, y); ctx.lineTo(x + size, y + size);
+  ctx.lineTo(x, y + size);
+  ctx.lineTo(x + b, y + size - b); ctx.lineTo(x + size - b, y + size - b);
+  ctx.lineTo(x + size - b, y + b);
+  ctx.closePath(); ctx.fill();
+  // 内側: 中心に薄いハイライトグラデーション
+  const ig = ctx.createRadialGradient(x + size*0.38, y + size*0.35, 0, x + size*0.5, y + size*0.5, size*0.65);
+  ig.addColorStop(0, 'rgba(255,255,255,0.18)');
+  ig.addColorStop(1, 'rgba(0,0,0,0.0)');
+  ctx.fillStyle = ig; ctx.fillRect(x + b, y + b, size - b*2, size - b*2);
+}
+
 function drawBoardWithConnectedMino(ctx, board, tile) {
   const rows = board.length, cols = board[0].length;
   const visited = Array.from({length: rows}, () => new Array(cols).fill(false));
@@ -4425,7 +4539,6 @@ function drawBoardWithConnectedMino(ctx, board, tile) {
         continue;
       }
       const group = floodFill(r, c, color);
-      // グループのバウンディングボックス
       let minR = rows, maxR = 0, minC = cols, maxC = 0;
       for(const [gr, gc] of group) {
         if(gr < minR) minR = gr; if(gr > maxR) maxR = gr;
@@ -4436,14 +4549,12 @@ function drawBoardWithConnectedMino(ctx, board, tile) {
       ctx.save();
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
-      // グループのセルだけクリップ
       ctx.beginPath();
-      for(const [gr, gc] of group) {
-        ctx.rect(gc*tile, gr*tile, tile, tile);
-      }
+      for(const [gr, gc] of group) { ctx.rect(gc*tile, gr*tile, tile, tile); }
       ctx.clip();
-      // 縦横比維持でグループ領域にcoverトリミング
       drawImageCover(ctx, img, gx, gy, gw, gh);
+      // 立体エフェクト（各セル）
+      for(const [gr, gc] of group) { draw3DCell(ctx, gc*tile, gr*tile, tile); }
       ctx.restore();
     }
   }
@@ -4487,6 +4598,10 @@ function drawPieceWithConnectedMino(ctx, piece, tileSize, alpha, ghostRow) {
   ctx.clip();
   // 縦横比維持でcoverトリミング
   drawImageCover(ctx, img, gx, gy, gw, gh);
+  // 立体エフェクト（ゴーストでない場合のみ）
+  if(alpha >= 0.8) {
+    for(const [r,c] of cells) { draw3DCell(ctx, c*tileSize, r*tileSize, tileSize); }
+  }
   if(alpha < 0.8) {
     ctx.globalAlpha = 0.5;
     ctx.fillStyle = 'rgba(0,0,0,1)';
@@ -4653,6 +4768,8 @@ const _origTitleBigSet = null;
 })();
 
 console.log('[ホロライブTETRIS] システム初期化完了');
+// 起動時にタッチパネル表示状態を適用
+applyTouchVisibility();
 </script>
 </body>
 </html>
