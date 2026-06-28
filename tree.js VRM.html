@@ -1,11 +1,14 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
     <meta charset="utf-8">
-    <title>VRM Viewer</title>
-    <style>body { margin: 0; overflow: hidden; }</style>
+    <title>VRM Animation Viewer</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #333; }
+    </style>
 </head>
 <body>
+
     <script type="importmap">
     {
       "imports": {
@@ -15,57 +18,80 @@
       }
     }
     </script>
+
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { VRM, VRMUtils } from '@pixiv/three-vrm';
+        import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
-        // --- シーン構築 ---
+        // 1. シーンの基本設定
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 20);
-        camera.position.set(0, 1.5, 3);
+        camera.position.set(0, 1.2, 3);
+
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
         const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 1.2, 0); // モデルの腰あたりに視点を固定
+
         const light = new THREE.DirectionalLight(0xffffff, 3);
         light.position.set(1, 1, 1);
         scene.add(light);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-        // --- VRMとアニメーションの読み込み ---
-        let currentVrm = null;
+        // 2. ローダーの設定
         const loader = new GLTFLoader();
+        loader.register((parser) => new VRMLoaderPlugin(parser));
 
-        // 1. VRMモデルの読み込み
+        let currentVrm = null;
+        const clock = new THREE.Clock();
+
+        // 3. VRMの読み込み
         loader.load('ayame_v1.1.vrm', (gltf) => {
-            VRMUtils.removeUnnecessaryJoints(gltf.scene);
-            VRM.from(gltf).then((vrm) => {
-                currentVrm = vrm;
-                scene.add(vrm.scene);
-                
-                // 表情の確認用（デバッグログ）
-                console.log("表情プリセット:", vrm.expressionManager.expressionNames);
-                // 例: vrm.expressionManager.setValue('happy', 1.0); // 表情変更方法
+            const vrm = gltf.userData.vrm;
+            currentVrm = vrm;
+            scene.add(vrm.scene);
 
-                // 2. アニメーションの読み込み
-                loader.load('Walking.fbx', (fbx) => {
-                    const mixer = new THREE.AnimationMixer(vrm.scene);
-                    const action = mixer.clipAction(fbx.animations[0]);
-                    action.play();
+            // 表情確認用のログ
+            console.log("利用可能な表情:", vrm.expressionManager.expressionNames);
+            
+            // 表情をセットする例 (必要に応じてコメントアウトを外す)
+            // vrm.expressionManager.setValue('happy', 1.0);
+
+            // 4. アニメーションの読み込み
+            loader.load('walking.fbx', (fbx) => {
+                const mixer = new THREE.AnimationMixer(vrm.scene);
+                const action = mixer.clipAction(fbx.animations[0]);
+                action.play();
+
+                // 5. アニメーションループ
+                function animate() {
+                    requestAnimationFrame(animate);
+                    const delta = clock.getDelta();
                     
-                    // レンダリングループ内でmixer.updateを呼ぶ
-                    const clock = new THREE.Clock();
-                    function animate() {
-                        requestAnimationFrame(animate);
-                        mixer.update(clock.getDelta());
-                        controls.update();
-                        renderer.render(scene, camera);
-                    }
-                    animate();
-                });
+                    // VRMの更新
+                    vrm.update(delta);
+                    // アニメーションの更新
+                    mixer.update(delta);
+                    
+                    controls.update();
+                    renderer.render(scene, camera);
+                }
+                animate();
             });
+        }, 
+        (progress) => console.log('Loading...', (progress.loaded / progress.total * 100) + '%'),
+        (error) => console.error('Error:', error)
+        );
+
+        // ウィンドウリサイズ対応
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
         });
     </script>
 </body>
