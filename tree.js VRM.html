@@ -3,244 +3,196 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>3D Overworld</title>
+<title>VRM 3D オーバーワールド</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0;
     overflow: hidden;
-    background: #0a0f1a;
+    background: #0d0d18;
     font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+    color: #e8e8f0;
   }
   #canvas-container { position: fixed; inset: 0; }
 
-  /* ── HUD ── */
   #hud {
-    position: fixed;
-    bottom: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 8px;
-    pointer-events: none;
-    z-index: 10;
-  }
-  .hud-key {
-    background: rgba(255,255,255,0.12);
-    border: 1px solid rgba(255,255,255,0.22);
-    border-radius: 6px;
-    color: #fff;
-    font-size: 11px;
-    padding: 4px 8px;
-    backdrop-filter: blur(6px);
-    white-space: nowrap;
-  }
-  .hud-key span { color: #7ec8ff; font-weight: 700; }
-
-  /* ── Status ── */
-  #status-bar {
-    position: fixed;
-    top: 12px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0,0,0,0.6);
-    border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 20px;
-    color: #fff;
-    font-size: 12px;
-    padding: 5px 16px;
-    pointer-events: none;
+    position: fixed; top: 12px; left: 12px;
+    background: rgba(10,10,25,0.78);
     backdrop-filter: blur(8px);
-    z-index: 10;
-  }
-  #anim-name { color: #7ec8ff; font-weight: 700; }
-
-  /* ── Settings Panel ── */
-  #settings-toggle {
-    position: fixed;
-    top: 12px;
-    right: 12px;
-    width: 36px; height: 36px;
-    border-radius: 50%;
-    background: rgba(0,0,0,0.6);
-    border: 1px solid rgba(255,255,255,0.2);
-    color: #fff;
-    font-size: 18px;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    z-index: 20;
-    backdrop-filter: blur(6px);
-  }
-  #settings-panel {
-    position: fixed;
-    top: 56px;
-    right: 12px;
-    background: rgba(10,15,30,0.92);
-    border: 1px solid rgba(255,255,255,0.15);
+    border: 1px solid rgba(120,120,255,0.2);
     border-radius: 12px;
-    color: #fff;
-    padding: 16px 18px;
-    font-size: 13px;
-    z-index: 20;
-    backdrop-filter: blur(10px);
-    display: none;
-    min-width: 240px;
-  }
-  #settings-panel h2 { margin: 0 0 12px; font-size: 14px; color: #7ec8ff; }
-  .setting-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin: 8px 0;
-    gap: 12px;
-  }
-  .setting-label { flex: 1; font-size: 12px; color: #ccc; }
-  .toggle-switch {
-    position: relative;
-    width: 40px; height: 22px;
-    flex-shrink: 0;
-  }
-  .toggle-switch input { opacity: 0; width: 0; height: 0; }
-  .toggle-slider {
-    position: absolute; inset: 0;
-    background: #333;
-    border-radius: 11px;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
-  .toggle-slider::before {
-    content: '';
-    position: absolute;
-    width: 16px; height: 16px;
-    left: 3px; top: 3px;
-    background: #fff;
-    border-radius: 50%;
-    transition: transform 0.2s;
-  }
-  .toggle-switch input:checked + .toggle-slider { background: #5b6cff; }
-  .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
-
-  .file-row {
-    margin: 10px 0 4px;
-    font-size: 11px;
-    color: #888;
-    border-top: 1px solid rgba(255,255,255,0.08);
-    padding-top: 10px;
-  }
-  .file-input-label {
-    display: block;
-    margin: 4px 0;
-    padding: 5px 8px;
-    background: rgba(255,255,255,0.07);
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 11px;
-    color: #bbb;
-    text-align: center;
-  }
-  .file-input-label:hover { background: rgba(255,255,255,0.14); }
-  .file-input-label input { display: none; }
-
-  /* ── Loading ── */
-  #loading {
-    position: fixed;
-    inset: 0;
-    background: #0a0f1a;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    padding: 12px 16px;
+    font-size: 12px;
+    line-height: 1.8;
+    max-width: 270px;
+    pointer-events: none;
     z-index: 100;
-    color: #fff;
-    gap: 16px;
   }
-  #loading-text { font-size: 14px; color: #7ec8ff; }
-  .loading-bar-outer {
-    width: 240px; height: 4px;
-    background: rgba(255,255,255,0.12);
-    border-radius: 2px;
-    overflow: hidden;
+  #hud h1 { margin: 0 0 6px; font-size: 14px; color: #a0a0ff; letter-spacing:.05em; }
+  #state-badge {
+    display: inline-block;
+    background: #1e1e4a; border: 1px solid #5555cc;
+    border-radius: 6px; padding: 2px 8px;
+    font-size: 11px; color: #8be9fd; margin-bottom: 4px;
   }
-  .loading-bar-inner {
-    height: 100%;
-    background: #5b6cff;
-    border-radius: 2px;
-    width: 0%;
-    transition: width 0.3s;
+  #anim-name { color: #ff79c6; font-size: 11px; }
+
+  #vrm-selector {
+    position: fixed; top: 12px; right: 12px;
+    background: rgba(10,10,25,0.82);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(120,120,255,0.2);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 12px; max-width: 240px;
+    max-height: 70vh; overflow-y: auto;
+    z-index: 100;
   }
-  #loading-logo { font-size: 28px; font-weight: 700; letter-spacing: 2px; color: #fff; }
+  #vrm-selector h2 { margin: 0 0 8px; font-size: 13px; color: #a0a0ff; }
+  .vrm-btn {
+    display: block; width: 100%;
+    margin: 3px 0; padding: 7px 10px;
+    border: 1px solid rgba(100,100,200,0.3);
+    border-radius: 7px; background: #1a1a35;
+    color: #e0e0f8; cursor: pointer;
+    font-size: 12px; text-align: left;
+    transition: background .15s, border-color .15s;
+  }
+  .vrm-btn:hover { background: #2a2a55; border-color: #6666cc; }
+  .vrm-btn.active { background: #3333aa; border-color: #8888ff; color: #fff; }
+
+  #settings-btn {
+    position: fixed; bottom: 16px; right: 16px;
+    background: rgba(10,10,25,0.82);
+    border: 1px solid rgba(120,120,255,0.3);
+    border-radius: 50%; width: 44px; height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 20px; z-index: 200;
+    transition: background .15s;
+  }
+  #settings-btn:hover { background: #2a2a55; }
+  #settings-panel {
+    position: fixed; bottom: 70px; right: 16px;
+    background: rgba(10,10,25,0.95);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(120,120,255,0.25);
+    border-radius: 12px; padding: 14px 18px;
+    font-size: 13px; min-width: 240px;
+    z-index: 200; display: none;
+  }
+  #settings-panel h3 { margin: 0 0 12px; color: #a0a0ff; font-size: 13px; }
+  .setting-row {
+    display: flex; align-items: center;
+    justify-content: space-between; margin-bottom: 10px;
+  }
+  .setting-row label { color: #c0c0e0; }
+  .toggle { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-track {
+    position: absolute; inset: 0;
+    background: #333355; border-radius: 11px;
+    cursor: pointer; transition: background .2s;
+  }
+  .toggle input:checked + .toggle-track { background: #5555cc; }
+  .toggle-track::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 16px; height: 16px; background: #fff;
+    border-radius: 50%; transition: transform .2s;
+  }
+  .toggle input:checked + .toggle-track::after { transform: translateX(18px); }
+
+  #keys-help {
+    position: fixed; bottom: 16px; left: 12px;
+    background: rgba(10,10,25,0.72);
+    border: 1px solid rgba(120,120,255,0.15);
+    border-radius: 10px; padding: 10px 14px;
+    font-size: 11px; line-height: 1.9; color: #aaa;
+    pointer-events: none; z-index: 100;
+  }
+  #keys-help b { color: #e0e0ff; }
+
+  #loading {
+    position: fixed; inset: 0; background: #0d0d18;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 999; transition: opacity .5s;
+  }
+  #loading.hidden { opacity: 0; pointer-events: none; }
+  #loading-title { font-size: 22px; color: #a0a0ff; margin-bottom: 12px; }
+  #loading-bar-wrap {
+    width: 260px; height: 6px;
+    background: #1a1a35; border-radius: 3px; overflow: hidden;
+  }
+  #loading-bar {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg,#5555cc,#8888ff);
+    border-radius: 3px; transition: width .2s;
+  }
+  #loading-text { margin-top: 10px; color: #8888bb; font-size: 13px; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #333355; border-radius: 3px; }
 </style>
 </head>
 <body>
 
-<div id="loading">
-  <div id="loading-logo">OVERWORLD</div>
-  <div class="loading-bar-outer"><div class="loading-bar-inner" id="loading-bar"></div></div>
-  <div id="loading-text">VRM ファイルを読み込んでください</div>
-</div>
-
 <div id="canvas-container"></div>
 
-<div id="status-bar">
-  アニメーション: <span id="anim-name">---</span>
-  &nbsp;|&nbsp; 座標: <span id="pos-info">0, 0, 0</span>
-</div>
-
-<button id="settings-toggle">⚙</button>
-
-<div id="settings-panel">
-  <h2>⚙ 設定</h2>
-
-  <div class="setting-row">
-    <span class="setting-label">視点方向を向く（S/A/D）</span>
-    <label class="toggle-switch">
-      <input type="checkbox" id="setting-face-camera" checked>
-      <span class="toggle-slider"></span>
-    </label>
-  </div>
-
-  <div class="setting-row">
-    <span class="setting-label">カメラがキャラを追従</span>
-    <label class="toggle-switch">
-      <input type="checkbox" id="setting-cam-follow" checked>
-      <span class="toggle-slider"></span>
-    </label>
-  </div>
-
-  <div class="setting-row">
-    <span class="setting-label">後ろ歩きスピード低下</span>
-    <label class="toggle-switch">
-      <input type="checkbox" id="setting-backward-slow" checked>
-      <span class="toggle-slider"></span>
-    </label>
-  </div>
-
-  <div class="file-row">ファイルを読み込む</div>
-
-  <label class="file-input-label">
-    📁 VRMファイル (.vrm)
-    <input type="file" id="file-vrm" accept=".vrm">
-  </label>
-
-  <div style="font-size:10px;color:#666;margin:6px 0 4px;">アニメーション FBX（複数選択可）</div>
-  <label class="file-input-label">
-    🎬 FBXファイルを追加
-    <input type="file" id="file-fbx" accept=".fbx" multiple>
-  </label>
-  <div id="loaded-anims" style="font-size:10px;color:#888;margin-top:6px;"></div>
+<div id="loading">
+  <div id="loading-title">🎮 VRM Overworld</div>
+  <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+  <div id="loading-text">初期化中...</div>
 </div>
 
 <div id="hud">
-  <div class="hud-key"><span>W</span> 歩く</div>
-  <div class="hud-key"><span>Ctrl+W</span> 走る</div>
-  <div class="hud-key"><span>S</span> 後退</div>
-  <div class="hud-key"><span>A/D</span> 横移動</div>
-  <div class="hud-key"><span>Shift</span> しゃがみ</div>
-  <div class="hud-key"><span>Space</span> ジャンプ</div>
-  <div class="hud-key"><span>ドラッグ</span> 視点</div>
+  <h1>🎮 VRM Overworld</h1>
+  <div id="state-badge">IDLE</div><br>
+  <div id="anim-name">Standard Idle.fbx</div>
+  <div style="margin-top:6px;color:#555;font-size:11px;">
+    🖱 ドラッグ：視点 ／ ホイール：ズーム
+  </div>
 </div>
 
-<!-- importmap -->
+<div id="vrm-selector">
+  <h2>📦 VRMキャラクター</h2>
+  <div id="vrm-list"><div style="color:#666;font-size:11px;">検索中...</div></div>
+</div>
+
+<div id="settings-btn" title="設定">⚙️</div>
+
+<div id="settings-panel">
+  <h3>⚙️ 設定</h3>
+  <div class="setting-row">
+    <label>S/A/D で視点方向に向く</label>
+    <label class="toggle">
+      <input type="checkbox" id="face-direction-toggle" checked>
+      <div class="toggle-track"></div>
+    </label>
+  </div>
+  <div class="setting-row">
+    <label>カメラ追従</label>
+    <label class="toggle">
+      <input type="checkbox" id="camera-follow-toggle" checked>
+      <div class="toggle-track"></div>
+    </label>
+  </div>
+  <div class="setting-row">
+    <label>後退を遅くする</label>
+    <label class="toggle">
+      <input type="checkbox" id="backward-slow-toggle" checked>
+      <div class="toggle-track"></div>
+    </label>
+  </div>
+</div>
+
+<div id="keys-help">
+  <b>W</b> 歩く &nbsp; <b>Ctrl+W</b> 走る<br>
+  <b>S</b> 後退 &nbsp; <b>Ctrl+S</b> 走り後退<br>
+  <b>A/D</b> 横移動 &nbsp; <b>Ctrl+A/D</b> 走り横移動<br>
+  <b>Shift</b> しゃがむ（トグル）<br>
+  <b>Space</b> ジャンプ
+</div>
+
 <script type="importmap">
 {
   "imports": {
@@ -258,18 +210,43 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
-// ================================================================
-//  設定
-// ================================================================
-const settings = {
-  faceCamera: true,       // S/A/D で視点方向を向く
-  camFollow: true,        // カメラがキャラを追従
-  backwardSlow: true,     // 後ろ歩きのスピード低下
+/* ================================================================
+   ★ HTMLファイルと同じフォルダのVRMファイルを列挙してください
+   ================================================================ */
+const VRM_FILES = [
+  { name: 'Ayame v1.1',    path: './ayame_v1.1.vrm' },
+  // 追加例:
+  // { name: 'My Character', path: './mychar.vrm' },
+];
+
+/* ================================================================
+   アニメーションファイル名（Mixamo標準名称）
+   ================================================================ */
+const ANIM_FILES = {
+  idle:          'Standard Idle.fbx',
+  walk:          'Walking.fbx',
+  walkBack:      'Walking Backwards.fbx',
+  turn180:       'Walking Turn 180.fbx',
+  strafeL:       'Left Strafe Walking.fbx',
+  strafeR:       'Right Strafe Walking.fbx',
+  run:           'Running.fbx',
+  runBack:       'Running Backwards.fbx',
+  runTurn180:    'Running Turn 180.fbx',
+  runStrafeL:    'Left Strafe.fbx',
+  runStrafeR:    'Right Strafe.fbx',
+  crouch:        'Male Crouch Pose.fbx',
+  crouchWalk:    'Crouched Walking.fbx',
+  crouchStrafeL: 'Crouched Sneaking Left.fbx',
+  crouchStrafeR: 'Crouched Sneaking Right.fbx',
+  jump:          'Jumping.fbx',
+  fall:          'Falling Idle.fbx',
+  land:          'Falling to Landing.fbx',
+  stairsUp:      'Ascending Stairs.fbx',
 };
 
-// ================================================================
-//  ボーンマップ (Mixamo → VRM)
-// ================================================================
+/* ================================================================
+   Mixamo → VRM ボーンマップ
+   ================================================================ */
 const mixamoVRMRigMap = {
   mixamorigHips:'hips', mixamorigSpine:'spine', mixamorigSpine1:'chest',
   mixamorigSpine2:'upperChest', mixamorigNeck:'neck', mixamorigHead:'head',
@@ -298,777 +275,695 @@ const mixamoVRMRigMap = {
   mixamorigRightFoot:'rightFoot', mixamorigRightToeBase:'rightToes',
 };
 
-// ================================================================
-//  FBX → VRM AnimationClip 変換
-// ================================================================
-async function loadMixamoAnimation(urlOrBuffer, vrm, clipName = 'anim', reverse = false) {
+/* ================================================================
+   FBX → VRM AnimationClip 変換
+   reverse=true で逆再生クリップを生成（しゃがみ後退など）
+   ================================================================ */
+async function loadMixamoAnimation(filename, vrm, { reverse = false } = {}) {
+  const url = `./${filename}`;
   const loader = new FBXLoader();
   let asset;
-  if (typeof urlOrBuffer === 'string') {
-    asset = await loader.loadAsync(urlOrBuffer);
-  } else {
-    asset = await new Promise((res, rej) => loader.parse(urlOrBuffer, '', res, rej));
+  try {
+    asset = await loader.loadAsync(url);
+  } catch(e) {
+    console.warn(`[Anim] 読み込みスキップ: ${filename}`, e.message);
+    return null;
   }
 
-  const clip = THREE.AnimationClip.findByName(asset.animations, 'mixamo.com') || asset.animations[0];
-  if (!clip) throw new Error('FBXにアニメーションがありません');
+  const clip = THREE.AnimationClip.findByName(asset.animations, 'mixamo.com')
+             || asset.animations[0];
+  if (!clip) return null;
 
   const tracks = [];
   const restRotInv = new THREE.Quaternion();
   const parentRestWorldRot = new THREE.Quaternion();
-  const _q = new THREE.Quaternion();
+  const qA = new THREE.Quaternion();
 
-  const mixamoHipsNode = asset.getObjectByName('mixamorigHips');
-  const motionHipsH = mixamoHipsNode ? mixamoHipsNode.position.y : 1;
-  const vrmHipsH = vrm.humanoid.normalizedRestPose.hips?.position?.[1] ?? 1;
+  const hipsNode = asset.getObjectByName('mixamorigHips');
+  if (!hipsNode) return null;
+  const motionHipsH = hipsNode.position.y;
+  const vrmHipsH = vrm.humanoid.normalizedRestPose.hips.position[1];
   const hipsScale = vrmHipsH / motionHipsH;
 
-  clip.tracks.forEach((track) => {
-    const [rigName, propName] = track.name.split('.');
-    const vrmBoneName = mixamoVRMRigMap[rigName];
-    const vrmNodeName = vrm.humanoid?.getNormalizedBoneNode(vrmBoneName)?.name;
-    const rigNode = asset.getObjectByName(rigName);
-    if (!vrmNodeName || !rigNode) return;
+  clip.tracks.forEach(track => {
+    const dotIdx = track.name.indexOf('.');
+    const mixamoName = track.name.substring(0, dotIdx);
+    const propName = track.name.substring(dotIdx + 1);
+    const vrmBone = mixamoVRMRigMap[mixamoName];
+    const vrmNode = vrm.humanoid?.getNormalizedBoneNode(vrmBone)?.name;
+    const mixamoNode = asset.getObjectByName(mixamoName);
+    if (!vrmNode || !mixamoNode) return;
 
-    rigNode.getWorldQuaternion(restRotInv).invert();
-    rigNode.parent.getWorldQuaternion(parentRestWorldRot);
+    mixamoNode.getWorldQuaternion(restRotInv).invert();
+    mixamoNode.parent.getWorldQuaternion(parentRestWorldRot);
+
+    const isHips = mixamoName === 'mixamorigHips';
+    const dur = clip.duration;
 
     if (track instanceof THREE.QuaternionKeyframeTrack) {
-      const values = [...track.values];
-      for (let i = 0; i < values.length; i += 4) {
-        const flat = values.slice(i, i + 4);
-        _q.fromArray(flat).premultiply(parentRestWorldRot).multiply(restRotInv).toArray(flat);
-        values.splice(i, 4, ...flat);
+      const vals = Array.from(track.values);
+      for (let i = 0; i < vals.length; i += 4) {
+        const sl = vals.slice(i, i+4);
+        qA.fromArray(sl).premultiply(parentRestWorldRot).multiply(restRotInv).toArray(sl);
+        vals.splice(i, 4, ...sl);
       }
-      const times = reverse ? [...track.times].map(t => clip.duration - t).reverse() : track.times;
-      const sortedValues = reverse ? reverseValues(values, 4) : values;
-      tracks.push(new THREE.QuaternionKeyframeTrack(`${vrmNodeName}.${propName}`, times, sortedValues));
-    } else if (track instanceof THREE.VectorKeyframeTrack && propName === 'position') {
-      const values = [];
-      for (let i = 0; i < track.values.length; i += 3) {
-        values.push(track.values[i] * hipsScale, track.values[i+1] * hipsScale, track.values[i+2] * hipsScale);
-      }
-      // 位置トラックはルート移動を除去（その場アニメーション）
-      const baseX = values[0], baseZ = values[2];
-      const fixed = [];
-      for (let i = 0; i < values.length; i += 3) {
-        fixed.push(0, values[i+1], 0);
-      }
-      const times = reverse ? [...track.times].map(t => clip.duration - t).reverse() : track.times;
-      const sortedFixed = reverse ? reverseValues(fixed, 3) : fixed;
-      tracks.push(new THREE.VectorKeyframeTrack(`${vrmNodeName}.${propName}`, times, sortedFixed));
+      const [times, values] = reverse
+        ? [Array.from(track.times).map(t => dur - t).reverse(), reverseStride(vals, 4)]
+        : [track.times, vals];
+      tracks.push(new THREE.QuaternionKeyframeTrack(`${vrmNode}.${propName}`, times, values));
+    } else if (track instanceof THREE.VectorKeyframeTrack) {
+      const vals = Array.from(track.values).map((v, idx) => {
+        if (isHips && propName === 'position') {
+          const axis = idx % 3;
+          if (axis === 0 || axis === 2) return 0; // X/Z固定
+          return v * hipsScale;
+        }
+        return v;
+      });
+      const [times, values] = reverse
+        ? [Array.from(track.times).map(t => dur - t).reverse(), reverseStride(vals, 3)]
+        : [track.times, vals];
+      tracks.push(new THREE.VectorKeyframeTrack(`${vrmNode}.${propName}`, times, values));
     }
   });
 
-  return new THREE.AnimationClip(clipName, clip.duration, tracks);
+  return new THREE.AnimationClip(filename.replace('.fbx',''), clip.duration, tracks);
 }
 
-function reverseValues(arr, stride) {
-  const result = [];
-  for (let i = arr.length - stride; i >= 0; i -= stride) {
-    result.push(...arr.slice(i, i + stride));
-  }
-  return result;
+function reverseStride(arr, s) {
+  const r = [];
+  for (let i = arr.length - s; i >= 0; i -= s)
+    for (let j = 0; j < s; j++) r.push(arr[i+j]);
+  return r;
 }
 
-// ================================================================
-//  シーン
-// ================================================================
+/* ================================================================
+   シーン構築
+   ================================================================ */
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0a0f1a);
-scene.fog = new THREE.FogExp2(0x0a0f1a, 0.025);
+scene.background = new THREE.Color(0x0d0d18);
+scene.fog = new THREE.FogExp2(0x0d0d18, 0.025);
 
-const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 200);
-camera.position.set(0, 2.5, 6);
+const camera = new THREE.PerspectiveCamera(35, innerWidth/innerHeight, 0.05, 100);
+camera.position.set(0, 1.8, 4.5);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
-renderer.setPixelRatio(devicePixelRatio);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-// OrbitControls
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 1.2, 0);
+controls.target.set(0, 1.0, 0);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
-controls.minDistance = 1;
-controls.maxDistance = 20;
-controls.maxPolarAngle = Math.PI * 0.85;
-controls.update();
+controls.minDistance = 1.0;
+controls.maxDistance = 25;
+controls.maxPolarAngle = Math.PI * 0.88;
 
-// ── ライト ──
-const hemi = new THREE.HemisphereLight(0x87ceeb, 0x334466, 0.8);
-scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff0e0, 2.2);
-sun.position.set(8, 15, 6);
+// ライト
+scene.add(new THREE.HemisphereLight(0x7777cc, 0x334433, 0.9));
+const sun = new THREE.DirectionalLight(0xfff0e0, 2.0);
+sun.position.set(5, 10, 6);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.near = 0.1;
-sun.shadow.camera.far = 80;
+sun.shadow.camera.far = 60;
 sun.shadow.camera.left = sun.shadow.camera.bottom = -20;
 sun.shadow.camera.right = sun.shadow.camera.top = 20;
 scene.add(sun);
-const fill = new THREE.DirectionalLight(0x8899ff, 0.4);
-fill.position.set(-5, 3, -3);
+const fill = new THREE.DirectionalLight(0x4466aa, 0.5);
+fill.position.set(-4, 3, -5);
 scene.add(fill);
 
-// ── ワールド地形 ──
-function buildWorld() {
-  // 地面
-  const groundGeo = new THREE.PlaneGeometry(100, 100, 40, 40);
-  // 地面を少し起伏させる
-  const pos = groundGeo.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), z = pos.getY(i);
-    if (Math.abs(x) > 3 || Math.abs(z) > 3) {
-      pos.setZ(i, (Math.sin(x * 0.3) + Math.cos(z * 0.3)) * 0.25);
-    }
-  }
-  groundGeo.computeVertexNormals();
-  const groundMat = new THREE.MeshStandardMaterial({ color: 0x2a4a2a, roughness: 0.95, metalness: 0 });
-  const ground = new THREE.Mesh(groundGeo, groundMat);
-  ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = true;
-  scene.add(ground);
+// 地面
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(60, 60, 1, 1),
+  new THREE.MeshStandardMaterial({ color: 0x1a2a1a, roughness: 0.95 })
+);
+ground.rotation.x = -Math.PI/2;
+ground.receiveShadow = true;
+scene.add(ground);
 
-  // 路面（キャラ周囲のタイル）
-  const tileGeo = new THREE.PlaneGeometry(16, 16, 8, 8);
-  const tileMat = new THREE.MeshStandardMaterial({ color: 0x3a3a5a, roughness: 0.9 });
-  const tile = new THREE.Mesh(tileGeo, tileMat);
-  tile.rotation.x = -Math.PI / 2;
-  tile.position.y = 0.001;
-  tile.receiveShadow = true;
-  scene.add(tile);
-  scene.add(new THREE.GridHelper(16, 16, 0x4444aa, 0x222240));
+const grid = new THREE.GridHelper(60, 60, 0x223322, 0x182218);
+grid.position.y = 0.002;
+scene.add(grid);
 
-  // 木
-  const treePositions = [
-    [5,0,5],[8,0,2],[6,0,-7],[-5,0,6],[-8,0,-3],[10,0,-10],
-    [-10,0,10],[12,0,4],[-6,0,-9],[3,0,12]
-  ];
-  treePositions.forEach(([x,y,z]) => {
-    const trunk = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.15, 0.2, 1.4, 8),
-      new THREE.MeshStandardMaterial({ color: 0x5c3d1e })
-    );
-    trunk.position.set(x, 0.7, z);
-    trunk.castShadow = true;
-    scene.add(trunk);
-    const foliage = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(0.9 + Math.random() * 0.4, 1),
-      new THREE.MeshStandardMaterial({ color: 0x1a6b2a + Math.floor(Math.random()*0x101010) })
-    );
-    foliage.position.set(x, 2.2 + Math.random() * 0.3, z);
-    foliage.castShadow = true;
-    scene.add(foliage);
-  });
+// 木
+[
+  [6,3],[−5,7],[9,−4],[−8,−3],[4,−9],[−7,9],[11,2],[−11,−7],
+  [3,13],[−4,−13],[8,10],[−9,5],[14,−5],[−14,4],[2,−16],[−2,16],
+].forEach(([x,z]) => {
+  const h = 0.6 + Math.random()*0.4;
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.07, 0.12, h, 6),
+    new THREE.MeshStandardMaterial({ color: 0x4a3020, roughness: 1 })
+  );
+  trunk.position.set(x, h/2, z);
+  trunk.castShadow = true;
+  scene.add(trunk);
 
-  // 石
-  [[2,0,4],[-3,0,-2],[7,0,-3]].forEach(([x,y,z]) => {
-    const stone = new THREE.Mesh(
-      new THREE.DodecahedronGeometry(0.3 + Math.random()*0.2, 0),
-      new THREE.MeshStandardMaterial({ color: 0x888898, roughness: 0.95 })
-    );
-    stone.position.set(x, 0.15, z);
-    stone.castShadow = true;
-    stone.receiveShadow = true;
-    scene.add(stone);
-  });
+  const leavesSize = 0.55 + Math.random()*0.35;
+  const leaves = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(leavesSize, 0),
+    new THREE.MeshStandardMaterial({
+      color: new THREE.Color().setHSL(0.33 + Math.random()*0.05, 0.6, 0.18 + Math.random()*0.08),
+      roughness: 0.9
+    })
+  );
+  leaves.position.set(x, h + leavesSize*0.7, z);
+  leaves.rotation.set(Math.random(), Math.random(), Math.random());
+  leaves.castShadow = true;
+  scene.add(leaves);
+});
 
-  // 階段オブジェクト（検出用）
-  buildStairs(4, 0, -5);
-}
+// 岩
+[[7,1],[−3,6],[5,−5],[−6,−8],[10,8]].forEach(([x,z]) => {
+  const s = 0.15 + Math.random()*0.2;
+  const rock = new THREE.Mesh(
+    new THREE.DodecahedronGeometry(s, 0),
+    new THREE.MeshStandardMaterial({ color: 0x555565, roughness: 0.9 })
+  );
+  rock.position.set(x, s*0.5, z);
+  rock.rotation.set(Math.random()*2, Math.random()*2, Math.random()*2);
+  rock.castShadow = rock.receiveShadow = true;
+  scene.add(rock);
+});
 
-// 階段（3段）
-const stairBounds = [];
-buildWorld();
+// 階段（X=-3付近）
+buildStairs(−3.5, 0, −2);
 function buildStairs(x, y, z) {
-  const mat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.8 });
-  for (let i = 0; i < 4; i++) {
-    const stepH = 0.2, stepD = 0.5;
-    const geo = new THREE.BoxGeometry(2, stepH, stepD);
-    const step = new THREE.Mesh(geo, mat);
-    step.position.set(x, y + stepH/2 + stepH*i, z + stepD*i);
-    step.castShadow = true;
-    step.receiveShadow = true;
+  const mat = new THREE.MeshStandardMaterial({ color: 0x888899, roughness: 0.8 });
+  for (let i = 0; i < 5; i++) {
+    const step = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.16, 0.45), mat);
+    step.position.set(x, y + i * 0.16, z − i * 0.45);
+    step.castShadow = step.receiveShadow = true;
     scene.add(step);
-    stairBounds.push({ x, z: z + stepD*i, width: 2, depth: stepD, height: stepH*(i+1) });
   }
 }
 
-// ================================================================
-//  アニメーション管理
-// ================================================================
+/* ================================================================
+   アニメーション管理
+   ================================================================ */
+const ONE_SHOT_KEYS = new Set(['jump','land','turn180','runTurn180']);
+
 let currentVrm = null;
 let mixer = null;
-const animClips = {}; // name -> AnimationClip
-const animActions = {}; // name -> AnimationAction
+const clips   = {};  // key → AnimationClip
+const actions = {};  // key → AnimationAction
+let currentKey = null;
 let currentAction = null;
-let currentAnimName = '';
 
-// アニメーション名一覧 (FBXファイル名 → キー名マッピング)
-const ANIM_KEYS = {
-  'Standard Idle': 'idle',
-  'Walking': 'walk',
-  'Walking Backwards': 'walkBack',
-  'Walking Turn 180': 'walkTurn180',
-  'Running': 'run',
-  'Running Backwards': 'runBack',
-  'Running Turn 180': 'runTurn180',
-  'Left Strafe Walking': 'strafeWalkLeft',
-  'Right Strafe Walking': 'strafeWalkRight',
-  'Left Strafe': 'strafeRunLeft',
-  'Right Strafe': 'strafeRunRight',
-  'Male Crouch Pose': 'crouch',
-  'Crouched Walking': 'crouchWalk',
-  'Crouched Sneaking Left': 'crouchLeft',
-  'Crouched Sneaking Right': 'crouchRight',
-  'Jumping': 'jump',
-  'Falling Idle': 'fall',
-  'Falling to Landing': 'land',
-  'Ascending Stairs': 'stairs',
+function playAnim(key, fade = 0.18) {
+  if (!mixer) return;
+  const targetKey = actions[key] ? key : 'idle';
+  if (currentKey === targetKey) return;
+
+  const next = actions[targetKey];
+  if (!next) return;
+
+  next.reset().setEffectiveWeight(1).setEffectiveTimeScale(1).play();
+  if (currentAction && currentAction !== next) {
+    currentAction.crossFadeTo(next, fade, true);
+  }
+  currentAction = next;
+  currentKey = targetKey;
+
+  // HUD
+  document.getElementById('state-badge').textContent = targetKey.toUpperCase();
+  const fname = ANIM_FILES[{
+    idle:'idle', walk:'walk', walkBack:'walkBack', turn180:'turn180',
+    strafeL:'strafeL', strafeR:'strafeR', run:'run', runBack:'runBack',
+    runTurn180:'runTurn180', runStrafeL:'runStrafeL', runStrafeR:'runStrafeR',
+    crouch:'crouch', crouchWalk:'crouchWalk', crouchWalkBack:'crouchWalk',
+    crouchStrafeL:'crouchStrafeL', crouchStrafeR:'crouchStrafeR',
+    jump:'jump', fall:'fall', land:'land',
+  }[targetKey] || 'idle'];
+  document.getElementById('anim-name').textContent = fname || targetKey;
+}
+
+/* ================================================================
+   キャラクター状態
+   ================================================================ */
+const charPos = new THREE.Vector3(0, 0, 0);
+let charYaw = 0;   // キャラクターの向き（ラジアン）
+
+let isCrouching = false;
+let isGrounded  = true;
+let isJumping   = false;
+let isLanding   = false;
+let landTimer   = 0;
+let turn180Active = false;
+let turn180IsRun  = false;
+let turn180Timer  = 0;
+let velY = 0;
+
+const GROUND_Y    = 0;
+const WALK_SPD    = 2.2;
+const RUN_SPD     = 5.0;
+const CROUCH_SPD  = 1.0;
+const BACK_MULT   = 0.65;
+const GRAVITY     = -14;
+const JUMP_V      = 6.0;
+
+/* ================================================================
+   キー入力
+   ================================================================ */
+const keys = {};
+window.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (['Space','KeyW','KeyS','KeyA','KeyD'].includes(e.code)) e.preventDefault();
+
+  // Shift: しゃがみトグル
+  if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && !isJumping && !isLanding) {
+    isCrouching = !isCrouching;
+    e.preventDefault();
+  }
+});
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+const isCtrl  = () => keys['ControlLeft'] || keys['ControlRight'];
+const isW     = () => keys['KeyW'];
+const isS     = () => keys['KeyS'];
+const isA     = () => keys['KeyA'];
+const isD     = () => keys['KeyD'];
+const isSpace = () => keys['Space'];
+
+/* ================================================================
+   設定ゲッター
+   ================================================================ */
+const getFaceDir     = () => document.getElementById('face-direction-toggle').checked;
+const getCamFollow   = () => document.getElementById('camera-follow-toggle').checked;
+const getBackSlow    = () => document.getElementById('backward-slow-toggle').checked;
+
+document.getElementById('settings-btn').onclick = () => {
+  const p = document.getElementById('settings-panel');
+  p.style.display = p.style.display === 'block' ? 'none' : 'block';
 };
 
-// reverse版も管理
-const reverseClips = {}; // key -> reversed AnimationClip
-
-function getAction(key, reverse = false) {
-  const k = reverse ? key + '_rev' : key;
-  if (animActions[k]) return animActions[k];
-  const clip = reverse ? reverseClips[key] : animClips[key];
-  if (!clip || !mixer) return null;
-  const action = mixer.clipAction(clip);
-  animActions[k] = action;
-  return action;
-}
-
-function crossFadeTo(key, duration = 0.15, { reverse = false, loop = true, clampWhenFinished = false } = {}) {
-  if (!mixer) return;
-  const k = reverse ? key + '_rev' : key;
-  if (currentAnimName === k) return;
-
-  const nextAction = getAction(key, reverse);
-  if (!nextAction) return; // FBX未ロード
-
-  nextAction.loop = loop ? THREE.LoopRepeat : THREE.LoopOnce;
-  nextAction.clampWhenFinished = clampWhenFinished;
-
-  if (currentAction && currentAction !== nextAction) {
-    nextAction.reset().play();
-    currentAction.crossFadeTo(nextAction, duration, true);
-  } else {
-    nextAction.reset().play();
-  }
-  currentAction = nextAction;
-  currentAnimName = k;
-
-  document.getElementById('anim-name').textContent = k;
-}
-
-// アニメーション終了イベント
-function onAnimFinished(e) {
-  // ターン180→歩き/走りへ
-  if (currentAnimName === 'walkTurn180' || currentAnimName === 'walkTurn180_rev') {
-    crossFadeTo('walk', 0.1);
-  } else if (currentAnimName === 'runTurn180' || currentAnimName === 'runTurn180_rev') {
-    crossFadeTo('run', 0.1);
-  } else if (currentAnimName === 'land') {
-    // 着地→idle
-    crossFadeTo('idle', 0.2);
-    jumpState = 'ground';
-  } else if (currentAnimName === 'jump') {
-    crossFadeTo('fall', 0.1, { loop: true });
-    jumpState = 'falling';
-  }
-}
-
-// ================================================================
-//  キャラクター状態
-// ================================================================
-let charPos = new THREE.Vector3(0, 0, 0);
-let charYaw = 0; // キャラの向き (radians)
-
-// ジャンプ
-let jumpState = 'ground'; // 'ground' | 'jumping' | 'falling'
-let jumpVelocity = 0;
-const JUMP_POWER = 5.0;
-const GRAVITY = -12.0;
-
-// しゃがみ
-let isCrouching = false;
-
-// ターン処理
-let isTurning180 = false;
-let turnTarget = 0;
-
-// 移動速度
-const WALK_SPEED = 2.0;
-const RUN_SPEED = 4.5;
-const BACKWARD_SLOW = 0.65;
-const STAIR_SPEED = 1.2;
-
-// ================================================================
-//  キー入力
-// ================================================================
-const keys = {};
-let prevKeys = {};
-
-window.addEventListener('keydown', (e) => {
-  const k = e.key.toLowerCase();
-  if (!keys[k]) {
-    keys[k] = true;
-    onKeyDown(e);
-  }
-  if (['w','a','s','d',' '].includes(k) || e.code === 'Space') e.preventDefault();
-});
-window.addEventListener('keyup', (e) => {
-  keys[e.key.toLowerCase()] = false;
-  keys[e.code] = false;
-});
-
-function isKey(...ks) { return ks.some(k => keys[k]); }
-function isCtrl() { return keys['control']; }
-function justPressed(k) { return keys[k] && !prevKeys[k]; }
-
-// Shift toggle for crouch
-window.addEventListener('keydown', (e) => {
-  if (e.key === 'Shift' && !e.repeat) {
-    isCrouching = !isCrouching;
-  }
-  if ((e.code === 'Space' || e.key === ' ') && jumpState === 'ground' && !isCrouching) {
-    startJump();
-  }
-});
-
-function onKeyDown(e) {}
-
-function startJump() {
-  jumpState = 'jumping';
-  jumpVelocity = JUMP_POWER;
-  crossFadeTo('jump', 0.1, { loop: false, clampWhenFinished: false });
-}
-
-// ================================================================
-//  階段検出（簡易）
-// ================================================================
-function getStairHeight(px, pz) {
-  for (const s of stairBounds) {
-    if (Math.abs(px - s.x) < s.width / 2 && Math.abs(pz - s.z) < s.depth / 2) {
-      return s.height;
-    }
-  }
-  return 0;
-}
-
-// ================================================================
-//  メインアニメーションロジック
-// ================================================================
-let prevAnimKey = '';
-let lastMoveDir = 1; // 1=forward, -1=backward (for turn180 detection)
-
-function updateCharacter(delta) {
+/* ================================================================
+   移動・アニメーション更新
+   ================================================================ */
+function updateCharacter(dt) {
   if (!currentVrm) return;
 
+  // カメラYaw（水平方向）
+  const camFwd = new THREE.Vector3();
+  camera.getWorldDirection(camFwd);
+  const camYaw = Math.atan2(camFwd.x, camFwd.z);
+
+  const faceDir  = getFaceDir();
+  const backSlow = getBackSlow();
   const ctrl = isCtrl();
-  const w = isKey('w');
-  const s = isKey('s');
-  const a = isKey('a');
-  const d = isKey('d');
-  const moving = w || s || a || d;
+  const w = isW(), s = isS(), a = isA(), d = isD();
 
-  // ── カメラ前方ベクトル（Y除去、正規化）
-  const camDir = new THREE.Vector3();
-  camera.getWorldDirection(camDir);
-  camDir.y = 0;
-  camDir.normalize();
-  const camRight = new THREE.Vector3().crossVectors(camDir, new THREE.Vector3(0,1,0));
-
-  // ── 移動方向ベクトル
-  let moveVec = new THREE.Vector3();
-  if (w) moveVec.add(camDir);
-  if (s) moveVec.sub(camDir);
-  if (a) moveVec.sub(camRight);
-  if (d) moveVec.add(camRight);
-  moveVec.normalize();
-
-  // ── ジャンプ/落下物理
-  if (jumpState === 'jumping' || jumpState === 'falling') {
-    jumpVelocity += GRAVITY * delta;
-    charPos.y += jumpVelocity * delta;
-    const floorH = getStairHeight(charPos.x, charPos.z);
-    if (charPos.y <= floorH) {
-      charPos.y = floorH;
-      jumpVelocity = 0;
-      jumpState = 'landing';
-      crossFadeTo('land', 0.1, { loop: false, clampWhenFinished: true });
+  // --- 空中 ---
+  if (!isGrounded) {
+    velY += GRAVITY * dt;
+    charPos.y += velY * dt;
+    if (charPos.y <= GROUND_Y) {
+      charPos.y = GROUND_Y;
+      velY = 0;
+      isGrounded = true;
+      isJumping  = false;
+      isLanding  = true;
+      landTimer  = 0.55;
+      playAnim('land', 0.08);
+    } else if (velY < 0 && currentKey !== 'fall') {
+      playAnim('fall', 0.15);
     }
-    // 移動しながらジャンプは水平移動も許可
-    if (moving && moveVec.lengthSq() > 0) {
-      const spd = ctrl ? RUN_SPEED : WALK_SPEED;
-      charPos.addScaledVector(moveVec, spd * delta);
-    }
-    applyCharTransform();
-    return;
-  }
-  if (jumpState === 'landing') {
-    applyCharTransform();
+    applyToVRM();
     return;
   }
 
-  // ── 地面高さ適用
-  const stairH = getStairHeight(charPos.x, charPos.z);
-  charPos.y = stairH;
+  // --- 着地アニメ中 ---
+  if (isLanding) {
+    landTimer -= dt;
+    if (landTimer <= 0) { isLanding = false; playAnim('idle', 0.2); }
+    applyToVRM();
+    return;
+  }
 
-  // ── アニメーション決定
-  let animKey = 'idle';
-  let speed = 0;
-  let turnNeeded = false;
+  // --- Turn180トランジション中 ---
+  if (turn180Active) {
+    turn180Timer -= dt;
+    if (turn180Timer <= 0) {
+      turn180Active = false;
+      charYaw += Math.PI;  // 実際に180度向きを変える
+      playAnim(turn180IsRun ? 'run' : 'walk', 0.1);
+    }
+    applyToVRM();
+    return;
+  }
+
+  // --- ジャンプ開始 ---
+  if (isSpace() && isGrounded && !isJumping) {
+    isGrounded = false;
+    isJumping  = true;
+    isCrouching = false;
+    velY = JUMP_V;
+    playAnim('jump', 0.08);
+    applyToVRM();
+    return;
+  }
+
+  // --- 移動計算 ---
+  let mx = 0, mz = 0;
+  let targetKey = 'idle';
+  let faceYaw = charYaw;
 
   if (isCrouching) {
-    // しゃがみ状態
-    if (!moving) {
-      animKey = 'crouch';
+    // === しゃがみ ===
+    if (!w && !s && !a && !d) {
+      targetKey = 'crouch';
     } else if (w) {
-      animKey = 'crouchWalk';
-      speed = WALK_SPEED * 0.7;
+      targetKey = 'crouchWalk';
+      faceYaw = camYaw;
+      const spd = CROUCH_SPD;
+      mx = -Math.sin(camYaw) * spd;
+      mz = -Math.cos(camYaw) * spd;
     } else if (s) {
-      if (settings.faceCamera) {
-        animKey = 'crouchWalk_rev'; // 逆再生
+      if (faceDir) {
+        // 視点方向ON: crouchWalkを逆再生（後退）
+        targetKey = 'crouchWalkBack';
+        faceYaw = camYaw;
+        const spd = CROUCH_SPD;
+        mx = Math.sin(camYaw) * spd;
+        mz = Math.cos(camYaw) * spd;
       } else {
-        // キャラを後ろ向きにしてcrouchWalk
-        turnCharTo(charPos.clone().add(moveVec), true);
-        animKey = 'crouchWalk';
-        speed = WALK_SPEED * 0.7;
+        // 視点方向OFF: 後ろに向いてからcrouchWalk
+        faceYaw = camYaw + Math.PI;
+        targetKey = 'crouchWalk';
+        const spd = CROUCH_SPD;
+        mx = -Math.sin(faceYaw) * spd;
+        mz = -Math.cos(faceYaw) * spd;
       }
     } else if (a) {
-      if (settings.faceCamera) {
-        animKey = 'crouchLeft';
-        speed = WALK_SPEED * 0.7;
+      if (faceDir) {
+        targetKey = 'crouchStrafeL';
+        faceYaw = camYaw;
+        mx = -Math.cos(camYaw) * CROUCH_SPD;
+        mz =  Math.sin(camYaw) * CROUCH_SPD;
       } else {
-        turnCharTo(charPos.clone().add(moveVec), true);
-        animKey = 'crouchWalk';
-        speed = WALK_SPEED * 0.7;
+        faceYaw = camYaw - Math.PI/2;
+        targetKey = 'crouchWalk';
+        mx = -Math.sin(faceYaw) * CROUCH_SPD;
+        mz = -Math.cos(faceYaw) * CROUCH_SPD;
       }
     } else if (d) {
-      if (settings.faceCamera) {
-        animKey = 'crouchRight';
-        speed = WALK_SPEED * 0.7;
+      if (faceDir) {
+        targetKey = 'crouchStrafeR';
+        faceYaw = camYaw;
+        mx =  Math.cos(camYaw) * CROUCH_SPD;
+        mz = -Math.sin(camYaw) * CROUCH_SPD;
       } else {
-        turnCharTo(charPos.clone().add(moveVec), true);
-        animKey = 'crouchWalk';
-        speed = WALK_SPEED * 0.7;
+        faceYaw = camYaw + Math.PI/2;
+        targetKey = 'crouchWalk';
+        mx = -Math.sin(faceYaw) * CROUCH_SPD;
+        mz = -Math.cos(faceYaw) * CROUCH_SPD;
       }
     }
-  } else if (jumpState === 'ground') {
-    // 通常状態
-    if (!moving) {
-      animKey = 'idle';
-    } else if (w && !s) {
-      if (ctrl) { animKey = 'run'; speed = RUN_SPEED; }
-      else { animKey = 'walk'; speed = WALK_SPEED; }
-
-      // ターン180検出: 直前が後退中で今前進
-      if (lastMoveDir === -1 && (prevAnimKey === 'walkBack' || prevAnimKey === 'runBack')) {
-        if (ctrl) {
-          animKey = 'runTurn180';
-          crossFadeTo('runTurn180', 0.05, { loop: false });
-          lastMoveDir = 1;
-          applyCharTransform();
-          return;
-        } else {
-          animKey = 'walkTurn180';
-          crossFadeTo('walkTurn180', 0.05, { loop: false });
-          lastMoveDir = 1;
-          applyCharTransform();
-          return;
-        }
+  } else if (ctrl) {
+    // === 走り ===
+    if (w && s) {
+      // 走り中に逆キー → RunTurn180
+      if ((currentKey === 'run') && !turn180Active) {
+        turn180Active = true; turn180IsRun = true; turn180Timer = 0.4;
+        playAnim('runTurn180', 0.08);
+        applyToVRM(); return;
       }
-      lastMoveDir = 1;
-
-    } else if (s && !w) {
-      const onStair = stairH > 0;
-      if (onStair) {
-        animKey = 'stairs';
-        speed = STAIR_SPEED;
-      } else if (settings.faceCamera) {
-        if (ctrl) { animKey = 'runBack'; speed = RUN_SPEED * (settings.backwardSlow ? BACKWARD_SLOW : 1); }
-        else { animKey = 'walkBack'; speed = WALK_SPEED * (settings.backwardSlow ? BACKWARD_SLOW : 1); }
+    }
+    if (w) {
+      targetKey = 'run';
+      faceYaw = camYaw;
+      mx = -Math.sin(camYaw) * RUN_SPD;
+      mz = -Math.cos(camYaw) * RUN_SPD;
+    } else if (s) {
+      if (faceDir) {
+        targetKey = 'runBack';
+        faceYaw = camYaw;
+        const spd = RUN_SPD * BACK_MULT;
+        mx = Math.sin(camYaw) * spd;
+        mz = Math.cos(camYaw) * spd;
       } else {
-        // キャラを後ろ向きにしてwalk/run
-        if (moveVec.lengthSq() > 0) {
-          smoothTurnTo(Math.atan2(-moveVec.x, -moveVec.z));
-        }
-        if (ctrl) { animKey = 'run'; speed = RUN_SPEED * (settings.backwardSlow ? BACKWARD_SLOW : 1); }
-        else { animKey = 'walk'; speed = WALK_SPEED * (settings.backwardSlow ? BACKWARD_SLOW : 1); }
+        faceYaw = camYaw + Math.PI;
+        targetKey = 'run';
+        const spd = getBackSlow() ? RUN_SPD * BACK_MULT : RUN_SPD;
+        mx = -Math.sin(faceYaw) * spd;
+        mz = -Math.cos(faceYaw) * spd;
       }
-
-      // ターン180: 直前が前進
-      if (lastMoveDir === 1 && (prevAnimKey === 'walk' || prevAnimKey === 'run')) {
-        if (ctrl) {
-          crossFadeTo('runTurn180', 0.05, { loop: false });
-          lastMoveDir = -1;
-          applyCharTransform();
-          return;
-        } else {
-          crossFadeTo('walkTurn180', 0.05, { loop: false });
-          lastMoveDir = -1;
-          applyCharTransform();
-          return;
-        }
-      }
-      lastMoveDir = -1;
-
-    } else if (a && !d) {
-      if (settings.faceCamera) {
-        animKey = ctrl ? 'strafeRunLeft' : 'strafeWalkLeft';
-        speed = ctrl ? RUN_SPEED * 0.85 : WALK_SPEED * 0.85;
+    } else if (a) {
+      if (faceDir) {
+        targetKey = 'runStrafeL';
+        faceYaw = camYaw;
+        mx = -Math.cos(camYaw) * RUN_SPD;
+        mz =  Math.sin(camYaw) * RUN_SPD;
       } else {
-        if (moveVec.lengthSq() > 0) smoothTurnTo(Math.atan2(-moveVec.x, -moveVec.z));
-        animKey = ctrl ? 'run' : 'walk';
-        speed = ctrl ? RUN_SPEED : WALK_SPEED;
+        faceYaw = camYaw - Math.PI/2;
+        targetKey = 'run';
+        mx = -Math.sin(faceYaw) * RUN_SPD;
+        mz = -Math.cos(faceYaw) * RUN_SPD;
       }
-    } else if (d && !a) {
-      if (settings.faceCamera) {
-        animKey = ctrl ? 'strafeRunRight' : 'strafeWalkRight';
-        speed = ctrl ? RUN_SPEED * 0.85 : WALK_SPEED * 0.85;
+    } else if (d) {
+      if (faceDir) {
+        targetKey = 'runStrafeR';
+        faceYaw = camYaw;
+        mx =  Math.cos(camYaw) * RUN_SPD;
+        mz = -Math.sin(camYaw) * RUN_SPD;
       } else {
-        if (moveVec.lengthSq() > 0) smoothTurnTo(Math.atan2(-moveVec.x, -moveVec.z));
-        animKey = ctrl ? 'run' : 'walk';
-        speed = ctrl ? RUN_SPEED : WALK_SPEED;
+        faceYaw = camYaw + Math.PI/2;
+        targetKey = 'run';
+        mx = -Math.sin(faceYaw) * RUN_SPD;
+        mz = -Math.cos(faceYaw) * RUN_SPD;
       }
+    } else {
+      targetKey = 'idle';
+    }
+  } else {
+    // === 歩き ===
+    if (w && s) {
+      // 歩き中に逆キー → Turn180
+      if ((currentKey === 'walk') && !turn180Active) {
+        turn180Active = true; turn180IsRun = false; turn180Timer = 0.45;
+        playAnim('turn180', 0.08);
+        applyToVRM(); return;
+      }
+    }
+    if (w) {
+      targetKey = 'walk';
+      faceYaw = camYaw;
+      mx = -Math.sin(camYaw) * WALK_SPD;
+      mz = -Math.cos(camYaw) * WALK_SPD;
+    } else if (s) {
+      if (faceDir) {
+        targetKey = 'walkBack';
+        faceYaw = camYaw;
+        const spd = backSlow ? WALK_SPD * BACK_MULT : WALK_SPD;
+        mx = Math.sin(camYaw) * spd;
+        mz = Math.cos(camYaw) * spd;
+      } else {
+        faceYaw = camYaw + Math.PI;
+        targetKey = 'walk';
+        const spd = backSlow ? WALK_SPD * BACK_MULT : WALK_SPD;
+        mx = -Math.sin(faceYaw) * spd;
+        mz = -Math.cos(faceYaw) * spd;
+      }
+    } else if (a) {
+      if (faceDir) {
+        targetKey = 'strafeL';
+        faceYaw = camYaw;
+        mx = -Math.cos(camYaw) * WALK_SPD;
+        mz =  Math.sin(camYaw) * WALK_SPD;
+      } else {
+        faceYaw = camYaw - Math.PI/2;
+        targetKey = 'walk';
+        mx = -Math.sin(faceYaw) * WALK_SPD;
+        mz = -Math.cos(faceYaw) * WALK_SPD;
+      }
+    } else if (d) {
+      if (faceDir) {
+        targetKey = 'strafeR';
+        faceYaw = camYaw;
+        mx =  Math.cos(camYaw) * WALK_SPD;
+        mz = -Math.sin(camYaw) * WALK_SPD;
+      } else {
+        faceYaw = camYaw + Math.PI/2;
+        targetKey = 'walk';
+        mx = -Math.sin(faceYaw) * WALK_SPD;
+        mz = -Math.cos(faceYaw) * WALK_SPD;
+      }
+    } else {
+      targetKey = 'idle';
     }
   }
 
-  // ── 前後以外の移動でもキャラをカメラ正面に向ける（Wキー）
-  if ((w || (animKey.startsWith('run') && !animKey.includes('Back')) || animKey === 'walk') && moveVec.lengthSq() > 0.01) {
-    const targetYaw = Math.atan2(-moveVec.x, -moveVec.z);
-    smoothTurnTo(targetYaw);
-  }
+  // 位置更新
+  charPos.x += mx * dt;
+  charPos.z += mz * dt;
 
-  // ── しゃがみ移動でキャラを進行方向に向ける
-  if (isCrouching && w && moveVec.lengthSq() > 0.01) {
-    const targetYaw = Math.atan2(-moveVec.x, -moveVec.z);
-    smoothTurnTo(targetYaw);
-  }
+  // 向きをスムーズに補間
+  const diff = normAngle(faceYaw - charYaw);
+  charYaw += diff * Math.min(dt * 12, 1);
 
-  // ── 移動量を適用
-  if (speed > 0 && moveVec.lengthSq() > 0.01) {
-    charPos.addScaledVector(moveVec, speed * delta);
-  }
-  // 後退(faceCamera=ON)はキャラが向いてる反対に移動
-  if ((animKey === 'walkBack' || animKey === 'runBack') && settings.faceCamera) {
-    const backDir = new THREE.Vector3(-Math.sin(charYaw), 0, -Math.cos(charYaw));
-    charPos.addScaledVector(backDir, speed * delta);
-  }
+  playAnim(targetKey, 0.15);
+  applyToVRM();
 
-  // ── アニメーション切り替え（逆再生判定）
-  const needsReverse = animKey === 'crouchWalk_rev';
-  const realKey = needsReverse ? 'crouchWalk' : animKey;
-
-  if (animKey !== prevAnimKey) {
-    crossFadeTo(realKey, 0.15, { reverse: needsReverse });
+  // カメラ追従
+  if (getCamFollow()) {
+    controls.target.lerp(charPos.clone().add(new THREE.Vector3(0, 1.2, 0)), 0.1);
   }
-  prevAnimKey = animKey;
-
-  // 階段アニメーション
-  if (stairH > 0 && moving) {
-    crossFadeTo('stairs', 0.2);
-  }
-
-  applyCharTransform();
 }
 
-function smoothTurnTo(targetYaw) {
-  let diff = targetYaw - charYaw;
-  while (diff > Math.PI) diff -= Math.PI * 2;
-  while (diff < -Math.PI) diff += Math.PI * 2;
-  charYaw += diff * 0.18; // 平滑化
+function normAngle(a) {
+  while (a >  Math.PI) a -= Math.PI*2;
+  while (a < -Math.PI) a += Math.PI*2;
+  return a;
 }
 
-function applyCharTransform() {
+function applyToVRM() {
   if (!currentVrm) return;
   currentVrm.scene.position.copy(charPos);
   currentVrm.scene.rotation.y = charYaw;
 }
 
-// ================================================================
-//  カメラ追従
-// ================================================================
-const camOffset = new THREE.Vector3(0, 2.5, 5.5);
-function updateCamera() {
-  if (!settings.camFollow || !currentVrm) return;
-  const target = charPos.clone().add(new THREE.Vector3(0, 1.2, 0));
-  controls.target.lerp(target, 0.07);
+/* ================================================================
+   VRM 読み込み
+   ================================================================ */
+const gltfLoader = new GLTFLoader();
+gltfLoader.register(p => new VRMLoaderPlugin(p));
+
+async function loadVRM(path) {
+  // 既存削除
+  if (currentVrm) {
+    scene.remove(currentVrm.scene);
+    currentVrm = null;
+    mixer = null;
+    Object.keys(actions).forEach(k => delete actions[k]);
+    Object.keys(clips).forEach(k => delete clips[k]);
+    currentKey = null; currentAction = null;
+  }
+
+  setLoad(true, 0, 'VRM読み込み中...');
+
+  let vrm;
+  try {
+    const gltf = await new Promise((res, rej) => {
+      gltfLoader.load(path, res,
+        p => { if (p.total) setLoad(true, (p.loaded/p.total)*45, 'VRM読み込み中...'); },
+        rej);
+    });
+    vrm = gltf.userData.vrm;
+    VRMUtils.removeUnnecessaryVertices(gltf.scene);
+    VRMUtils.removeUnnecessaryJoints(gltf.scene);
+    VRMUtils.rotateVRM0(vrm);
+    vrm.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    vrm.scene.position.copy(charPos);
+    scene.add(vrm.scene);
+    currentVrm = vrm;
+    mixer = new THREE.AnimationMixer(vrm.scene);
+  } catch(e) {
+    console.error('VRM失敗:', e);
+    setLoad(true, 0, `読み込み失敗: ${e.message}`);
+    return;
+  }
+
+  // アニメ読み込み
+  setLoad(true, 48, 'アニメーション読み込み中...');
+  const entries = Object.entries(ANIM_FILES);
+  for (let i = 0; i < entries.length; i++) {
+    const [key, file] = entries[i];
+    setLoad(true, 48 + (i/entries.length)*48, `読込中: ${file}`);
+    const opts = (key === 'crouchWalkBack') ? { reverse: true } : {};
+    const clip = await loadMixamoAnimation(file, vrm, opts);
+    if (clip) {
+      clips[key] = clip;
+      actions[key] = mixer.clipAction(clip);
+      actions[key].setLoop(
+        ONE_SHOT_KEYS.has(key) ? THREE.LoopOnce : THREE.LoopRepeat
+      );
+      actions[key].clampWhenFinished = ONE_SHOT_KEYS.has(key);
+    }
+  }
+
+  setLoad(true, 100, '完了！');
+  setTimeout(() => setLoad(false), 500);
+
+  isCrouching = false;
+  isGrounded = true; isJumping = false; isLanding = false;
+  turn180Active = false;
+  charPos.set(0, 0, 0);
+  charYaw = 0;
+  controls.target.set(0, 1.2, 0);
+
+  currentKey = null; currentAction = null;
+  playAnim('idle', 0.0);
 }
 
-// ================================================================
-//  VRM 読み込み
-// ================================================================
-async function loadVRM(buffer) {
-  document.getElementById('loading').style.display = 'flex';
-  document.getElementById('loading-text').textContent = 'VRM 読み込み中...';
-
-  const blob = new Blob([buffer]);
-  const url = URL.createObjectURL(blob);
-
-  const loader = new GLTFLoader();
-  loader.register(p => new VRMLoaderPlugin(p));
-
-  return new Promise((res, rej) => {
-    loader.load(url, async (gltf) => {
-      const vrm = gltf.userData.vrm;
-      VRMUtils.removeUnnecessaryVertices(gltf.scene);
-      VRMUtils.removeUnnecessaryJoints(gltf.scene);
-      VRMUtils.rotateVRM0(vrm);
-      vrm.scene.traverse(obj => { if (obj.isMesh) { obj.castShadow = true; obj.receiveShadow = true; } });
-
-      if (currentVrm) scene.remove(currentVrm.scene);
-      scene.add(vrm.scene);
-      currentVrm = vrm;
-
-      mixer = new THREE.AnimationMixer(vrm.scene);
-      mixer.addEventListener('finished', onAnimFinished);
-
-      document.getElementById('loading-text').textContent = 'アニメーション準備完了！FBXを読み込んでください';
-      document.getElementById('loading-bar').style.width = '100%';
-      setTimeout(() => {
-        document.getElementById('loading').style.display = 'none';
-      }, 800);
-
-      URL.revokeObjectURL(url);
-      res(vrm);
-    }, (p) => {
-      if (p.total) {
-        document.getElementById('loading-bar').style.width = `${(p.loaded/p.total*100)}%`;
-      }
-    }, rej);
+/* ================================================================
+   VRM Selector UI
+   ================================================================ */
+function buildVRMSelector() {
+  const list = document.getElementById('vrm-list');
+  list.innerHTML = '';
+  if (!VRM_FILES.length) {
+    list.innerHTML = '<div style="color:#666;font-size:11px;">VRM_FILESにファイルを追加してください</div>';
+    return;
+  }
+  VRM_FILES.forEach((v, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'vrm-btn' + (i===0?' active':'');
+    btn.textContent = v.name;
+    btn.onclick = () => {
+      document.querySelectorAll('.vrm-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadVRM(v.path);
+    };
+    list.appendChild(btn);
   });
 }
 
-// ================================================================
-//  FBX 読み込み（複数対応）
-// ================================================================
-async function loadFBX(name, buffer) {
-  if (!currentVrm) { alert('先にVRMを読み込んでください'); return; }
-  const key = detectAnimKey(name);
-  if (!key) { console.warn('認識できないFBX名:', name); return; }
-
-  try {
-    const clip = await loadMixamoAnimation(buffer, currentVrm, key);
-    animClips[key] = clip;
-    // 逆再生版も作成（Crouched Walking等に使用）
-    const revClip = await loadMixamoAnimation(buffer, currentVrm, key + '_rev', true);
-    reverseClips[key] = revClip;
-
-    // キャッシュをリセット
-    if (animActions[key]) { animActions[key].stop(); delete animActions[key]; }
-    if (animActions[key + '_rev']) { animActions[key + '_rev'].stop(); delete animActions[key + '_rev']; }
-
-    console.log(`✅ ${name} → key: ${key}`);
-    updateLoadedAnimsList();
-
-    // アイドルが読み込まれたら即再生
-    if (key === 'idle' && (!currentAction)) {
-      crossFadeTo('idle', 0);
-    }
-  } catch(e) {
-    console.error(`FBX読み込み失敗: ${name}`, e);
-  }
+/* ================================================================
+   Loading UI
+   ================================================================ */
+function setLoad(vis, pct, txt) {
+  const el = document.getElementById('loading');
+  if (vis) el.classList.remove('hidden'); else el.classList.add('hidden');
+  document.getElementById('loading-bar').style.width = pct + '%';
+  document.getElementById('loading-text').textContent = txt;
 }
 
-function detectAnimKey(filename) {
-  const base = filename.replace(/\.fbx$/i, '').trim();
-  // 完全一致チェック
-  if (ANIM_KEYS[base]) return ANIM_KEYS[base];
-  // 部分一致
-  for (const [k, v] of Object.entries(ANIM_KEYS)) {
-    if (base.toLowerCase().includes(k.toLowerCase())) return v;
-  }
-  return null;
-}
-
-function updateLoadedAnimsList() {
-  const el = document.getElementById('loaded-anims');
-  const loaded = Object.keys(animClips);
-  el.textContent = loaded.length ? `読み込み済み: ${loaded.join(', ')}` : '';
-}
-
-// ================================================================
-//  設定 UI
-// ================================================================
-document.getElementById('settings-toggle').addEventListener('click', () => {
-  const p = document.getElementById('settings-panel');
-  p.style.display = p.style.display === 'none' ? 'block' : 'none';
-});
-
-document.getElementById('setting-face-camera').addEventListener('change', e => {
-  settings.faceCamera = e.target.checked;
-});
-document.getElementById('setting-cam-follow').addEventListener('change', e => {
-  settings.camFollow = e.target.checked;
-});
-document.getElementById('setting-backward-slow').addEventListener('change', e => {
-  settings.backwardSlow = e.target.checked;
-});
-
-// ファイル入力
-document.getElementById('file-vrm').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const buf = await file.arrayBuffer();
-  await loadVRM(buf);
-  e.target.value = '';
-});
-
-document.getElementById('file-fbx').addEventListener('change', async (e) => {
-  const files = Array.from(e.target.files);
-  for (const file of files) {
-    const buf = await file.arrayBuffer();
-    await loadFBX(file.name, buf);
-  }
-  e.target.value = '';
-});
-
-// ================================================================
-//  リサイズ
-// ================================================================
+/* ================================================================
+   Resize
+   ================================================================ */
 window.addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight;
+  camera.aspect = innerWidth/innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
 });
 
-// ================================================================
-//  メインループ
-// ================================================================
+/* ================================================================
+   メインループ
+   ================================================================ */
 const clock = new THREE.Clock();
-
 function animate() {
   requestAnimationFrame(animate);
-  const delta = Math.min(clock.getDelta(), 0.05);
+  const dt = Math.min(clock.getDelta(), 0.05);
 
-  updateCharacter(delta);
-  updateCamera();
-
-  if (mixer) mixer.update(delta);
-  if (currentVrm) currentVrm.update(delta);
-
+  updateCharacter(dt);
+  if (mixer) mixer.update(dt);
+  if (currentVrm) currentVrm.update(dt);
   controls.update();
   renderer.render(scene, camera);
-
-  // 座標表示
-  if (currentVrm) {
-    const p = charPos;
-    document.getElementById('pos-info').textContent =
-      `${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`;
-  }
-
-  // prevKeys更新
-  prevKeys = {...keys};
 }
+
+/* ================================================================
+   起動
+   ================================================================ */
+buildVRMSelector();
+if (VRM_FILES.length > 0) loadVRM(VRM_FILES[0].path);
+else setLoad(false);
 animate();
 </script>
 </body>
