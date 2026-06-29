@@ -128,7 +128,6 @@ const ANIM_PATHS = {
   crouchLeft:         './Crouched Sneaking Left.fbx',
   crouchRight:        './Crouched Sneaking Right.fbx',
   jump:               './Jumping.fbx',
-  land:               './Falling To Landing.fbx',
   stair:              './Ascending Stairs.fbx',
 };
 
@@ -309,9 +308,8 @@ let mixer = null;
 const actions = {};
 let currentAction = null;
 
-// ジャンプ・着地 状態
+// ジャンプ状態
 let isJumping = false;
-let isLanding = false;
 
 // しゃがみ状態
 let isCrouching = false;
@@ -322,7 +320,10 @@ let prevMovingBack = false;
 
 // ターン180中フラグ
 let inWalkTurn = false;
-let inRunTurn = false;
+let inRunTurn  = false;
+// ターン後に確定するキャラのyaw（二重回転防止）
+let walkTurn180TargetYaw = 0;
+let runTurn180TargetYaw  = 0;
 
 // ====================================================================
 // オーバーワールドカメラ設定
@@ -439,18 +440,18 @@ gltfLoader.load(
         const clip = await loadMixamoAnimation(path, vrm, KEEP_IN_PLACE);
         const action = mixer.clipAction(clip);
         action.setLoop(THREE.LoopRepeat, Infinity);
-        // Walking Turn 180 / Running Turn 180 / Land は1回再生
-        if (key === 'walkTurn180' || key === 'runTurn180' || key === 'land') {
+        // Walking Turn 180 / Running Turn 180 は1回再生
+        if (key === 'walkTurn180' || key === 'runTurn180') {
           action.setLoop(THREE.LoopOnce, 1);
           action.clampWhenFinished = true;
         }
-        // しゃがみポーズは静止させる（1フレーム目で止める）
+        // しゃがみポーズは静止させる
         if (key === 'crouch') {
           action.setLoop(THREE.LoopOnce, 1);
           action.clampWhenFinished = true;
         }
-        // ジャンプ・着地も1回
-        if (key === 'jump' || key === 'land') {
+        // ジャンプも1回
+        if (key === 'jump') {
           action.setLoop(THREE.LoopOnce, 1);
           action.clampWhenFinished = true;
         }
@@ -592,31 +593,56 @@ function playAction(key, fadeTime = 0.15) {
 }
 
 /* ====================================================================
-   ターン/ジャンプ/着地 終了時の処理
+   ターン/ジャンプ 終了時の処理
    ==================================================================== */
 function onActionFinished(e) {
   const fa = e.action;
 
-  // walkTurn180終了 → 通常歩行へ
+  // walkTurn180終了 → 向きをコードで確定させてから歩行へ
   if (actions['walkTurn180'] && fa === actions['walkTurn180']) {
+    // アニメが180°回した分をコード側に確定（二重回転防止）
+    snapCharYawToTarget(walkTurn180TargetYaw);
     inWalkTurn = false;
-    playAction('walk');
+    // キーがまだ押されていれば続けて歩く、離していればidle
+    if (pressedKeys.has('w') || pressedKeys.has('s')) {
+      playAction('walk');
+    } else {
+      playAction('idle');
+    }
   }
-  // runTurn180終了 → 走行へ
+
+  // runTurn180終了 → 向きを確定させてから走行へ
   if (actions['runTurn180'] && fa === actions['runTurn180']) {
+    snapCharYawToTarget(runTurn180TargetYaw);
     inRunTurn = false;
-    playAction('run');
+    if (pressedKeys.has('w') || pressedKeys.has('s')) {
+      playAction('run');
+    } else {
+      playAction('idle');
+    }
   }
-  // 着地終了 → アイドルへ
-  if (actions['land'] && fa === actions['land']) {
-    isLanding = false;
-    playAction('idle');
-  }
-  // ジャンプ終了 → 即着地（浮遊なし）
+
+  // ジャンプ終了 → Hips Y座標を強制リセットしてidle
   if (actions['jump'] && fa === actions['jump'] && isJumping) {
     isJumping = false;
-    isLanding = true;
-    playAction('land', 0.05);
+    // ジャンプアニメで浮いた腰の位置を強制的に初期値に戻す
+    forceResetHipsY();
+    playAction('idle', 0.1);
+  }
+}
+
+// ターン後の向きを「ターン開始前の向き + 180°」に確定する
+function snapCharYawToTarget(yaw) {
+  if (!currentVrm) return;
+  currentVrm.scene.rotation.y = yaw;
+}
+
+// ジャンプ後にhipsのY位置を強制的にrest位置に戻す
+function forceResetHipsY() {
+  if (!currentVrm) return;
+  const hipsNode = currentVrm.humanoid?.getNormalizedBoneNode('hips');
+  if (hipsNode) {
+    hipsNode.position.y = currentVrm.humanoid.normalizedRestPose?.hips?.position?.[1] ?? hipsNode.position.y;
   }
 }
 
@@ -653,16 +679,13 @@ function setupKeyControls() {
 
 /* ====================================================================
    毎フレームのアニメーション更新
-   ・W/A/S/D の「前後左右」はカメラazimuthを基準に解釈
-   ・FACE_CAMERA_DIRECTION=ON → ストレイフ/バック専用アニメ使用
-   ・FACE_CAMERA_DIRECTION=OFF → キャラを向き変えてWalk/Runアニメ
    ==================================================================== */
-function updateInputAnimation() {
+function updateInputAnimation(delta) {
   if (!currentVrm || !mixer) return;
-  if (isJumping || isLanding) return;
+  if (isJumping) return;
 
   // スペースでジャンプ
-  if (pressedKeys.has('space') && !isJumping && !isCrouching) {
+  if (pressedKeys.has('space') && !isCrouching) {
     isJumping = true;
     playAction('jump', 0.1);
     return;
@@ -675,33 +698,32 @@ function updateInputAnimation() {
   const right = pressedKeys.has('d');
   const anyMove = fwd || back || left || right;
 
+  // ターン180再生中はアニメに任せる（コード回転しない）
   if (inWalkTurn || inRunTurn) return;
 
-  // キャラの向きをカメラ基準で設定する（FACE_CAMERA_DIR=OFFのとき）
-  if (anyMove && !FACE_CAMERA_DIRECTION) {
-    const yaw = getTargetYaw(fwd, back, left, right);
-    if (yaw !== null) {
-      // 現在の向きから滑らかに補間
-      let diff = yaw - currentVrm.scene.rotation.y;
-      while (diff >  Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      currentVrm.scene.rotation.y += diff * 0.2;
+  // --- キャラ向きをカメラ基準で滑らかに回転 ---
+  // FACE_CAMERA_DIR=OFF or ON どちらも、移動中はカメラ前方基準でキャラを向かせる
+  // （STRAFEアニメ使用時は向きを変えない）
+  if (anyMove) {
+    const useStrafe = FACE_CAMERA_DIRECTION && (left || right) && !fwd && !back;
+    if (!useStrafe) {
+      const targetYaw = getTargetYaw(fwd, back, left, right);
+      if (targetYaw !== null) {
+        let diff = targetYaw - currentVrm.scene.rotation.y;
+        while (diff >  Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        // 滑らかに補間（ただし大きな差がある場合は早めに回す）
+        const lerpT = Math.min(1.0, delta * 10);
+        currentVrm.scene.rotation.y += diff * lerpT;
+      }
     }
   }
 
-  // FACE_CAMERA_DIR=ON のとき、キャラはカメラ前方を常に「前」として固定しない。
-  // 代わりにW=前進(カメラ前方へ向く)、A/D=ストレイフ、S=後退アニメ
   if (isCrouching) {
-    // ========== しゃがみ状態 ==========
     if (!anyMove) { playAction('crouch'); return; }
-    if (FACE_CAMERA_DIRECTION) {
-      if (fwd)        playAction('crouchWalk');
-      else if (back)  { playAction('crouchWalk'); actions['crouchWalk'] && (actions['crouchWalk'].timeScale = -1); }
-      else if (left)  playAction('crouchLeft');
-      else if (right) playAction('crouchRight');
-    } else {
-      playAction('crouchWalk');
-    }
+    if (left && FACE_CAMERA_DIRECTION)       playAction('crouchLeft');
+    else if (right && FACE_CAMERA_DIRECTION) playAction('crouchRight');
+    else                                     playAction('crouchWalk');
     return;
   }
 
@@ -714,84 +736,69 @@ function updateInputAnimation() {
 
   if (isRunning) {
     // ========== ランニング ==========
-    if (fwd) {
+    if (fwd && !back) {
       if (prevMovingBack && actions['runTurn180']) {
-        inRunTurn = true; playAction('runTurn180', 0.1);
+        // ターン180開始：目標yawを記録（現在向きから180°）
+        runTurn180TargetYaw = currentVrm.scene.rotation.y + Math.PI;
+        inRunTurn = true;
+        playAction('runTurn180', 0.05);
       } else {
-        if (FACE_CAMERA_DIRECTION) {
-          // カメラ前方を向かせてから走る
-          faceCamera();
-        }
         playAction('run');
       }
       prevMovingFwd = true; prevMovingBack = false;
-    } else if (back) {
+    } else if (back && !fwd) {
       if (prevMovingFwd && actions['runTurn180']) {
-        inRunTurn = true; playAction('runTurn180', 0.1);
+        runTurn180TargetYaw = currentVrm.scene.rotation.y + Math.PI;
+        inRunTurn = true;
+        playAction('runTurn180', 0.05);
       } else {
-        if (FACE_CAMERA_DIRECTION) {
-          playAction('runBack');
-          if (actions['runBack']) actions['runBack'].timeScale = 0.7;
-        } else {
-          playAction('run');
-        }
+        playAction(FACE_CAMERA_DIRECTION ? 'runBack' : 'run');
+        if (FACE_CAMERA_DIRECTION && actions['runBack']) actions['runBack'].timeScale = 0.7;
       }
       prevMovingFwd = false; prevMovingBack = true;
-    } else if (left) {
-      if (FACE_CAMERA_DIRECTION) playAction('strafeRunLeft');
-      else playAction('run');
-    } else if (right) {
-      if (FACE_CAMERA_DIRECTION) playAction('strafeRunRight');
-      else playAction('run');
+    } else if (left && FACE_CAMERA_DIRECTION) {
+      playAction('strafeRunLeft');
+    } else if (right && FACE_CAMERA_DIRECTION) {
+      playAction('strafeRunRight');
+    } else {
+      playAction('run');
     }
   } else {
     // ========== 歩き ==========
-    if (fwd) {
+    if (fwd && !back) {
       if (prevMovingBack && actions['walkTurn180']) {
-        inWalkTurn = true; playAction('walkTurn180', 0.1);
+        walkTurn180TargetYaw = currentVrm.scene.rotation.y + Math.PI;
+        inWalkTurn = true;
+        playAction('walkTurn180', 0.05);
       } else {
-        if (FACE_CAMERA_DIRECTION) {
-          faceCamera();
-        }
         playAction('walk');
       }
       prevMovingFwd = true; prevMovingBack = false;
-    } else if (back) {
+    } else if (back && !fwd) {
       if (prevMovingFwd && actions['walkTurn180']) {
-        // 前進中→後退でターン180
-        inWalkTurn = true; playAction('walkTurn180', 0.1);
+        walkTurn180TargetYaw = currentVrm.scene.rotation.y + Math.PI;
+        inWalkTurn = true;
+        playAction('walkTurn180', 0.05);
+      } else if (FACE_CAMERA_DIRECTION) {
+        playAction('walkBack');
+        if (actions['walkBack']) actions['walkBack'].timeScale = 0.7;
       } else {
-        if (FACE_CAMERA_DIRECTION) {
-          // 設定ON：Walking Backwards（後ろ歩きアニメ、スピード落とす）
-          playAction('walkBack');
-          if (actions['walkBack']) actions['walkBack'].timeScale = 0.7;
-        } else {
-          // 設定OFF：向きはgetTargetYawで後ろを向かせ、通常Walking再生
-          // （Turn 180はしない、向きをコードで即変更せずWalkTurn180→Walk）
-          if (!inWalkTurn && actions['walkTurn180']) {
-            inWalkTurn = true; playAction('walkTurn180', 0.1);
-          }
+        // FACE_CAMERA_DIR=OFF: S初回入力 → walkTurn180→walk
+        if (actions['walkTurn180'] && !inWalkTurn) {
+          walkTurn180TargetYaw = currentVrm.scene.rotation.y + Math.PI;
+          inWalkTurn = true;
+          playAction('walkTurn180', 0.05);
         }
       }
       prevMovingFwd = false; prevMovingBack = true;
-    } else if (left) {
-      if (FACE_CAMERA_DIRECTION) playAction('strafeLeft');
-      else playAction('walk');
-    } else if (right) {
-      if (FACE_CAMERA_DIRECTION) playAction('strafeRight');
-      else playAction('walk');
+    } else if (left && FACE_CAMERA_DIRECTION) {
+      playAction('strafeLeft');
+    } else if (right && FACE_CAMERA_DIRECTION) {
+      playAction('strafeRight');
+    } else {
+      playAction('walk');
     }
   }
-}
-
-/* カメラが向いている方向にキャラを向かせる（FACE_CAMERA_DIR=ONでWキー時） */
-function faceCamera() {
-  if (!currentVrm) return;
-  const targetYaw = camAzimuth + Math.PI;
-  let diff = targetYaw - currentVrm.scene.rotation.y;
-  while (diff >  Math.PI) diff -= Math.PI * 2;
-  while (diff < -Math.PI) diff += Math.PI * 2;
-  currentVrm.scene.rotation.y += diff * 0.15;
 }
 
 /* ====================================================================
@@ -809,7 +816,7 @@ function updateCamera(delta) {
     const right= pressedKeys.has('d');
     const anyMove = fwd || back || left || right;
 
-    if (anyMove && fwd && !isJumping && !isLanding) {
+    if (anyMove && fwd && !isJumping) {
       // Wキー押しでカメラがキャラの背後に追従（azimuthをキャラのyawに揃える）
       const charYaw = currentVrm.scene.rotation.y;
       // キャラ後方 = charYaw + π
@@ -846,7 +853,7 @@ function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
 
-  updateInputAnimation();
+  updateInputAnimation(delta);
   updateCamera(delta);
 
   if (mixer) mixer.update(delta);
