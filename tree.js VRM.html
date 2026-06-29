@@ -70,8 +70,6 @@
   <h1>VRM Viewer</h1>
   <div id="status">読み込み中...</div>
   <div>ドラッグ：視点回転 / ホイール：ズーム</div>
-  <div>W/S/A/D：移動　Ctrl+W：走る</div>
-  <div>Shift：しゃがみトグル　Space：ジャンプ</div>
 </div>
 
 <div id="expressions">
@@ -114,32 +112,32 @@ const KEEP_IN_PLACE = true; // true: その場で足踏み（移動しない） 
 /* ====================================================================
    アニメーションファイルパス一覧
    ==================================================================== */
-const ANIM_FILES = {
-  idle:                 './Standard Idle.fbx',
-  walk:                 './Walking.fbx',
-  walkBack:             './Walking Backwards.fbx',
-  walkTurn180:          './Walking Turn 180.fbx',
-  leftStrafe:           './Left Strafe Walking.fbx',
-  rightStrafe:          './Right Strafe Walking.fbx',
-  run:                  './Running.fbx',
-  runBack:              './Running Backwards.fbx',
-  runTurn180:           './Running Turn 180.fbx',
-  leftStrafeRun:        './Left Strafe.fbx',
-  rightStrafeRun:       './Right Strafe.fbx',
-  crouch:               './Male Crouch Pose.fbx',
-  crouchWalk:           './Crouched Walking.fbx',
-  crouchLeft:           './Crouched Sneaking Left.fbx',
-  crouchRight:          './Crouched Sneaking Right.fbx',
-  jump:                 './Jumping.fbx',
-  fall:                 './Falling Idle.fbx',
-  land:                 './Falling to Landing.fbx',
-  stairs:               './Ascending Stairs.fbx',
+const ANIM_PATHS = {
+  idle:               './Standard Idle.fbx',
+  walk:               './Walking.fbx',
+  walkBack:           './Walking Backwards.fbx',
+  walkTurn180:        './Walking Turn 180.fbx',
+  strafeLeft:         './Left Strafe Walking.fbx',
+  strafeRight:        './Right Strafe Walking.fbx',
+  run:                './Running.fbx',
+  runBack:            './Running Backwards.fbx',
+  runTurn180:         './Running Turn 180.fbx',
+  strafeRunLeft:      './Left Strafe.fbx',
+  strafeRunRight:     './Right Strafe.fbx',
+  crouch:             './Male Crouch Pose.fbx',
+  crouchWalk:         './Crouched Walking.fbx',
+  crouchLeft:         './Crouched Sneaking Left.fbx',
+  crouchRight:        './Crouched Sneaking Right.fbx',
+  jump:               './Jumping.fbx',
+  fall:               './Falling Idle.fbx',
+  land:               './Falling to Landing.fbx',
+  stair:              './Ascending Stairs.fbx',
 };
 
 /* ====================================================================
-   設定：「視点方向向く」ON/OFF スイッチ
-   true  = 方向キーでキャラが視点方向へ向いてストレイフ/後退アニメを使う
-   false = コードでキャラを回転させて歩行アニメを使う
+   設定：「視点方向を向く」ON/OFFの切り替え
+   true  = Mixamoの横歩き/後歩きアニメーションをそのまま使う
+   false = キャラの向きをコードで回転させてからWalking/Runningを使う
    ==================================================================== */
 let FACE_CAMERA_DIRECTION = true;
 
@@ -318,19 +316,25 @@ const clock = new THREE.Clock();
 let currentVrm = null;
 let mixer = null;
 
-// 全アニメーションアクションを格納するマップ
-const actions = {};
-// 現在再生中のアクション
-let currentAction = null;
-// 前フレームのキー状態（ターン180検出用）
-let prevMovingForward = false;
-let prevMovingBack = false;
+// アニメーション管理
+const actions = {};           // { キー: AnimationAction }
+let currentAction = null;     // 現在再生中のアクション名
+let currentState = 'idle';    // 論理ステート
+
+// キャラクターの向き管理（コード回転モード用）
+let charYaw = 0;              // キャラクターのY軸回転（ラジアン）
+
+// ジャンプ・落下・着地 状態
+let isJumping = false;
+let isFalling = false;
+let isLanding = false;
+
 // しゃがみ状態
 let isCrouching = false;
-// 地面に居るか（ジャンプ/落下管理）
-let isOnGround = true;
-// 着地アニメーション再生中
-let isLanding = false;
+
+// ランニングモード中に反対向きキーが押された瞬間
+let wasMovingForward = false;  // 前フレームの進行方向
+let wasMovingBackward = false;
 
 const statusEl = document.getElementById('status');
 
@@ -363,56 +367,52 @@ gltfLoader.load(
     // ミクサモのアニメーションを読み込んでVRMに適用する
     mixer = new THREE.AnimationMixer(vrm.scene);
 
-    try {
-      // 全アニメーションを並列ロード
-      const entries = Object.entries(ANIM_FILES);
-      await Promise.all(entries.map(async ([key, path]) => {
-        try {
-          const clip = await loadMixamoAnimation(path, vrm, KEEP_IN_PLACE);
-          const action = mixer.clipAction(clip);
-          action.setLoop(THREE.LoopRepeat, Infinity);
-          action.clampWhenFinished = false;
-          actions[key] = action;
-        } catch (e) {
-          console.warn(`アニメーション読み込み失敗 [${key}]: ${path}`, e);
+    statusEl.textContent = 'アニメーション読み込み中...';
+
+    // 全アニメーションを並列ロード
+    const loadResults = await Promise.allSettled(
+      Object.entries(ANIM_PATHS).map(async ([key, path]) => {
+        const clip = await loadMixamoAnimation(path, vrm, KEEP_IN_PLACE);
+        const action = mixer.clipAction(clip);
+        action.setLoop(THREE.LoopRepeat, Infinity);
+        // Walking Turn 180 / Running Turn 180 / Land は1回再生
+        if (key === 'walkTurn180' || key === 'runTurn180' || key === 'land') {
+          action.setLoop(THREE.LoopOnce, 1);
+          action.clampWhenFinished = true;
         }
-      }));
+        // しゃがみポーズは静止させる（1フレーム目で止める）
+        if (key === 'crouch') {
+          action.setLoop(THREE.LoopOnce, 1);
+          action.clampWhenFinished = true;
+        }
+        // ジャンプ・着地も1回
+        if (key === 'jump' || key === 'land') {
+          action.setLoop(THREE.LoopOnce, 1);
+          action.clampWhenFinished = true;
+        }
+        actions[key] = action;
+        return key;
+      })
+    );
 
-      // ルートモーション（位置移動）を持つアニメーションを固定化
-      // loadMixamoAnimation内の keepInPlace がすでに XZ を0にしているが念のため
-      // 着地・ターン系の一回再生アニメを設定
-      if (actions.land) {
-        actions.land.setLoop(THREE.LoopOnce, 1);
-        actions.land.clampWhenFinished = true;
-      }
-      if (actions.walkTurn180) {
-        actions.walkTurn180.setLoop(THREE.LoopOnce, 1);
-        actions.walkTurn180.clampWhenFinished = true;
-      }
-      if (actions.runTurn180) {
-        actions.runTurn180.setLoop(THREE.LoopOnce, 1);
-        actions.runTurn180.clampWhenFinished = true;
-      }
-      if (actions.jump) {
-        actions.jump.setLoop(THREE.LoopOnce, 1);
-        actions.jump.clampWhenFinished = true;
-      }
+    const loaded = loadResults.filter(r => r.status === 'fulfilled').map(r => r.value);
+    const failed = loadResults.filter(r => r.status === 'rejected');
+    if (failed.length > 0) console.warn('一部アニメーション読み込み失敗:', failed.map(r => r.reason));
 
-      // ループ再生アニメのうち逆再生なし（通常）のものはLoopRepeatのまま
-      // しゃがみポーズも一回止まる系
-      if (actions.crouch) {
-        actions.crouch.setLoop(THREE.LoopOnce, 1);
-        actions.crouch.clampWhenFinished = true;
-      }
+    // 設定パネルのON/OFFトグルを追加
+    addSettingsUI();
 
-      // アイドルで開始
-      playAction('idle');
+    // 初期アニメーション：アイドル
+    playAction('idle');
 
-      statusEl.textContent = '準備完了！WASD/Ctrl/Shift/Space で操作';
-    } catch (e) {
-      console.error('アニメーション読み込み失敗:', e);
-      statusEl.textContent = 'アニメーション読込に失敗しました（コンソール参照）';
-    }
+    // キー入力の設定
+    setupKeyControls();
+
+    // ジャンプ/ターン終了イベント
+    mixer.addEventListener('finished', onActionFinished);
+
+    statusEl.textContent = '準備完了！ W/A/S/D で移動、Z+W で走る、Shift でしゃがむ、Space でジャンプ';
+
   },
   (progress) => {
     if (progress.total) {
@@ -469,293 +469,307 @@ function setupExpressionUI(vrm) {
 }
 
 /* ====================================================================
-   ⑥ アニメーション切り替えヘルパー
+   設定UIの追加（視点方向を向くON/OFF）
    ==================================================================== */
-function playAction(key, fadeDuration = 0.2) {
-  const next = actions[key];
-  if (!next) return; // そのFBXがロードされていない場合はスキップ
-  if (currentAction === next) return;
+function addSettingsUI() {
+  const uiEl = document.getElementById('ui');
+  uiEl.style.pointerEvents = 'auto';
 
-  if (currentAction) {
-    currentAction.fadeOut(fadeDuration);
-  }
-  next.reset().fadeIn(fadeDuration).play();
-  currentAction = next;
-}
+  const label = document.createElement('label');
+  label.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:10px;cursor:pointer;';
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.checked = FACE_CAMERA_DIRECTION;
+  checkbox.onchange = () => { FACE_CAMERA_DIRECTION = checkbox.checked; };
+  label.appendChild(checkbox);
+  label.appendChild(document.createTextNode('視点方向を向くモード'));
+  uiEl.appendChild(label);
 
-// 逆再生ラッパー（しゃがみ後退など）
-function playActionReverse(key, fadeDuration = 0.2) {
-  const next = actions[key];
-  if (!next) return;
-  if (currentAction) currentAction.fadeOut(fadeDuration);
-  next.reset();
-  next.timeScale = -1;
-  next.time = next.getClip().duration; // 末尾から再生
-  next.fadeIn(fadeDuration).play();
-  currentAction = next;
-}
-
-// 一回再生してから別アクションへ移行
-function playOnceAndThen(key, thenKey, fadeDuration = 0.2) {
-  const once = actions[key];
-  if (!once) { playAction(thenKey, fadeDuration); return; }
-  if (currentAction) currentAction.fadeOut(fadeDuration);
-  once.reset().fadeIn(fadeDuration).play();
-  currentAction = once;
-  const onFinished = (e) => {
-    if (e.action === once) {
-      mixer.removeEventListener('finished', onFinished);
-      playAction(thenKey, fadeDuration);
-    }
-  };
-  mixer.addEventListener('finished', onFinished);
+  const hint = document.createElement('div');
+  hint.style.cssText = 'margin-top:8px;font-size:11px;color:#aaa;';
+  hint.innerHTML = 'W:歩く　S:後退　A:左　D:右<br>Z+W:走る　Shift:しゃがむ　Space:ジャンプ';
+  uiEl.appendChild(hint);
 }
 
 /* ====================================================================
-   ⑦ キー入力管理
+   アニメーション切り替え
+   ==================================================================== */
+function playAction(key, fadeTime = 0.15) {
+  if (!actions[key]) {
+    // フォールバック：アニメーションが存在しない場合はidleへ
+    if (key !== 'idle' && actions['idle']) playAction('idle', fadeTime);
+    return;
+  }
+  if (currentAction === key) return;
+
+  const next = actions[key];
+  const prev = currentAction ? actions[currentAction] : null;
+
+  // ターン・ジャンプ・着地は頭から再生
+  next.reset();
+
+  if (prev && prev !== next) {
+    prev.crossFadeTo(next, fadeTime, true);
+  }
+  next.play();
+  currentAction = key;
+}
+
+/* ====================================================================
+   ターン/ジャンプ/着地 終了時の処理
+   ==================================================================== */
+function onActionFinished(e) {
+  const finishedAction = e.action;
+
+  // walkTurn180終了 → 通常歩行へ
+  if (actions['walkTurn180'] && finishedAction === actions['walkTurn180']) {
+    inWalkTurn = false;
+    playAction('walk');
+  }
+  // runTurn180終了 → 走行へ
+  if (actions['runTurn180'] && finishedAction === actions['runTurn180']) {
+    inRunTurn = false;
+    playAction('run');
+  }
+  // 着地終了 → アイドルへ
+  if (actions['land'] && finishedAction === actions['land']) {
+    isLanding = false;
+    playAction('idle');
+  }
+  // ジャンプ終了 → 落下へ
+  if (actions['jump'] && finishedAction === actions['jump']) {
+    isJumping = false;
+    isFalling = true;
+    playAction('fall');
+    // 1.2秒後に着地（簡易シミュレーション）
+    setTimeout(() => {
+      isFalling = false;
+      isLanding = true;
+      playAction('land');
+    }, 1200);
+  }
+}
+
+/* ====================================================================
+   キー入力のセットアップ
    ==================================================================== */
 const pressedKeys = new Set();
-// Shiftはtoggleにするのでkeydownで1回だけ処理
-let shiftHandledThisPress = false;
+// ターン180中フラグ
+let inWalkTurn = false;
+let inRunTurn = false;
+// 前フレームでの移動方向
+let prevMovingFwd = false;
+let prevMovingBack = false;
 
-window.addEventListener('keydown', (e) => {
-  const key = e.key.toLowerCase();
-  // スペース・WASD・Ctrl・Shiftのデフォルト動作を抑制
-  if ([' ', 'w', 'a', 's', 'd', 'control', 'shift'].includes(key)) e.preventDefault();
-
-  if (key === 'shift' && !shiftHandledThisPress) {
-    shiftHandledThisPress = true;
-    isCrouching = !isCrouching;
-    if (isCrouching) {
-      playAction('crouch', 0.15);
-    } else {
-      playAction('idle', 0.15);
+function setupKeyControls() {
+  window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (['w','a','s','d','z',' ','shift'].includes(k) ||
+        ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Shift'].includes(e.key)) {
+      pressedKeys.add(k === 'shift' ? 'shift' : k === ' ' ? 'space' : k);
+      e.preventDefault();
     }
-    return;
-  }
+  });
 
-  if (key === ' ' && isOnGround && !pressedKeys.has(' ')) {
-    // ジャンプ：一回再生 → 落下 → 着地
-    isOnGround = false;
-    playOnceAndThen('jump', 'fall', 0.1);
-    // 簡易タイマーで着地（物理無しのため固定時間）
-    setTimeout(() => {
-      isLanding = true;
-      playOnceAndThen('land', 'idle', 0.15);
-      setTimeout(() => {
-        isOnGround = true;
-        isLanding = false;
-        // 着地後に即キーが押されていれば再評価
-        evaluateLocomotion();
-      }, 700);
-    }, 900);
-  }
+  window.addEventListener('keyup', (e) => {
+    const k = e.key.toLowerCase();
+    pressedKeys.delete(k === 'shift' ? 'shift' : k === ' ' ? 'space' : k);
 
-  pressedKeys.add(key);
-});
-
-window.addEventListener('keyup', (e) => {
-  const key = e.key.toLowerCase();
-  pressedKeys.delete(key);
-  if (key === 'shift') shiftHandledThisPress = false;
-  // キー離したときもアニメーション再評価
-  if (!isLanding && isOnGround) evaluateLocomotion();
-});
-
-/* ====================================================================
-   ⑧ ロコモーション（移動状態）評価
-   ==================================================================== */
-function rotateCharacter(angleRad) {
-  if (currentVrm) {
-    currentVrm.scene.rotation.y = angleRad;
-  }
+    // Shiftトグル：keydownより keyupで行う（押した瞬間ではなく離した時）
+    if (e.key === 'Shift') {
+      isCrouching = !isCrouching;
+      if (!isCrouching) {
+        playAction('idle');
+      } else {
+        playAction('crouch');
+      }
+    }
+  });
 }
 
-function evaluateLocomotion() {
-  if (!isOnGround || isLanding) return;
+/* ====================================================================
+   毎フレームのアニメーション更新
+   ==================================================================== */
+function updateInputAnimation(delta) {
+  if (!currentVrm || !mixer) return;
 
-  const w = pressedKeys.has('w');
-  const s = pressedKeys.has('s');
-  const a = pressedKeys.has('a');
-  const d = pressedKeys.has('d');
-  const ctrl = pressedKeys.has('control');
-  const isMoving = w || s || a || d;
+  // ジャンプ/落下/着地中は移動入力を無視
+  if (isJumping || isFalling || isLanding) return;
 
-  // しゃがみ状態
+  // スペースでジャンプ
+  if (pressedKeys.has('space') && !isJumping && !isFalling && !isCrouching) {
+    isJumping = true;
+    playAction('jump', 0.1);
+    return;
+  }
+
+  const isRunning = pressedKeys.has('z');
+  const fwd   = pressedKeys.has('w');
+  const back  = pressedKeys.has('s');
+  const left  = pressedKeys.has('a');
+  const right = pressedKeys.has('d');
+  const anyMove = fwd || back || left || right;
+
+  // ターン180中は入力を受け付けない
+  if (inWalkTurn || inRunTurn) return;
+
   if (isCrouching) {
-    if (!isMoving) {
-      playAction('crouch', 0.15);
+    // ========== しゃがみ状態 ==========
+    if (!anyMove) {
+      playAction('crouch');
       return;
     }
-    if (w) { playAction('crouchWalk', 0.15); return; }
-    if (s) {
+    if (fwd) {
+      playAction('crouchWalk');
+    } else if (back) {
       if (FACE_CAMERA_DIRECTION) {
-        // 逆再生で後退
-        playActionReverse('crouchWalk', 0.15);
+        // 逆再生で後ろ歩き
+        const a = actions['crouchWalk'];
+        if (a && currentAction !== 'crouchWalkBack') {
+          if (currentAction && actions[currentAction]) {
+            actions[currentAction].fadeOut(0.15);
+          }
+          a.reset();
+          a.timeScale = -1;
+          a.play();
+          currentAction = 'crouchWalkBack';
+        }
       } else {
-        rotateCharacter(Math.PI);
-        playAction('crouchWalk', 0.15);
+        rotateChar(Math.PI);
+        playAction('crouchWalk');
       }
-      return;
-    }
-    if (a) {
+    } else if (left) {
       if (FACE_CAMERA_DIRECTION) {
-        playAction('crouchLeft', 0.15);
+        playAction('crouchLeft');
       } else {
-        rotateCharacter(Math.PI / 2);
-        playAction('crouchWalk', 0.15);
+        rotateChar(-Math.PI / 2);
+        playAction('crouchWalk');
       }
-      return;
-    }
-    if (d) {
+    } else if (right) {
       if (FACE_CAMERA_DIRECTION) {
-        playAction('crouchRight', 0.15);
+        playAction('crouchRight');
       } else {
-        rotateCharacter(-Math.PI / 2);
-        playAction('crouchWalk', 0.15);
+        rotateChar(Math.PI / 2);
+        playAction('crouchWalk');
       }
-      return;
     }
     return;
   }
 
-  // 通常状態
-  if (!isMoving) {
-    playAction('idle', 0.2);
+  if (!anyMove) {
+    prevMovingFwd = false;
+    prevMovingBack = false;
+    playAction('idle');
     return;
   }
 
-  // 走り（Ctrl）
-  if (ctrl) {
-    if (w) {
-      // ランニング中にSを押した場合はターン180
-      if (prevMovingBack) {
-        playOnceAndThen('runTurn180', 'run', 0.15);
+  if (isRunning) {
+    // ========== ランニング ==========
+    if (fwd) {
+      // 前フレームで後退していたらターン180
+      if (prevMovingBack && actions['runTurn180']) {
+        inRunTurn = true;
+        playAction('runTurn180', 0.1);
       } else {
-        playAction('run', 0.2);
+        playAction('run');
       }
-      prevMovingForward = true; prevMovingBack = false;
-      return;
-    }
-    if (s) {
-      // ランニング中にWを押した場合はターン180
-      if (prevMovingForward) {
-        playOnceAndThen('runTurn180', 'run', 0.15);
+      prevMovingFwd = true; prevMovingBack = false;
+    } else if (back) {
+      if (prevMovingFwd && actions['runTurn180']) {
+        inRunTurn = true;
+        playAction('runTurn180', 0.1);
       } else {
         if (FACE_CAMERA_DIRECTION) {
-          playAction('runBack', 0.2);
+          playAction('runBack');
         } else {
-          rotateCharacter(Math.PI);
-          playAction('run', 0.2);
+          rotateChar(Math.PI);
+          playAction('run');
         }
       }
-      prevMovingBack = true; prevMovingForward = false;
-      return;
-    }
-    if (a) {
+      prevMovingFwd = false; prevMovingBack = true;
+    } else if (left) {
       if (FACE_CAMERA_DIRECTION) {
-        playAction('leftStrafeRun', 0.2);
+        playAction('strafeRunLeft');
       } else {
-        rotateCharacter(Math.PI / 2);
-        playAction('run', 0.2);
+        rotateChar(-Math.PI / 2);
+        playAction('run');
       }
-      return;
-    }
-    if (d) {
+    } else if (right) {
       if (FACE_CAMERA_DIRECTION) {
-        playAction('rightStrafeRun', 0.2);
+        playAction('strafeRunRight');
       } else {
-        rotateCharacter(-Math.PI / 2);
-        playAction('run', 0.2);
-      }
-      return;
-    }
-    return;
-  }
-
-  // 歩き
-  if (w) {
-    if (prevMovingBack) {
-      // 歩き中に反対方向キー → ターン180からWalk
-      playOnceAndThen('walkTurn180', 'walk', 0.15);
-    } else {
-      playAction('walk', 0.2);
-    }
-    prevMovingForward = true; prevMovingBack = false;
-    return;
-  }
-  if (s) {
-    if (prevMovingForward) {
-      playOnceAndThen('walkTurn180', 'walk', 0.15);
-    } else {
-      if (FACE_CAMERA_DIRECTION) {
-        // 後ろ歩きはスピードを落とす
-        const action = actions['walkBack'];
-        if (action) action.timeScale = 0.7;
-        playAction('walkBack', 0.2);
-      } else {
-        rotateCharacter(Math.PI);
-        // 後ろ向き歩きもスピードダウン
-        const action = actions['walk'];
-        if (action) action.timeScale = 0.7;
-        playAction('walk', 0.2);
+        rotateChar(Math.PI / 2);
+        playAction('run');
       }
     }
-    prevMovingBack = true; prevMovingForward = false;
-    return;
-  }
-  if (a) {
-    if (FACE_CAMERA_DIRECTION) {
-      playAction('leftStrafe', 0.2);
-    } else {
-      rotateCharacter(Math.PI / 2);
-      playAction('walk', 0.2);
+    // 後退走りはスピードを落とす
+    if (actions['runBack'] && currentAction === 'runBack') {
+      actions['runBack'].timeScale = 0.7;
     }
-    return;
-  }
-  if (d) {
-    if (FACE_CAMERA_DIRECTION) {
-      playAction('rightStrafe', 0.2);
-    } else {
-      rotateCharacter(-Math.PI / 2);
-      playAction('walk', 0.2);
+  } else {
+    // ========== 歩き ==========
+    if (fwd) {
+      // 前フレームで後退していたらターン180
+      if (prevMovingBack && actions['walkTurn180']) {
+        inWalkTurn = true;
+        playAction('walkTurn180', 0.1);
+      } else {
+        playAction('walk');
+      }
+      prevMovingFwd = true; prevMovingBack = false;
+    } else if (back) {
+      if (prevMovingFwd && actions['walkTurn180']) {
+        inWalkTurn = true;
+        playAction('walkTurn180', 0.1);
+      } else {
+        if (FACE_CAMERA_DIRECTION) {
+          // 設定ON：Walking Backwards
+          if (actions['walkBack']) {
+            playAction('walkBack');
+            if (actions['walkBack']) actions['walkBack'].timeScale = 0.7; // スピードを落とす
+          } else {
+            playAction('walkTurn180');
+          }
+        } else {
+          // 設定OFF：Walking Turn 180 → Walking
+          if (!inWalkTurn && actions['walkTurn180']) {
+            inWalkTurn = true;
+            playAction('walkTurn180', 0.1);
+          }
+        }
+      }
+      prevMovingFwd = false; prevMovingBack = true;
+    } else if (left) {
+      if (FACE_CAMERA_DIRECTION) {
+        playAction('strafeLeft');
+      } else {
+        rotateChar(-Math.PI / 2);
+        playAction('walk');
+      }
+    } else if (right) {
+      if (FACE_CAMERA_DIRECTION) {
+        playAction('strafeRight');
+      } else {
+        rotateChar(Math.PI / 2);
+        playAction('walk');
+      }
     }
-    return;
   }
 }
 
 /* ====================================================================
-   設定パネル：「視点方向向く」トグル
+   キャラクターのY軸を指定角度に補間しながら回転
    ==================================================================== */
-const settingPanel = document.createElement('div');
-settingPanel.style.cssText = `
-  position: fixed; bottom: 14px; left: 12px;
-  background: rgba(0,0,0,0.55); color: #fff;
-  padding: 10px 14px; border-radius: 10px;
-  font-size: 12px; user-select: none;
-`;
-settingPanel.innerHTML = `
-  <label style="cursor:pointer; display:flex; align-items:center; gap:8px;">
-    <input type="checkbox" id="faceCamToggle" ${FACE_CAMERA_DIRECTION ? 'checked' : ''}>
-    視点方向向く（ストレイフ/後退アニメ使用）
-  </label>
-  <div style="margin-top:6px; color:#aaa; font-size:11px;">
-    W:歩き　Ctrl+W:走り　Shift:しゃがみ<br>
-    Space:ジャンプ　Ctrl+A/D:ストレイフ
-  </div>
-`;
-document.body.appendChild(settingPanel);
-document.getElementById('faceCamToggle').addEventListener('change', (e) => {
-  FACE_CAMERA_DIRECTION = e.target.checked;
-});
-
-function updateInputAnimation() {
-  // walkのtimeScaleをW押し時に1.0に戻す（後退後の正規化）
-  if (pressedKeys.has('w') && actions.walk) {
-    actions.walk.timeScale = 1.0;
-  }
-  // キー状態の変化で再評価（毎フレームではなくkeydown/keyupで呼ぶが念のため）
+function rotateChar(targetYaw) {
+  if (!currentVrm) return;
+  currentVrm.scene.rotation.y = targetYaw;
 }
+
+/* ====================================================================
+   ⑥（旧）矢印キー操作 → 新システムに統合済み。ここは空にする
+   ==================================================================== */
+
+
 
 /* ====================================================================
    ウィンドウリサイズ対応
@@ -773,7 +787,7 @@ function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
 
-  updateInputAnimation();
+  updateInputAnimation(delta);
 
   if (mixer) mixer.update(delta);
   if (currentVrm) currentVrm.update(delta); // 表情・ボーン・LookAt・スプリングボーン等を一括更新
