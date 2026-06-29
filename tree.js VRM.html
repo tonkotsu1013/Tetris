@@ -416,8 +416,6 @@ fill.position.set(-5, 3, -3);
 scene.add(fill);
 
 // ── ワールド地形 ──
-buildWorld();
-
 function buildWorld() {
   // 地面
   const groundGeo = new THREE.PlaneGeometry(100, 100, 40, 40);
@@ -486,6 +484,7 @@ function buildWorld() {
 
 // 階段（3段）
 const stairBounds = [];
+buildWorld();
 function buildStairs(x, y, z) {
   const mat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.8 });
   for (let i = 0; i < 4; i++) {
