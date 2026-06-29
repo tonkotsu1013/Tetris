@@ -3,64 +3,96 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>3D オーバーワールド</title>
+<title>VRM Viewer</title>
 <style>
-html,body{margin:0;padding:0;overflow:hidden;background:#0a0e1a;
-  font-family:-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;}
-#canvas-container{position:fixed;inset:0}
-#state-label{position:fixed;top:12px;left:50%;transform:translateX(-50%);
-  color:#8be9fd;background:rgba(0,0,0,.65);padding:6px 16px;border-radius:8px;
-  font-size:13px;pointer-events:none;white-space:nowrap}
-#status{position:fixed;top:48px;left:50%;transform:translateX(-50%);
-  color:#ffb86c;background:rgba(0,0,0,.6);padding:4px 12px;border-radius:7px;
-  font-size:11px;pointer-events:none;display:none}
-#hud{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);
-  color:#ccc;background:rgba(0,0,0,.55);padding:8px 16px;border-radius:9px;
-  font-size:11px;pointer-events:none;text-align:center;white-space:nowrap}
-#settings-panel{position:fixed;top:12px;right:12px;background:rgba(0,0,0,.72);
-  color:#fff;padding:14px 16px;border-radius:10px;font-size:12px;min-width:195px;
-  border:1px solid rgba(255,255,255,.12)}
-#settings-panel h3{margin:0 0 10px;font-size:13px;color:#bd93f9}
-.setting-row{display:flex;align-items:center;justify-content:space-between;margin:6px 0;gap:8px}
-.toggle-btn{padding:3px 10px;border-radius:5px;border:1px solid #555;background:#333;
-  color:#fff;cursor:pointer;font-size:11px;min-width:48px;text-align:center}
-.toggle-btn.on{background:#5b6cff;border-color:#7b8cff}
-#expressions{position:fixed;top:12px;left:12px;max-width:170px;max-height:68vh;
-  overflow-y:auto;background:rgba(0,0,0,.68);color:#fff;padding:10px 12px;
-  border-radius:10px;font-size:11px;border:1px solid rgba(255,255,255,.1)}
-#expressions h3{margin:0 0 7px;font-size:12px;color:#50fa7b}
-.expr-btn{display:block;width:100%;margin:2px 0;padding:5px 7px;border:none;
-  border-radius:5px;background:#2e2e4d;color:#fff;cursor:pointer;font-size:11px;text-align:left}
-.expr-btn:hover{background:#45457a}.expr-btn.active{background:#5b6cff}
-#resetExpr{margin-top:6px;background:#553333}
-#loading-overlay{position:fixed;inset:0;background:#0a0e1a;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;color:#8be9fd;font-size:15px;z-index:999}
-#loading-bar-wrap{width:280px;height:6px;background:#222;border-radius:3px;margin-top:16px;overflow:hidden}
-#loading-bar{height:100%;background:#5b6cff;width:0%;transition:width .15s}
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #15151f;
+    font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  }
+  #canvas-container { position: fixed; inset: 0; }
+
+  #ui {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.55);
+    padding: 14px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.7;
+    max-width: 280px;
+    pointer-events: none;
+  }
+  #ui h1 { margin: 0 0 6px; font-size: 15px; }
+  #status { color: #8be9fd; }
+
+  #expressions {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    max-width: 230px;
+    max-height: 80vh;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+  #expressions h2 { margin: 0 0 8px; font-size: 13px; }
+  .expr-btn {
+    display: block;
+    width: 100%;
+    margin: 3px 0;
+    padding: 6px 8px;
+    border: none;
+    border-radius: 6px;
+    background: #2e2e4d;
+    color: #fff;
+    cursor: pointer;
+    font-size: 12px;
+    text-align: left;
+  }
+  .expr-btn:hover { background: #45457a; }
+  .expr-btn.active { background: #5b6cff; }
+  #resetExpr { margin-top: 8px; background: #553333; }
 </style>
 </head>
 <body>
-<div id="loading-overlay">
-  <div id="loading-text">読み込み中...</div>
-  <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
-</div>
-<div id="canvas-container"></div>
-<div id="state-label">状態: 初期化中</div>
-<div id="status"></div>
-<div id="hud">W/S:歩く &nbsp; Ctrl+W/S:走る &nbsp; A/D:横移動 &nbsp; Shift:しゃがみ切替 &nbsp; Space:ジャンプ &nbsp; マウスドラッグ:視点 &nbsp; ホイール:ズーム</div>
-<div id="settings-panel">
-  <h3>⚙ 設定</h3>
-  <div class="setting-row"><span>視点方向に向く</span><button class="toggle-btn on" id="btn-face-dir">ON</button></div>
-  <div class="setting-row"><span>カメラ自動追従</span><button class="toggle-btn on" id="btn-cam-follow">ON</button></div>
-</div>
-<div id="expressions"><h3>😊 表情</h3><div id="exprList">VRM読み込み後</div></div>
 
+<div id="canvas-container"></div>
+
+<div id="ui">
+  <h1>VRM Viewer</h1>
+  <div id="status">読み込み中...</div>
+  <div>ドラッグ：視点回転 / ホイール：ズーム</div>
+  <div>W/S/A/D：移動　Ctrl+W：走る</div>
+  <div>Shift：しゃがみトグル　Space：ジャンプ</div>
+</div>
+
+<div id="expressions">
+  <h2>表情一覧（VRMから自動検出）</h2>
+  <div id="exprList">VRM読み込み後に表示されます</div>
+</div>
+
+<!--
+  ====================================================================
+  importmap: three.js / three-vrm / addons をCDN(jsdelivr)から読み込む設定。
+  バージョンを変えたい場合はここの数字を変更してください。
+  ====================================================================
+-->
 <script type="importmap">
-{"imports":{
-  "three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
-  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
-  "@pixiv/three-vrm":"https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3/lib/three-vrm.module.min.js"
-}}
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+    "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3/lib/three-vrm.module.min.js"
+  }
+}
 </script>
 
 <script type="module">
@@ -70,794 +102,683 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
-/* ──────────────────────────────────────────
-   定数・設定
-────────────────────────────────────────── */
-const VRM_PATH = './ayame_v1.1.vrm';
+/* ====================================================================
+   ① ファイル名はここで指定します
+   index.html と「同じフォルダ」に以下のファイルを置いてください。
+   サブフォルダに入れた場合はパスを './models/xxx.vrm' のように直してください。
+   ==================================================================== */
+const VRM_FILE_PATH = './ayame_v1.1.vrm';     // ← VRMファイル名
 
-// アニメーションファイル名（全てVRMと同じフォルダ）
-const ANIM = {
-  idle:          'Standard Idle.fbx',
-  walk:          'Walking.fbx',
-  walkBack:      'Walking Backwards.fbx',
-  turn180:       'Walking Turn 180.fbx',
-  strafeL:       'Left Strafe Walking.fbx',
-  strafeR:       'Right Strafe Walking.fbx',
-  run:           'Running.fbx',
-  runBack:       'Running Backwards.fbx',
-  runTurn180:    'Running Turn 180.fbx',
-  runStrafeL:    'Left Strafe.fbx',
-  runStrafeR:    'Right Strafe.fbx',
-  crouch:        'Male Crouch Pose.fbx',
-  crouchWalk:    'Crouched Walking.fbx',
-  crouchWalkRev: 'Crouched Walking.fbx',   // 後ろしゃがみ用（逆再生）
-  crouchStrafeL: 'Crouched Sneaking Left.fbx',
-  crouchStrafeR: 'Crouched Sneaking Right.fbx',
-  jump:          'Jumping.fbx',
-  fall:          'Falling Idle.fbx',
-  land:          'Falling to Landing.fbx',
-  stairsUp:      'Ascending Stairs.fbx',
+const KEEP_IN_PLACE = true; // true: その場で足踏み（移動しない） / false: 実際に前進してしまう
+
+/* ====================================================================
+   アニメーションファイルパス一覧
+   ==================================================================== */
+const ANIM_FILES = {
+  idle:                 './Standard Idle.fbx',
+  walk:                 './Walking.fbx',
+  walkBack:             './Walking Backwards.fbx',
+  walkTurn180:          './Walking Turn 180.fbx',
+  leftStrafe:           './Left Strafe Walking.fbx',
+  rightStrafe:          './Right Strafe Walking.fbx',
+  run:                  './Running.fbx',
+  runBack:              './Running Backwards.fbx',
+  runTurn180:           './Running Turn 180.fbx',
+  leftStrafeRun:        './Left Strafe.fbx',
+  rightStrafeRun:       './Right Strafe.fbx',
+  crouch:               './Male Crouch Pose.fbx',
+  crouchWalk:           './Crouched Walking.fbx',
+  crouchLeft:           './Crouched Sneaking Left.fbx',
+  crouchRight:          './Crouched Sneaking Right.fbx',
+  jump:                 './Jumping.fbx',
+  fall:                 './Falling Idle.fbx',
+  land:                 './Falling to Landing.fbx',
+  stairs:               './Ascending Stairs.fbx',
 };
 
-const SPEED = {
-  walk:       2.8,
-  walkBack:   1.7,   // 後ろ歩きは遅め
-  strafe:     2.2,
-  run:        5.8,
-  runBack:    2.2,
-  runStrafe:  4.8,
-  crouch:     1.2,
-  turnSmooth: 10,    // rad/s（向き補間速度）
+/* ====================================================================
+   設定：「視点方向向く」ON/OFF スイッチ
+   true  = 方向キーでキャラが視点方向へ向いてストレイフ/後退アニメを使う
+   false = コードでキャラを回転させて歩行アニメを使う
+   ==================================================================== */
+let FACE_CAMERA_DIRECTION = true;
+
+/* ====================================================================
+   ② Mixamo → VRM ボーン名 対応表
+   ミクサモのリグ名 (mixamorigXXX) は VRM の Humanoid ボーン名と
+   名前も階層も違うため、この対応表で1本ずつ紐づけてから動かします。
+   （pixiv公式 three-vrm のサンプルで使われている対応表と同じものです）
+   ==================================================================== */
+const mixamoVRMRigMap = {
+  mixamorigHips: 'hips',
+  mixamorigSpine: 'spine',
+  mixamorigSpine1: 'chest',
+  mixamorigSpine2: 'upperChest',
+  mixamorigNeck: 'neck',
+  mixamorigHead: 'head',
+  mixamorigLeftShoulder: 'leftShoulder',
+  mixamorigLeftArm: 'leftUpperArm',
+  mixamorigLeftForeArm: 'leftLowerArm',
+  mixamorigLeftHand: 'leftHand',
+  mixamorigLeftHandThumb1: 'leftThumbMetacarpal',
+  mixamorigLeftHandThumb2: 'leftThumbProximal',
+  mixamorigLeftHandThumb3: 'leftThumbDistal',
+  mixamorigLeftHandIndex1: 'leftIndexProximal',
+  mixamorigLeftHandIndex2: 'leftIndexIntermediate',
+  mixamorigLeftHandIndex3: 'leftIndexDistal',
+  mixamorigLeftHandMiddle1: 'leftMiddleProximal',
+  mixamorigLeftHandMiddle2: 'leftMiddleIntermediate',
+  mixamorigLeftHandMiddle3: 'leftMiddleDistal',
+  mixamorigLeftHandRing1: 'leftRingProximal',
+  mixamorigLeftHandRing2: 'leftRingIntermediate',
+  mixamorigLeftHandRing3: 'leftRingDistal',
+  mixamorigLeftHandPinky1: 'leftLittleProximal',
+  mixamorigLeftHandPinky2: 'leftLittleIntermediate',
+  mixamorigLeftHandPinky3: 'leftLittleDistal',
+  mixamorigRightShoulder: 'rightShoulder',
+  mixamorigRightArm: 'rightUpperArm',
+  mixamorigRightForeArm: 'rightLowerArm',
+  mixamorigRightHand: 'rightHand',
+  mixamorigRightHandPinky1: 'rightLittleProximal',
+  mixamorigRightHandPinky2: 'rightLittleIntermediate',
+  mixamorigRightHandPinky3: 'rightLittleDistal',
+  mixamorigRightHandRing1: 'rightRingProximal',
+  mixamorigRightHandRing2: 'rightRingIntermediate',
+  mixamorigRightHandRing3: 'rightRingDistal',
+  mixamorigRightHandMiddle1: 'rightMiddleProximal',
+  mixamorigRightHandMiddle2: 'rightMiddleIntermediate',
+  mixamorigRightHandMiddle3: 'rightMiddleDistal',
+  mixamorigRightHandIndex1: 'rightIndexProximal',
+  mixamorigRightHandIndex2: 'rightIndexIntermediate',
+  mixamorigRightHandIndex3: 'rightIndexDistal',
+  mixamorigRightHandThumb1: 'rightThumbMetacarpal',
+  mixamorigRightHandThumb2: 'rightThumbProximal',
+  mixamorigRightHandThumb3: 'rightThumbDistal',
+  mixamorigLeftUpLeg: 'leftUpperLeg',
+  mixamorigLeftLeg: 'leftLowerLeg',
+  mixamorigLeftFoot: 'leftFoot',
+  mixamorigLeftToeBase: 'leftToes',
+  mixamorigRightUpLeg: 'rightUpperLeg',
+  mixamorigRightLeg: 'rightLowerLeg',
+  mixamorigRightFoot: 'rightFoot',
+  mixamorigRightToeBase: 'rightToes',
 };
 
-const GRAVITY     = -14;
-const JUMP_VEL    =  5.5;
-const LAND_DUR    =  0.6;   // 着地モーション長さ(秒)
-const TURN180_DUR =  0.45;  // 180ターン長さ(秒)
-
-/* ──────────────────────────────────────────
-   Mixamo → VRM ボーンマップ
-────────────────────────────────────────── */
-const rigMap = {
-  mixamorigHips:'hips',mixamorigSpine:'spine',mixamorigSpine1:'chest',
-  mixamorigSpine2:'upperChest',mixamorigNeck:'neck',mixamorigHead:'head',
-  mixamorigLeftShoulder:'leftShoulder',mixamorigLeftArm:'leftUpperArm',
-  mixamorigLeftForeArm:'leftLowerArm',mixamorigLeftHand:'leftHand',
-  mixamorigLeftHandThumb1:'leftThumbMetacarpal',mixamorigLeftHandThumb2:'leftThumbProximal',
-  mixamorigLeftHandThumb3:'leftThumbDistal',mixamorigLeftHandIndex1:'leftIndexProximal',
-  mixamorigLeftHandIndex2:'leftIndexIntermediate',mixamorigLeftHandIndex3:'leftIndexDistal',
-  mixamorigLeftHandMiddle1:'leftMiddleProximal',mixamorigLeftHandMiddle2:'leftMiddleIntermediate',
-  mixamorigLeftHandMiddle3:'leftMiddleDistal',mixamorigLeftHandRing1:'leftRingProximal',
-  mixamorigLeftHandRing2:'leftRingIntermediate',mixamorigLeftHandRing3:'leftRingDistal',
-  mixamorigLeftHandPinky1:'leftLittleProximal',mixamorigLeftHandPinky2:'leftLittleIntermediate',
-  mixamorigLeftHandPinky3:'leftLittleDistal',mixamorigRightShoulder:'rightShoulder',
-  mixamorigRightArm:'rightUpperArm',mixamorigRightForeArm:'rightLowerArm',
-  mixamorigRightHand:'rightHand',mixamorigRightHandPinky1:'rightLittleProximal',
-  mixamorigRightHandPinky2:'rightLittleIntermediate',mixamorigRightHandPinky3:'rightLittleDistal',
-  mixamorigRightHandRing1:'rightRingProximal',mixamorigRightHandRing2:'rightRingIntermediate',
-  mixamorigRightHandRing3:'rightRingDistal',mixamorigRightHandMiddle1:'rightMiddleProximal',
-  mixamorigRightHandMiddle2:'rightMiddleIntermediate',mixamorigRightHandMiddle3:'rightMiddleDistal',
-  mixamorigRightHandIndex1:'rightIndexProximal',mixamorigRightHandIndex2:'rightIndexIntermediate',
-  mixamorigRightHandIndex3:'rightIndexDistal',mixamorigRightHandThumb1:'rightThumbMetacarpal',
-  mixamorigRightHandThumb2:'rightThumbProximal',mixamorigRightHandThumb3:'rightThumbDistal',
-  mixamorigLeftUpLeg:'leftUpperLeg',mixamorigLeftLeg:'leftLowerLeg',
-  mixamorigLeftFoot:'leftFoot',mixamorigLeftToeBase:'leftToes',
-  mixamorigRightUpLeg:'rightUpperLeg',mixamorigRightLeg:'rightLowerLeg',
-  mixamorigRightFoot:'rightFoot',mixamorigRightToeBase:'rightToes',
-};
-
-/* ──────────────────────────────────────────
-   Mixamo FBX → VRM AnimationClip 変換
-   reverse=true で逆再生クリップを生成（しゃがみ後退用）
-────────────────────────────────────────── */
-function loadMixamoAnimation(url, vrmModel, reverse = false) {
-  return new FBXLoader().loadAsync(url).then(asset => {
-    const clip = THREE.AnimationClip.findByName(asset.animations,'mixamo.com') || asset.animations[0];
-    if (!clip) throw new Error('アニメなし: ' + url);
-
-    const restRotInv = new THREE.Quaternion();
-    const parentRot  = new THREE.Quaternion();
-    const _q = new THREE.Quaternion();
-
-    const hipsNode = asset.getObjectByName('mixamorigHips');
-    const motionH  = hipsNode ? hipsNode.position.y : 1;
-    const vrmH     = vrmModel.humanoid.normalizedRestPose.hips?.position?.[1] ?? 1;
-    const hipsScale = vrmH / motionH;
-    const isVRM0    = vrmModel.meta?.metaVersion === '0';
+/* ====================================================================
+   ③ ミクサモのFBXアニメーションを VRM 用 AnimationClip に変換する関数
+   pixiv公式 three-vrm のサンプル loadMixamoAnimation.js をベースに、
+   「その場から動かさない」処理 (KEEP_IN_PLACE) を追加したものです。
+   https://github.com/pixiv/three-vrm/tree/dev/packages/three-vrm-core/examples/humanoidAnimation
+   ==================================================================== */
+function loadMixamoAnimation(url, vrm, keepInPlace = true) {
+  const loader = new FBXLoader();
+  return loader.loadAsync(url).then((asset) => {
+    // Mixamoから書き出されたFBXは、アニメーション名が "mixamo.com" になっていることが多い
+    const clip = THREE.AnimationClip.findByName(asset.animations, 'mixamo.com') || asset.animations[0];
+    if (!clip) throw new Error('FBXの中にアニメーションが見つかりませんでした');
 
     const tracks = [];
-    clip.tracks.forEach(track => {
-      const dotIdx = track.name.indexOf('.');
-      const rigName = track.name.slice(0, dotIdx);
-      const prop    = track.name.slice(dotIdx + 1);
-      const boneName = rigMap[rigName];
-      const vrmNode  = vrmModel.humanoid?.getNormalizedBoneNode(boneName)?.name;
-      const rigNode  = asset.getObjectByName(rigName);
-      if (!vrmNode || !rigNode) return;
+    const restRotationInverse = new THREE.Quaternion();
+    const parentRestWorldRotation = new THREE.Quaternion();
+    const _quatA = new THREE.Quaternion();
 
-      rigNode.getWorldQuaternion(restRotInv).invert();
-      rigNode.parent.getWorldQuaternion(parentRot);
+    // ミクサモとVRMでは腰(Hips)の高さ＝身長スケールが違うため、比率を求めて補正する
+    const mixamoHipsNode = asset.getObjectByName('mixamorigHips');
+    const motionHipsHeight = mixamoHipsNode.position.y;
+    const vrmHipsHeight = vrm.humanoid.normalizedRestPose.hips.position[1];
+    const hipsPositionScale = vrmHipsHeight / motionHipsHeight;
+
+    clip.tracks.forEach((track) => {
+      // トラック名は "mixamorigHips.quaternion" のような形式になっている
+      const [mixamoRigName, propertyName] = track.name.split('.');
+      const vrmBoneName = mixamoVRMRigMap[mixamoRigName];
+      const vrmNodeName = vrm.humanoid?.getNormalizedBoneNode(vrmBoneName)?.name;
+      const mixamoRigNode = asset.getObjectByName(mixamoRigName);
+
+      // 対応表に無いボーン（指の一部や補助ボーンなど）は無視する
+      if (vrmNodeName == null || mixamoRigNode == null) return;
+
+      // レスト(直立)姿勢時の回転を基準に、回転の差分だけを取り出す
+      mixamoRigNode.getWorldQuaternion(restRotationInverse).invert();
+      mixamoRigNode.parent.getWorldQuaternion(parentRestWorldRotation);
 
       if (track instanceof THREE.QuaternionKeyframeTrack) {
-        const vals = Float32Array.from(track.values);
-        for (let i = 0; i < vals.length; i += 4) {
-          const f = vals.subarray(i, i + 4);
-          _q.fromArray(f).premultiply(parentRot).multiply(restRotInv).toArray(f);
-          if (isVRM0) { vals[i] = -vals[i]; vals[i+2] = -vals[i+2]; }
+        for (let i = 0; i < track.values.length; i += 4) {
+          const flat = track.values.slice(i, i + 4);
+          _quatA.fromArray(flat).premultiply(parentRestWorldRotation).multiply(restRotationInverse).toArray(flat);
+          flat.forEach((v, idx) => (track.values[idx + i] = v));
         }
-        tracks.push(new THREE.QuaternionKeyframeTrack(`${vrmNode}.${prop}`, track.times, vals));
+        tracks.push(new THREE.QuaternionKeyframeTrack(
+          `${vrmNodeName}.${propertyName}`,
+          track.times,
+          // VRM0.0モデルは前後左右の軸が反転しているので、その場合だけ符号を反転する
+          track.values.map((v, i) => (vrm.meta?.metaVersion === '0' && i % 2 === 0 ? -v : v)),
+        ));
       } else if (track instanceof THREE.VectorKeyframeTrack) {
-        const vals = track.values.map((v, i) => {
-          const s = isVRM0 && i % 3 !== 1 ? -1 : 1;
-          return v * s * hipsScale;
-        });
-        // Hips XZ固定（その場で動く）
-        if (rigName === 'mixamorigHips' && prop === 'position') {
-          for (let i = 0; i < vals.length; i += 3) { vals[i] = 0; vals[i+2] = 0; }
+        const values = track.values.map(
+          (v, i) => (vrm.meta?.metaVersion === '0' && i % 3 !== 1 ? -v : v) * hipsPositionScale,
+        );
+
+        // Hipsの「位置」トラック＝歩行による前進(根本移動)が入っている部分
+        if (mixamoRigName === 'mixamorigHips' && propertyName === 'position' && keepInPlace) {
+          // X(左右)とZ(前後)だけ0にする。Y(上下の重心バウンス)はそのまま残すので
+          // 「その場で足踏みしている」自然な動きになる
+          for (let i = 0; i < values.length; i += 3) {
+            values[i] = 0;
+            values[i + 2] = 0;
+          }
         }
-        tracks.push(new THREE.VectorKeyframeTrack(`${vrmNode}.${prop}`, track.times, vals));
+        tracks.push(new THREE.VectorKeyframeTrack(`${vrmNodeName}.${propertyName}`, track.times, values));
       }
     });
 
-    // 逆再生：時間軸を反転
-    let finalTracks = tracks;
-    const dur = clip.duration;
-    if (reverse) {
-      finalTracks = tracks.map(t => {
-        const n = t.values.length / t.times.length;
-        const revT = [];
-        const revV = [];
-        for (let i = t.times.length - 1; i >= 0; i--) {
-          revT.push(dur - t.times[i]);
-          for (let j = 0; j < n; j++) revV.push(t.values[i * n + j]);
-        }
-        if (t instanceof THREE.QuaternionKeyframeTrack)
-          return new THREE.QuaternionKeyframeTrack(t.name, revT, revV);
-        return new THREE.VectorKeyframeTrack(t.name, revT, revV);
-      });
-    }
-
-    return new THREE.AnimationClip(url + (reverse?'_rev':''), dur, finalTracks);
+    return new THREE.AnimationClip(url, clip.duration, tracks);
   });
 }
 
-/* ──────────────────────────────────────────
-   シーン構築
-────────────────────────────────────────── */
+/* ====================================================================
+   シーンの基本構築
+   ==================================================================== */
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x0a0e1a, 40, 90);
+scene.background = new THREE.Color(0x15151f);
 
-// 夜空ドーム
-scene.add(Object.assign(
-  new THREE.Mesh(new THREE.SphereGeometry(80,32,16),
-    new THREE.MeshBasicMaterial({color:0x0d1530,side:THREE.BackSide}))
-));
+const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 50);
+camera.position.set(0, 1.4, 3.2);
 
-const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 120);
-camera.position.set(0, 4, 8);
-
-const renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(innerWidth, innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.getElementById('canvas-container').appendChild(renderer.domElement);
 
+// マウス/タッチで自由にいろんな角度から見られるようにする
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 1.2, 0);
+controls.target.set(0, 1.0, 0);
 controls.enableDamping = true;
-controls.minDistance = 2; controls.maxDistance = 20;
-controls.maxPolarAngle = Math.PI * 0.84;
+controls.minDistance = 0.6;
+controls.maxDistance = 8;
 controls.update();
 
-// 光源
-scene.add(new THREE.HemisphereLight(0x6688bb, 0x223322, 1.0));
-const sun = new THREE.DirectionalLight(0xfff8d0, 1.8);
-sun.position.set(6, 14, 8); sun.castShadow = true;
-sun.shadow.mapSize.set(2048,2048);
-sun.shadow.camera.left = sun.shadow.camera.bottom = -25;
-sun.shadow.camera.right = sun.shadow.camera.top = 25;
-sun.shadow.camera.far = 100;
-scene.add(sun);
+// ライト
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 1.3));
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.6);
+dirLight.position.set(1, 2, 1.5);
+scene.add(dirLight);
 
-/* ──────────────────────────────────────────
-   ワールドマップ
-────────────────────────────────────────── */
-(function buildWorld() {
-  const mkMesh = (geo,mat,pos,rx,shadow) => {
-    const m = new THREE.Mesh(geo,mat);
-    if (pos) m.position.set(...pos);
-    if (rx) m.rotation.x = rx;
-    m.castShadow = m.receiveShadow = !!shadow;
-    scene.add(m); return m;
-  };
+// 足元の目安になる地面とグリッド
+const floor = new THREE.Mesh(
+  new THREE.CircleGeometry(2.2, 48),
+  new THREE.MeshStandardMaterial({ color: 0x23233a, roughness: 1 }),
+);
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
+scene.add(new THREE.GridHelper(4, 16, 0x4444aa, 0x2c2c44));
 
-  // 地面
-  mkMesh(new THREE.PlaneGeometry(120,120),
-    new THREE.MeshStandardMaterial({color:0x2a5522,roughness:.9}),
-    [0,0,0], -Math.PI/2, true);
-
-  // 道路
-  mkMesh(new THREE.PlaneGeometry(4,120),
-    new THREE.MeshStandardMaterial({color:0x383848,roughness:.85}),
-    [0,0.004,0], -Math.PI/2, true);
-
-  // 道路中央線
-  const lineMat = new THREE.MeshStandardMaterial({color:0xffff88});
-  for (let z=-56;z<=56;z+=6)
-    mkMesh(new THREE.PlaneGeometry(.15,3.2),lineMat,[0,0.009,z],-Math.PI/2,false);
-
-  // 階段（左側 x=-6 付近）
-  const stairMat = new THREE.MeshStandardMaterial({color:0x998866,roughness:.8});
-  for (let i=0;i<6;i++) {
-    const h=.2*(i+1), w=3, d=.55;
-    mkMesh(new THREE.BoxGeometry(w,h,d),stairMat,[-6,h/2,-9+i*d],0,true);
-  }
-
-  // 木
-  const tPos = [[8,0,-5],[10,0,-14],[-8,0,-7],[-11,0,4],[13,0,7],
-                [7,0,16],[-9,0,19],[15,0,-21],[-13,0,-24],[6,0,27]];
-  const trunk = new THREE.MeshStandardMaterial({color:0x6b3f1e});
-  const leaf  = new THREE.MeshStandardMaterial({color:0x1e7a1e});
-  tPos.forEach(([x,,z]) => {
-    mkMesh(new THREE.CylinderGeometry(.2,.28,2.2,8),trunk,[x,1.1,z],0,true);
-    mkMesh(new THREE.SphereGeometry(1.6,8,7),leaf,[x,3.4,z],0,true);
-  });
-
-  // 岩
-  const rock = new THREE.MeshStandardMaterial({color:0x777766,roughness:.9});
-  [[3.5,.5,-3.5],[-4,.5,5.5],[-3,.5,-16],[5,.5,22]].forEach(([x,y,z])=>{
-    mkMesh(new THREE.SphereGeometry(.8,7,5),rock,[x,y,z],0,true);
-  });
-
-  // 建物（2棟）
-  const wall = new THREE.MeshStandardMaterial({color:0x336688});
-  const roof = new THREE.MeshStandardMaterial({color:0x882211});
-  [[18,2.5,-12],[18,2.5,12]].forEach(([x,y,z])=>{
-    mkMesh(new THREE.BoxGeometry(6,5,6),wall,[x,y,z],0,true);
-    const r=mkMesh(new THREE.ConeGeometry(4.6,2.2,4),roof,[x,6.2,z],0,true);
-    r.rotation.y=Math.PI/4;
-  });
-
-  // 小川（青い帯）
-  mkMesh(new THREE.PlaneGeometry(2.5,60),
-    new THREE.MeshStandardMaterial({color:0x2244aa,roughness:.2,metalness:.3}),
-    [-14,0.01,0],-Math.PI/2,false);
-})();
-
-/* ──────────────────────────────────────────
-   設定UI
-────────────────────────────────────────── */
-const settings = { faceDir: true, camFollow: true };
-
-document.getElementById('btn-face-dir').addEventListener('click', e=>{
-  settings.faceDir = !settings.faceDir;
-  e.target.textContent = settings.faceDir ? 'ON' : 'OFF';
-  e.target.classList.toggle('on', settings.faceDir);
-});
-document.getElementById('btn-cam-follow').addEventListener('click', e=>{
-  settings.camFollow = !settings.camFollow;
-  e.target.textContent = settings.camFollow ? 'ON' : 'OFF';
-  e.target.classList.toggle('on', settings.camFollow);
-  controls.enabled = !settings.camFollow;
-});
-
-/* ──────────────────────────────────────────
-   入力管理
-────────────────────────────────────────── */
-const keys = new Set();
-const justPressed = new Set(); // 1フレームだけのフラグ
-
-window.addEventListener('keydown', e => {
-  if (['Space','KeyW','KeyS','KeyA','KeyD'].includes(e.code)) e.preventDefault();
-  if (!e.repeat) justPressed.add(e.code);
-  keys.add(e.code);
-});
-window.addEventListener('keyup', e => keys.delete(e.code));
-
-const K = {
-  w:     () => keys.has('KeyW'),
-  s:     () => keys.has('KeyS'),
-  a:     () => keys.has('KeyA'),
-  d:     () => keys.has('KeyD'),
-  ctrl:  () => keys.has('ControlLeft') || keys.has('ControlRight'),
-  space: () => keys.has('Space'),
-  shiftJP: () => justPressed.has('ShiftLeft') || justPressed.has('ShiftRight'),
-};
-
-/* ──────────────────────────────────────────
-   ステート管理
-────────────────────────────────────────── */
-let vrm     = null;
-let mixer   = null;
-const acts  = {};          // key -> AnimationAction
-let curAct  = null;
-let curState = 'idle';
-
-// キャラ状態
-const charPos = new THREE.Vector3(0,0,0);
-let charYaw = 0;           // 現在の向き (Y軸ラジアン)
-let charYawTarget = 0;     // 目標向き
-let isCrouching = false;
-let velY = 0;
-let isGrounded = true;
-
-// タイマー
-let landTimer    = 0;
-let turn180Timer = 0;
-let turn180From  = 0;
-let turn180ToRun = false;   // ターン後に走るか歩くか
-
-function playAction(key, fadeIn = 0.2, timeScale = 1.0) {
-  const next = acts[key];
-  if (!next) return;        // アニメ未読込はスキップ
-  if (curAct === next) {
-    // 逆再生切り替えなどで timescale だけ変える
-    if (Math.sign(curAct.timeScale) !== Math.sign(timeScale)) {
-      curAct.setEffectiveTimeScale(timeScale);
-      if (timeScale < 0) curAct.time = curAct.getClip().duration - 0.001;
-    }
-    return;
-  }
-  if (curAct) curAct.fadeOut(fadeIn);
-  next.reset();
-  next.setEffectiveWeight(1);
-  next.setEffectiveTimeScale(timeScale);
-  if (timeScale < 0) next.time = next.getClip().duration - 0.001;
-  next.fadeIn(fadeIn);
-  next.play();
-  curAct = next;
-}
-
-// stateLabel 更新
-function updateLabel() {
-  document.getElementById('state-label').textContent =
-    `状態: ${curState}  (${charPos.x.toFixed(1)}, ${charPos.y.toFixed(1)}, ${charPos.z.toFixed(1)})`;
-}
-
-function setState(s, fadeIn=0.2) {
-  curState = s;
-  updateLabel();
-  const backScale = 0.7;
-
-  switch(s) {
-    case 'idle':         playAction('idle', fadeIn); break;
-    case 'walk':         playAction('walk', fadeIn); break;
-    case 'walkBack':     playAction('walkBack', fadeIn, backScale); break;
-    case 'turn180':      playAction('turn180', 0.08); break;
-    case 'runTurn180':   playAction('runTurn180', 0.08); break;
-    case 'walkStrafeL':  playAction('strafeL', fadeIn); break;
-    case 'walkStrafeR':  playAction('strafeR', fadeIn); break;
-    case 'run':          playAction('run', fadeIn); break;
-    case 'runBack':      playAction('runBack', fadeIn, backScale); break;
-    case 'runStrafeL':   playAction('runStrafeL', fadeIn); break;
-    case 'runStrafeR':   playAction('runStrafeR', fadeIn); break;
-    case 'crouch':       playAction('crouch', fadeIn); break;
-    case 'crouchWalk':   playAction('crouchWalk', fadeIn); break;
-    case 'crouchWalkBack': playAction('crouchWalkRev', fadeIn); break;  // 逆再生クリップ
-    case 'crouchStrafeL': playAction('crouchStrafeL', fadeIn); break;
-    case 'crouchStrafeR': playAction('crouchStrafeR', fadeIn); break;
-    case 'jump':         playAction('jump', 0.1); break;
-    case 'fall':         playAction('fall', 0.2); break;
-    case 'land':         playAction('land', 0.08); landTimer = LAND_DUR; break;
-    case 'stairsUp':     playAction('stairsUp', 0.2); break;
-  }
-}
-
-/* ──────────────────────────────────────────
-   地面高さ（階段エリア簡易判定）
-────────────────────────────────────────── */
-function getGroundH(x, z) {
-  // 左側の階段（x: -4.5〜-7.5, z: -9〜-5.7）
-  if (x > -7.5 && x < -4.5 && z > -9.2 && z < -5.7) {
-    const step = Math.max(0, Math.min(5, Math.floor((z + 9.2) / 0.55)));
-    return 0.2 * (step + 1);
-  }
-  return 0;
-}
-
-/* ──────────────────────────────────────────
-   カメラ追従
-────────────────────────────────────────── */
-function updateCamera(dt) {
-  if (!settings.camFollow) { controls.update(); return; }
-  const dist=7, height=3.8;
-  const target = new THREE.Vector3(
-    charPos.x + Math.sin(charYaw)*dist,
-    charPos.y + height,
-    charPos.z + Math.cos(charYaw)*dist
-  );
-  camera.position.lerp(target, dt*4.5);
-  const lookTarget = new THREE.Vector3(charPos.x, charPos.y+1.3, charPos.z);
-  controls.target.lerp(lookTarget, dt*9);
-  controls.update();
-}
-
-/* ──────────────────────────────────────────
-   キャラ更新（毎フレーム）
-────────────────────────────────────────── */
-function updateChar(dt) {
-  if (!vrm) return;
-
-  // ── Shiftトグル ──
-  if (K.shiftJP()) {
-    isCrouching = !isCrouching;
-    setState(isCrouching ? 'crouch' : 'idle');
-  }
-
-  // ── 重力・ジャンプ ──
-  const groundH = getGroundH(charPos.x, charPos.z);
-  const onGround = charPos.y <= groundH + 0.02;
-
-  if (!onGround) {
-    velY += GRAVITY * dt;
-    charPos.y = Math.max(groundH, charPos.y + velY * dt);
-    if (charPos.y <= groundH) {
-      velY = 0; charPos.y = groundH;
-      setState('land');
-    } else {
-      if (curState !== 'jump' && curState !== 'land') setState('fall');
-    }
-    applyChar(); updateCamera(dt);
-    mixer?.update(dt); vrm?.update(dt);
-    justPressed.clear(); return;
-  }
-  charPos.y = groundH;
-  isGrounded = true;
-
-  // ── 着地モーション待ち ──
-  if (landTimer > 0) {
-    landTimer -= dt;
-    if (landTimer <= 0) setState('idle');
-    applyChar(); updateCamera(dt);
-    mixer?.update(dt); vrm?.update(dt);
-    justPressed.clear(); return;
-  }
-
-  // ── ジャンプ ──
-  if (K.space() && justPressed.has('Space')) {
-    velY = JUMP_VEL;
-    charPos.y += 0.05;
-    setState('jump');
-    applyChar(); updateCamera(dt);
-    mixer?.update(dt); vrm?.update(dt);
-    justPressed.clear(); return;
-  }
-
-  // ── 180ターン処理 ──
-  if (turn180Timer > 0) {
-    turn180Timer -= dt;
-    const t = 1 - Math.max(0, turn180Timer / TURN180_DUR);
-    charYaw = turn180From + Math.PI * t;
-    if (turn180Timer <= 0) {
-      charYaw = turn180From + Math.PI;
-      setState(turn180ToRun ? 'run' : 'walk');
-    }
-    applyChar(); updateCamera(dt);
-    mixer?.update(dt); vrm?.update(dt);
-    justPressed.clear(); return;
-  }
-
-  // ── 視点方向yaw取得 ──
-  const camDirV = new THREE.Vector3();
-  camera.getWorldDirection(camDirV);
-  camDirV.y = 0; camDirV.normalize();
-  const viewYaw = Math.atan2(camDirV.x, camDirV.z);
-
-  // ── キー入力でステートを決定 ──
-  const ctrl = K.ctrl();
-  const w=K.w(), s=K.s(), a=K.a(), d=K.d();
-  const moving = w||s||a||d;
-  const isWalkState = curState==='walk'||curState==='walkBack'||curState==='walkStrafeL'||curState==='walkStrafeR';
-  const isRunState  = curState==='run' ||curState==='runBack' ||curState==='runStrafeL' ||curState==='runStrafeR';
-
-  let moveVec = new THREE.Vector3(0,0,0);
-  let newState = curState;
-
-  if (!isCrouching) {
-    // ============ 通常モード ============
-    if (!moving) {
-      newState = 'idle';
-    } else if (ctrl) {
-      // ── 走り ──
-      if (w && !s) {
-        if (isRunState && curState==='runBack') { // 後ろ走り中にW → Turn180
-          startTurn180(true); justPressed.clear(); return;
-        }
-        if (settings.faceDir) charYawTarget = viewYaw;
-        newState = 'run';
-        moveVec.set(Math.sin(charYaw),0,Math.cos(charYaw)).multiplyScalar(SPEED.run*dt);
-      } else if (s && !w) {
-        if (isRunState && curState==='run') { // 前走り中にS → Turn180 or runBack
-          if (settings.faceDir) {
-            charYawTarget = viewYaw;
-            newState = 'runBack';
-            moveVec.set(-Math.sin(charYaw),0,-Math.cos(charYaw)).multiplyScalar(SPEED.runBack*dt);
-          } else {
-            startTurn180(true); justPressed.clear(); return;
-          }
-        } else {
-          if (settings.faceDir) {
-            charYawTarget = viewYaw;
-            newState = 'runBack';
-            moveVec.set(-Math.sin(charYaw),0,-Math.cos(charYaw)).multiplyScalar(SPEED.runBack*dt);
-          } else {
-            charYawTarget = charYaw + Math.PI;
-            newState = 'run';
-            const fy = charYawTarget;
-            moveVec.set(Math.sin(fy),0,Math.cos(fy)).multiplyScalar(SPEED.run*dt);
-          }
-        }
-      } else if (a && !d) {
-        if (settings.faceDir) {
-          charYawTarget = viewYaw;
-          newState = 'runStrafeL';
-          moveVec.set(-Math.cos(charYaw),0,Math.sin(charYaw)).multiplyScalar(SPEED.runStrafe*dt);
-        } else {
-          charYawTarget = charYaw - Math.PI/2;
-          newState = 'run';
-          const fy = charYawTarget;
-          moveVec.set(Math.sin(fy),0,Math.cos(fy)).multiplyScalar(SPEED.run*dt);
-        }
-      } else if (d && !a) {
-        if (settings.faceDir) {
-          charYawTarget = viewYaw;
-          newState = 'runStrafeR';
-          moveVec.set(Math.cos(charYaw),0,-Math.sin(charYaw)).multiplyScalar(SPEED.runStrafe*dt);
-        } else {
-          charYawTarget = charYaw + Math.PI/2;
-          newState = 'run';
-          const fy = charYawTarget;
-          moveVec.set(Math.sin(fy),0,Math.cos(fy)).multiplyScalar(SPEED.run*dt);
-        }
-      }
-    } else {
-      // ── 歩き ──
-      if (w && !s) {
-        if (isWalkState && curState==='walkBack') {
-          startTurn180(false); justPressed.clear(); return;
-        }
-        if (settings.faceDir) charYawTarget = viewYaw;
-        newState = 'walk';
-        moveVec.set(Math.sin(charYaw),0,Math.cos(charYaw)).multiplyScalar(SPEED.walk*dt);
-      } else if (s && !w) {
-        if (isWalkState && curState==='walk') {
-          if (settings.faceDir) {
-            charYawTarget = viewYaw;
-            newState = 'walkBack';
-            moveVec.set(-Math.sin(charYaw),0,-Math.cos(charYaw)).multiplyScalar(SPEED.walkBack*dt);
-          } else {
-            startTurn180(false); justPressed.clear(); return;
-          }
-        } else {
-          if (settings.faceDir) {
-            charYawTarget = viewYaw;
-            newState = 'walkBack';
-            moveVec.set(-Math.sin(charYaw),0,-Math.cos(charYaw)).multiplyScalar(SPEED.walkBack*dt);
-          } else {
-            charYawTarget = charYaw + Math.PI;
-            newState = 'turn180';
-            startTurn180(false); justPressed.clear(); return;
-          }
-        }
-      } else if (a && !d) {
-        if (settings.faceDir) {
-          charYawTarget = viewYaw;
-          newState = 'walkStrafeL';
-          moveVec.set(-Math.cos(charYaw),0,Math.sin(charYaw)).multiplyScalar(SPEED.strafe*dt);
-        } else {
-          charYawTarget = charYaw - Math.PI/2;
-          newState = 'walk';
-          const fy = charYawTarget;
-          moveVec.set(Math.sin(fy),0,Math.cos(fy)).multiplyScalar(SPEED.walk*dt);
-        }
-      } else if (d && !a) {
-        if (settings.faceDir) {
-          charYawTarget = viewYaw;
-          newState = 'walkStrafeR';
-          moveVec.set(Math.cos(charYaw),0,-Math.sin(charYaw)).multiplyScalar(SPEED.strafe*dt);
-        } else {
-          charYawTarget = charYaw + Math.PI/2;
-          newState = 'walk';
-          const fy = charYawTarget;
-          moveVec.set(Math.sin(fy),0,Math.cos(fy)).multiplyScalar(SPEED.walk*dt);
-        }
-      }
-    }
-  } else {
-    // ============ しゃがみモード ============
-    if (!moving) {
-      newState = 'crouch';
-    } else if (w && !s) {
-      newState = 'crouchWalk';
-      moveVec.set(Math.sin(charYaw),0,Math.cos(charYaw)).multiplyScalar(SPEED.crouch*dt);
-    } else if (s && !w) {
-      if (settings.faceDir) {
-        // 視点方向設定ON: Crouched Walking逆再生
-        newState = 'crouchWalkBack';
-        moveVec.set(-Math.sin(charYaw),0,-Math.cos(charYaw)).multiplyScalar(SPEED.crouch*dt);
-      } else {
-        charYawTarget = charYaw + Math.PI;
-        newState = 'crouchWalk';
-        const fy = charYawTarget;
-        moveVec.set(Math.sin(fy),0,Math.cos(fy)).multiplyScalar(SPEED.crouch*dt);
-      }
-    } else if (a && !d) {
-      if (settings.faceDir) {
-        newState = 'crouchStrafeL';
-        moveVec.set(-Math.cos(charYaw),0,Math.sin(charYaw)).multiplyScalar(SPEED.crouch*dt);
-      } else {
-        charYawTarget = charYaw - Math.PI/2;
-        newState = 'crouchWalk';
-        const fy = charYawTarget;
-        moveVec.set(Math.sin(fy),0,Math.cos(fy)).multiplyScalar(SPEED.crouch*dt);
-      }
-    } else if (d && !a) {
-      if (settings.faceDir) {
-        newState = 'crouchStrafeR';
-        moveVec.set(Math.cos(charYaw),0,-Math.sin(charYaw)).multiplyScalar(SPEED.crouch*dt);
-      } else {
-        charYawTarget = charYaw + Math.PI/2;
-        newState = 'crouchWalk';
-        const fy = charYawTarget;
-        moveVec.set(Math.sin(fy),0,Math.cos(fy)).multiplyScalar(SPEED.crouch*dt);
-      }
-    }
-  }
-
-  // ── 階段判定 ──
-  const stairH = getGroundH(charPos.x + moveVec.x, charPos.z + moveVec.z);
-  if (stairH > charPos.y + 0.05 && moving) newState = 'stairsUp';
-
-  // ── ステート更新（変わったときのみ） ──
-  if (newState !== curState) setState(newState);
-
-  // ── 向きスムーズ補間 ──
-  let diff = ((charYawTarget - charYaw) % (Math.PI*2) + Math.PI*3) % (Math.PI*2) - Math.PI;
-  charYaw += diff * Math.min(1, SPEED.turnSmooth * dt);
-
-  // ── 移動 ──
-  charPos.add(moveVec);
-  charPos.y = Math.max(charPos.y, stairH);
-
-  applyChar();
-  updateCamera(dt);
-  mixer?.update(dt);
-  vrm?.update(dt);
-  justPressed.clear();
-}
-
-function startTurn180(run) {
-  turn180From = charYaw;
-  turn180Timer = TURN180_DUR;
-  turn180ToRun = run;
-  setState(run ? 'runTurn180' : 'turn180', 0.08);
-}
-
-function applyChar() {
-  if (!vrm) return;
-  vrm.scene.position.copy(charPos);
-  vrm.scene.rotation.y = charYaw;
-}
-
-/* ──────────────────────────────────────────
-   アニメーション全読込
-────────────────────────────────────────── */
-async function loadAllAnimations(vrmModel) {
-  mixer = new THREE.AnimationMixer(vrmModel.scene);
-  const entries = Object.entries(ANIM);
-  let done = 0;
-  for (const [key, file] of entries) {
-    try {
-      const rev = key === 'crouchWalkRev';
-      const clip = await loadMixamoAnimation('./'+file, vrmModel, rev);
-      clip.name = key;
-      const act = mixer.clipAction(clip);
-      act.setLoop(THREE.LoopRepeat);
-      acts[key] = act;
-      // land / jump は LoopOnce
-      if (key==='land'||key==='jump') act.setLoop(THREE.LoopOnce, 1);
-    } catch(e) {
-      console.warn(`スキップ: ${file}`, e.message);
-    }
-    done++;
-    loadingBar.style.width = (50 + Math.round(done/entries.length*48)) + '%';
-    loadingText.textContent = `アニメ読込 ${done}/${entries.length}: ${file}`;
-  }
-}
-
-/* ──────────────────────────────────────────
-   VRM読み込み
-────────────────────────────────────────── */
 const clock = new THREE.Clock();
-const loadingBar  = document.getElementById('loading-bar');
-const loadingText = document.getElementById('loading-text');
+let currentVrm = null;
+let mixer = null;
 
+// 全アニメーションアクションを格納するマップ
+const actions = {};
+// 現在再生中のアクション
+let currentAction = null;
+// 前フレームのキー状態（ターン180検出用）
+let prevMovingForward = false;
+let prevMovingBack = false;
+// しゃがみ状態
+let isCrouching = false;
+// 地面に居るか（ジャンプ/落下管理）
+let isOnGround = true;
+// 着地アニメーション再生中
+let isLanding = false;
+
+const statusEl = document.getElementById('status');
+
+/* ====================================================================
+   ④ VRMの読み込み
+   ==================================================================== */
 const gltfLoader = new GLTFLoader();
-gltfLoader.register(p => new VRMLoaderPlugin(p));
+gltfLoader.register((parser) => new VRMLoaderPlugin(parser));
 
-gltfLoader.load(VRM_PATH,
-  async gltf => {
-    const vrmModel = gltf.userData.vrm;
+gltfLoader.load(
+  VRM_FILE_PATH,
+  async (gltf) => {
+    const vrm = gltf.userData.vrm;
+
+    // 表示に不要なデータを削除して軽量化（任意・無くても動作します）
     VRMUtils.removeUnnecessaryVertices(gltf.scene);
     VRMUtils.removeUnnecessaryJoints(gltf.scene);
-    VRMUtils.rotateVRM0(vrmModel);
-    vrmModel.scene.castShadow = true;
-    scene.add(vrmModel.scene);
-    vrm = vrmModel;
-    charPos.set(0,0,0); applyChar();
 
-    setupExpressionUI(vrmModel);
-    loadingBar.style.width = '50%';
-    loadingText.textContent = 'アニメーション読み込み中...';
+    // VRM0.x のモデルは正面が後ろ(-Z)を向いているため、自動で前(+Z)向きに補正する
+    // VRM1.0のモデルなら何もしない（バージョンを自動判定）
+    VRMUtils.rotateVRM0(vrm);
+
+    scene.add(vrm.scene);
+    currentVrm = vrm;
+    statusEl.textContent = 'VRM読み込み完了。アニメーション読込中...';
+
+    // VRMに入っている表情(Expression)の一覧をUIとコンソールに表示
+    setupExpressionUI(vrm);
+
+    // ミクサモのアニメーションを読み込んでVRMに適用する
+    mixer = new THREE.AnimationMixer(vrm.scene);
 
     try {
-      await loadAllAnimations(vrmModel);
-      setState('idle');
-    } catch(e) { console.error(e); }
+      // 全アニメーションを並列ロード
+      const entries = Object.entries(ANIM_FILES);
+      await Promise.all(entries.map(async ([key, path]) => {
+        try {
+          const clip = await loadMixamoAnimation(path, vrm, KEEP_IN_PLACE);
+          const action = mixer.clipAction(clip);
+          action.setLoop(THREE.LoopRepeat, Infinity);
+          action.clampWhenFinished = false;
+          actions[key] = action;
+        } catch (e) {
+          console.warn(`アニメーション読み込み失敗 [${key}]: ${path}`, e);
+        }
+      }));
 
-    loadingBar.style.width = '100%';
-    setTimeout(()=>{ document.getElementById('loading-overlay').style.display='none'; }, 250);
-  },
-  prog => {
-    if (prog.total) {
-      const p = Math.round(prog.loaded/prog.total*50);
-      loadingBar.style.width = p+'%';
-      loadingText.textContent = `VRM読込中... ${p}%`;
+      // ルートモーション（位置移動）を持つアニメーションを固定化
+      // loadMixamoAnimation内の keepInPlace がすでに XZ を0にしているが念のため
+      // 着地・ターン系の一回再生アニメを設定
+      if (actions.land) {
+        actions.land.setLoop(THREE.LoopOnce, 1);
+        actions.land.clampWhenFinished = true;
+      }
+      if (actions.walkTurn180) {
+        actions.walkTurn180.setLoop(THREE.LoopOnce, 1);
+        actions.walkTurn180.clampWhenFinished = true;
+      }
+      if (actions.runTurn180) {
+        actions.runTurn180.setLoop(THREE.LoopOnce, 1);
+        actions.runTurn180.clampWhenFinished = true;
+      }
+      if (actions.jump) {
+        actions.jump.setLoop(THREE.LoopOnce, 1);
+        actions.jump.clampWhenFinished = true;
+      }
+
+      // ループ再生アニメのうち逆再生なし（通常）のものはLoopRepeatのまま
+      // しゃがみポーズも一回止まる系
+      if (actions.crouch) {
+        actions.crouch.setLoop(THREE.LoopOnce, 1);
+        actions.crouch.clampWhenFinished = true;
+      }
+
+      // アイドルで開始
+      playAction('idle');
+
+      statusEl.textContent = '準備完了！WASD/Ctrl/Shift/Space で操作';
+    } catch (e) {
+      console.error('アニメーション読み込み失敗:', e);
+      statusEl.textContent = 'アニメーション読込に失敗しました（コンソール参照）';
     }
   },
-  err => {
-    console.error(err);
-    loadingText.textContent = 'VRM読み込み失敗';
-    loadingBar.style.background = '#ff5555';
-  }
+  (progress) => {
+    if (progress.total) {
+      statusEl.textContent = `VRM読み込み中... ${Math.round((progress.loaded / progress.total) * 100)}%`;
+    }
+  },
+  (error) => {
+    console.error(error);
+    statusEl.textContent = 'VRMの読み込みに失敗しました。ファイル名/パスを確認してください。';
+  },
 );
 
-/* ──────────────────────────────────────────
-   表情UI
-────────────────────────────────────────── */
-function setupExpressionUI(vrmModel) {
+/* ====================================================================
+   ⑤ 表情(Expression) UI
+   VRMに入っている表情を自動で検出してボタンを生成します。
+   ボタンを押すと vrm.expressionManager.setValue(名前, 1.0) を呼びます。
+   ==================================================================== */
+function setupExpressionUI(vrm) {
   const listEl = document.getElementById('exprList');
   listEl.innerHTML = '';
-  if (!vrmModel.expressionManager) { listEl.textContent='表情なし'; return; }
-  const names = Object.keys(vrmModel.expressionManager.expressionMap);
-  names.forEach(name => {
+
+  if (!vrm.expressionManager) {
+    listEl.textContent = 'このVRMには表情(Expression)が設定されていません';
+    return;
+  }
+
+  // このVRMが持つ全表情名（プリセット＋VRoidStudio等で作ったカスタム表情）
+  const names = Object.keys(vrm.expressionManager.expressionMap);
+  console.log('このVRMが持つ表情一覧:', names);
+
+  names.forEach((name) => {
     const btn = document.createElement('button');
-    btn.className='expr-btn'; btn.textContent=name;
+    btn.className = 'expr-btn';
+    btn.textContent = name;
     btn.onclick = () => {
-      names.forEach(n=>vrmModel.expressionManager.setValue(n,0));
-      vrmModel.expressionManager.setValue(name,1);
-      document.querySelectorAll('.expr-btn').forEach(b=>b.classList.remove('active'));
+      // 一旦すべて0にしてから、押した表情だけ1.0にする
+      names.forEach((n) => vrm.expressionManager.setValue(n, 0));
+      vrm.expressionManager.setValue(name, 1.0);
+      document.querySelectorAll('.expr-btn').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
     };
     listEl.appendChild(btn);
   });
-  const rst=document.createElement('button');
-  rst.className='expr-btn';rst.id='resetExpr';rst.textContent='リセット';
-  rst.onclick=()=>{
-    names.forEach(n=>vrmModel.expressionManager.setValue(n,0));
-    document.querySelectorAll('.expr-btn').forEach(b=>b.classList.remove('active'));
+
+  const resetBtn = document.createElement('button');
+  resetBtn.className = 'expr-btn';
+  resetBtn.id = 'resetExpr';
+  resetBtn.textContent = 'リセット（neutral）';
+  resetBtn.onclick = () => {
+    names.forEach((n) => vrm.expressionManager.setValue(n, 0));
+    document.querySelectorAll('.expr-btn').forEach((b) => b.classList.remove('active'));
   };
-  listEl.appendChild(rst);
+  listEl.appendChild(resetBtn);
 }
 
-/* ──────────────────────────────────────────
-   リサイズ
-────────────────────────────────────────── */
-window.addEventListener('resize',()=>{
-  camera.aspect=innerWidth/innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight);
+/* ====================================================================
+   ⑥ アニメーション切り替えヘルパー
+   ==================================================================== */
+function playAction(key, fadeDuration = 0.2) {
+  const next = actions[key];
+  if (!next) return; // そのFBXがロードされていない場合はスキップ
+  if (currentAction === next) return;
+
+  if (currentAction) {
+    currentAction.fadeOut(fadeDuration);
+  }
+  next.reset().fadeIn(fadeDuration).play();
+  currentAction = next;
+}
+
+// 逆再生ラッパー（しゃがみ後退など）
+function playActionReverse(key, fadeDuration = 0.2) {
+  const next = actions[key];
+  if (!next) return;
+  if (currentAction) currentAction.fadeOut(fadeDuration);
+  next.reset();
+  next.timeScale = -1;
+  next.time = next.getClip().duration; // 末尾から再生
+  next.fadeIn(fadeDuration).play();
+  currentAction = next;
+}
+
+// 一回再生してから別アクションへ移行
+function playOnceAndThen(key, thenKey, fadeDuration = 0.2) {
+  const once = actions[key];
+  if (!once) { playAction(thenKey, fadeDuration); return; }
+  if (currentAction) currentAction.fadeOut(fadeDuration);
+  once.reset().fadeIn(fadeDuration).play();
+  currentAction = once;
+  const onFinished = (e) => {
+    if (e.action === once) {
+      mixer.removeEventListener('finished', onFinished);
+      playAction(thenKey, fadeDuration);
+    }
+  };
+  mixer.addEventListener('finished', onFinished);
+}
+
+/* ====================================================================
+   ⑦ キー入力管理
+   ==================================================================== */
+const pressedKeys = new Set();
+// Shiftはtoggleにするのでkeydownで1回だけ処理
+let shiftHandledThisPress = false;
+
+window.addEventListener('keydown', (e) => {
+  const key = e.key.toLowerCase();
+  // スペース・WASD・Ctrl・Shiftのデフォルト動作を抑制
+  if ([' ', 'w', 'a', 's', 'd', 'control', 'shift'].includes(key)) e.preventDefault();
+
+  if (key === 'shift' && !shiftHandledThisPress) {
+    shiftHandledThisPress = true;
+    isCrouching = !isCrouching;
+    if (isCrouching) {
+      playAction('crouch', 0.15);
+    } else {
+      playAction('idle', 0.15);
+    }
+    return;
+  }
+
+  if (key === ' ' && isOnGround && !pressedKeys.has(' ')) {
+    // ジャンプ：一回再生 → 落下 → 着地
+    isOnGround = false;
+    playOnceAndThen('jump', 'fall', 0.1);
+    // 簡易タイマーで着地（物理無しのため固定時間）
+    setTimeout(() => {
+      isLanding = true;
+      playOnceAndThen('land', 'idle', 0.15);
+      setTimeout(() => {
+        isOnGround = true;
+        isLanding = false;
+        // 着地後に即キーが押されていれば再評価
+        evaluateLocomotion();
+      }, 700);
+    }, 900);
+  }
+
+  pressedKeys.add(key);
 });
 
-/* ──────────────────────────────────────────
+window.addEventListener('keyup', (e) => {
+  const key = e.key.toLowerCase();
+  pressedKeys.delete(key);
+  if (key === 'shift') shiftHandledThisPress = false;
+  // キー離したときもアニメーション再評価
+  if (!isLanding && isOnGround) evaluateLocomotion();
+});
+
+/* ====================================================================
+   ⑧ ロコモーション（移動状態）評価
+   ==================================================================== */
+function rotateCharacter(angleRad) {
+  if (currentVrm) {
+    currentVrm.scene.rotation.y = angleRad;
+  }
+}
+
+function evaluateLocomotion() {
+  if (!isOnGround || isLanding) return;
+
+  const w = pressedKeys.has('w');
+  const s = pressedKeys.has('s');
+  const a = pressedKeys.has('a');
+  const d = pressedKeys.has('d');
+  const ctrl = pressedKeys.has('control');
+  const isMoving = w || s || a || d;
+
+  // しゃがみ状態
+  if (isCrouching) {
+    if (!isMoving) {
+      playAction('crouch', 0.15);
+      return;
+    }
+    if (w) { playAction('crouchWalk', 0.15); return; }
+    if (s) {
+      if (FACE_CAMERA_DIRECTION) {
+        // 逆再生で後退
+        playActionReverse('crouchWalk', 0.15);
+      } else {
+        rotateCharacter(Math.PI);
+        playAction('crouchWalk', 0.15);
+      }
+      return;
+    }
+    if (a) {
+      if (FACE_CAMERA_DIRECTION) {
+        playAction('crouchLeft', 0.15);
+      } else {
+        rotateCharacter(Math.PI / 2);
+        playAction('crouchWalk', 0.15);
+      }
+      return;
+    }
+    if (d) {
+      if (FACE_CAMERA_DIRECTION) {
+        playAction('crouchRight', 0.15);
+      } else {
+        rotateCharacter(-Math.PI / 2);
+        playAction('crouchWalk', 0.15);
+      }
+      return;
+    }
+    return;
+  }
+
+  // 通常状態
+  if (!isMoving) {
+    playAction('idle', 0.2);
+    return;
+  }
+
+  // 走り（Ctrl）
+  if (ctrl) {
+    if (w) {
+      // ランニング中にSを押した場合はターン180
+      if (prevMovingBack) {
+        playOnceAndThen('runTurn180', 'run', 0.15);
+      } else {
+        playAction('run', 0.2);
+      }
+      prevMovingForward = true; prevMovingBack = false;
+      return;
+    }
+    if (s) {
+      // ランニング中にWを押した場合はターン180
+      if (prevMovingForward) {
+        playOnceAndThen('runTurn180', 'run', 0.15);
+      } else {
+        if (FACE_CAMERA_DIRECTION) {
+          playAction('runBack', 0.2);
+        } else {
+          rotateCharacter(Math.PI);
+          playAction('run', 0.2);
+        }
+      }
+      prevMovingBack = true; prevMovingForward = false;
+      return;
+    }
+    if (a) {
+      if (FACE_CAMERA_DIRECTION) {
+        playAction('leftStrafeRun', 0.2);
+      } else {
+        rotateCharacter(Math.PI / 2);
+        playAction('run', 0.2);
+      }
+      return;
+    }
+    if (d) {
+      if (FACE_CAMERA_DIRECTION) {
+        playAction('rightStrafeRun', 0.2);
+      } else {
+        rotateCharacter(-Math.PI / 2);
+        playAction('run', 0.2);
+      }
+      return;
+    }
+    return;
+  }
+
+  // 歩き
+  if (w) {
+    if (prevMovingBack) {
+      // 歩き中に反対方向キー → ターン180からWalk
+      playOnceAndThen('walkTurn180', 'walk', 0.15);
+    } else {
+      playAction('walk', 0.2);
+    }
+    prevMovingForward = true; prevMovingBack = false;
+    return;
+  }
+  if (s) {
+    if (prevMovingForward) {
+      playOnceAndThen('walkTurn180', 'walk', 0.15);
+    } else {
+      if (FACE_CAMERA_DIRECTION) {
+        // 後ろ歩きはスピードを落とす
+        const action = actions['walkBack'];
+        if (action) action.timeScale = 0.7;
+        playAction('walkBack', 0.2);
+      } else {
+        rotateCharacter(Math.PI);
+        // 後ろ向き歩きもスピードダウン
+        const action = actions['walk'];
+        if (action) action.timeScale = 0.7;
+        playAction('walk', 0.2);
+      }
+    }
+    prevMovingBack = true; prevMovingForward = false;
+    return;
+  }
+  if (a) {
+    if (FACE_CAMERA_DIRECTION) {
+      playAction('leftStrafe', 0.2);
+    } else {
+      rotateCharacter(Math.PI / 2);
+      playAction('walk', 0.2);
+    }
+    return;
+  }
+  if (d) {
+    if (FACE_CAMERA_DIRECTION) {
+      playAction('rightStrafe', 0.2);
+    } else {
+      rotateCharacter(-Math.PI / 2);
+      playAction('walk', 0.2);
+    }
+    return;
+  }
+}
+
+/* ====================================================================
+   設定パネル：「視点方向向く」トグル
+   ==================================================================== */
+const settingPanel = document.createElement('div');
+settingPanel.style.cssText = `
+  position: fixed; bottom: 14px; left: 12px;
+  background: rgba(0,0,0,0.55); color: #fff;
+  padding: 10px 14px; border-radius: 10px;
+  font-size: 12px; user-select: none;
+`;
+settingPanel.innerHTML = `
+  <label style="cursor:pointer; display:flex; align-items:center; gap:8px;">
+    <input type="checkbox" id="faceCamToggle" ${FACE_CAMERA_DIRECTION ? 'checked' : ''}>
+    視点方向向く（ストレイフ/後退アニメ使用）
+  </label>
+  <div style="margin-top:6px; color:#aaa; font-size:11px;">
+    W:歩き　Ctrl+W:走り　Shift:しゃがみ<br>
+    Space:ジャンプ　Ctrl+A/D:ストレイフ
+  </div>
+`;
+document.body.appendChild(settingPanel);
+document.getElementById('faceCamToggle').addEventListener('change', (e) => {
+  FACE_CAMERA_DIRECTION = e.target.checked;
+});
+
+function updateInputAnimation() {
+  // walkのtimeScaleをW押し時に1.0に戻す（後退後の正規化）
+  if (pressedKeys.has('w') && actions.walk) {
+    actions.walk.timeScale = 1.0;
+  }
+  // キー状態の変化で再評価（毎フレームではなくkeydown/keyupで呼ぶが念のため）
+}
+
+/* ====================================================================
+   ウィンドウリサイズ対応
+   ==================================================================== */
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* ====================================================================
    メインループ
-────────────────────────────────────────── */
+   ==================================================================== */
 function animate() {
   requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 0.1);
-  updateChar(dt);
+  const delta = clock.getDelta();
+
+  updateInputAnimation();
+
+  if (mixer) mixer.update(delta);
+  if (currentVrm) currentVrm.update(delta); // 表情・ボーン・LookAt・スプリングボーン等を一括更新
+
+  controls.update();
   renderer.render(scene, camera);
 }
 animate();
