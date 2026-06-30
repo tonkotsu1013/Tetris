@@ -661,7 +661,9 @@ function updateMovement(delta) {
             currentActionName = 'crouchWalkBack';
           }
         }
-        moveCharacter(camYaw, Math.PI, CROUCH_SPEED, delta);
+        charState.yaw = camYaw;
+        charState.position.x -= Math.sin(camYaw + Math.PI) * CROUCH_SPEED * delta;
+        charState.position.z -= Math.cos(camYaw + Math.PI) * CROUCH_SPEED * delta;
       } else {
         playAnim('crouchWalk');
         moveCharacter(charState.yaw + Math.PI, 0, CROUCH_SPEED, delta);
@@ -669,7 +671,9 @@ function updateMovement(delta) {
     } else if (inp.left) {
       if (faceCameraDir) {
         playAnim('crouchStrafeL');
-        moveCharacter(camYaw, -Math.PI / 2, CROUCH_SPEED, delta);
+        charState.yaw = camYaw;
+        charState.position.x -= Math.sin(camYaw - Math.PI / 2) * CROUCH_SPEED * delta;
+        charState.position.z -= Math.cos(camYaw - Math.PI / 2) * CROUCH_SPEED * delta;
       } else {
         charState.yaw += Math.PI / 2 * delta * 3;
         playAnim('crouchWalk');
@@ -678,7 +682,9 @@ function updateMovement(delta) {
     } else if (inp.right) {
       if (faceCameraDir) {
         playAnim('crouchStrafeR');
-        moveCharacter(camYaw, Math.PI / 2, CROUCH_SPEED, delta);
+        charState.yaw = camYaw;
+        charState.position.x -= Math.sin(camYaw + Math.PI / 2) * CROUCH_SPEED * delta;
+        charState.position.z -= Math.cos(camYaw + Math.PI / 2) * CROUCH_SPEED * delta;
       } else {
         charState.yaw -= Math.PI / 2 * delta * 3;
         playAnim('crouchWalk');
@@ -713,10 +719,14 @@ function updateMovement(delta) {
     if (faceCameraDir) {
       if (isRunning) {
         playAnim('runBack');
-        moveCharacter(camYaw, Math.PI, RUN_SPEED * 0.6, delta);
+        charState.yaw = camYaw;
+        charState.position.x -= Math.sin(camYaw + Math.PI) * RUN_SPEED * 0.6 * delta;
+        charState.position.z -= Math.cos(camYaw + Math.PI) * RUN_SPEED * 0.6 * delta;
       } else {
         playAnim('walkBack');
-        moveCharacter(camYaw, Math.PI, WALK_BACK_SPEED, delta);
+        charState.yaw = camYaw;
+        charState.position.x -= Math.sin(camYaw + Math.PI) * WALK_BACK_SPEED * delta;
+        charState.position.z -= Math.cos(camYaw + Math.PI) * WALK_BACK_SPEED * delta;
       }
       if (thirdPersonMode) snapCameraBehindCharacter(delta);
     } else {
