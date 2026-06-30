@@ -69,7 +69,21 @@
 <div id="ui">
   <h1>VRM Viewer</h1>
   <div id="status">読み込み中...</div>
-  <div>ドラッグ：視点回転 / ホイール：ズーム</div>
+  <div id="keyHints">
+    WASD：移動 / Z+WASD：走る / Shift：しゃがむ / Space：ジャンプ<br>
+    マウスドラッグ：視点 / ホイール：ズーム
+  </div>
+</div>
+
+<!-- 設定パネル -->
+<div id="settingsPanel" style="
+  position:fixed; bottom:12px; left:12px;
+  background:rgba(0,0,0,0.6); color:#fff;
+  padding:12px 16px; border-radius:10px; font-size:12px; line-height:2;
+">
+  <b>設定</b><br>
+  <label><input type="checkbox" id="chkFaceDir" checked> 視点方向に向く（S/A/D）</label><br>
+  <label><input type="checkbox" id="chkThirdPerson" checked> 3人称追跡カメラ</label>
 </div>
 
 <div id="expressions">
@@ -96,6 +110,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
@@ -105,38 +120,14 @@ import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
    サブフォルダに入れた場合はパスを './models/xxx.vrm' のように直してください。
    ==================================================================== */
 const VRM_FILE_PATH = './ayame_v1.1.vrm';     // ← VRMファイル名
+const WALK_ANIMATION_PATH = './Walking.fbx';  // ← ミクサモ(Mixamo)の歩行アニメーション(FBX)
+
+// 走る/アイドルなど別のモーションを追加したい場合は、ここに増やして
+// 下の「複数アニメーションを使う場合の拡張例」を参考に組み込んでください。
+// const RUN_ANIMATION_PATH = './Running.fbx';
+// const IDLE_ANIMATION_PATH = './Idle.fbx';
 
 const KEEP_IN_PLACE = true; // true: その場で足踏み（移動しない） / false: 実際に前進してしまう
-
-/* ====================================================================
-   アニメーションファイルパス一覧
-   ==================================================================== */
-const ANIM_PATHS = {
-  idle:               './Standard Idle.fbx',
-  walk:               './Walking.fbx',
-  walkBack:           './Walking Backwards.fbx',
-  walkTurn180:        './Walking Turn 180.fbx',
-  strafeLeft:         './Left Strafe Walking.fbx',
-  strafeRight:        './Right Strafe Walking.fbx',
-  run:                './Running.fbx',
-  runBack:            './Running Backward.fbx',
-  runTurn180:         './Running Turn 180.fbx',
-  strafeRunLeft:      './Left Strafe.fbx',
-  strafeRunRight:     './Right Strafe.fbx',
-  crouch:             './Male Crouch Pose.fbx',
-  crouchWalk:         './Crouched Walking.fbx',
-  crouchLeft:         './Crouched Sneaking Left.fbx',
-  crouchRight:        './Crouched Sneaking Right.fbx',
-  jump:               './Jumping.fbx',
-  stair:              './Ascending Stairs.fbx',
-};
-
-/* ====================================================================
-   設定：「視点方向を向く」ON/OFFの切り替え
-   true  = Mixamoの横歩き/後歩きアニメーションをそのまま使う
-   false = キャラの向きをコードで回転させてからWalking/Runningを使う
-   ==================================================================== */
-let FACE_CAMERA_DIRECTION = true;
 
 /* ====================================================================
    ② Mixamo → VRM ボーン名 対応表
@@ -267,7 +258,7 @@ function loadMixamoAnimation(url, vrm, keepInPlace = true) {
       }
     });
 
-    return new THREE.AnimationClip(url, clip.duration, tracks);
+    return new THREE.AnimationClip(clip.name || 'anim', clip.duration, tracks);
   });
 }
 
@@ -277,7 +268,8 @@ function loadMixamoAnimation(url, vrm, keepInPlace = true) {
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x15151f);
 
-const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 50);
+const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 50);
+camera.position.set(0, 1.4, 3.2);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -285,135 +277,94 @@ renderer.setPixelRatio(window.devicePixelRatio);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.getElementById('canvas-container').appendChild(renderer.domElement);
 
+// OrbitControls（手動操作時のみ使用、3人称追跡時は無効化）
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.0, 0);
+controls.enableDamping = true;
+controls.minDistance = 0.6;
+controls.maxDistance = 12;
+controls.update();
+
 // ライト
 scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 1.3));
 const dirLight = new THREE.DirectionalLight(0xffffff, 1.6);
 dirLight.position.set(1, 2, 1.5);
 scene.add(dirLight);
 
-// 足元の目安になる地面とグリッド
+// 足元の目安になる地面とグリッド（ワールド広め）
 const floor = new THREE.Mesh(
-  new THREE.CircleGeometry(2.2, 48),
+  new THREE.PlaneGeometry(60, 60),
   new THREE.MeshStandardMaterial({ color: 0x23233a, roughness: 1 }),
 );
 floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
-scene.add(new THREE.GridHelper(4, 16, 0x4444aa, 0x2c2c44));
+scene.add(new THREE.GridHelper(60, 60, 0x4444aa, 0x2c2c44));
 
 const clock = new THREE.Clock();
 let currentVrm = null;
 let mixer = null;
 
-// アニメーション管理
-const actions = {};
+// アニメーションアクション管理
+const actions = {};  // { name: THREE.AnimationAction }
 let currentAction = null;
+let currentActionName = '';
 
-// ジャンプ状態
-let isJumping = false;
+// 設定フラグ
+let faceCameraDir = true;  // 視点方向に向く
+let thirdPersonMode = true; // 3人称追跡カメラ
 
-// しゃがみ状態
-let isCrouching = false;
-
-// 前フレームの移動方向（ターン180判定用）
-let prevMovingFwd = false;
-let prevMovingBack = false;
-
-// ターン180中フラグ
-let inWalkTurn = false;
-let inRunTurn  = false;
-// ターン後に確定するキャラのyaw（二重回転防止）
-let walkTurn180TargetYaw = 0;
-let runTurn180TargetYaw  = 0;
-
-// ====================================================================
-// オーバーワールドカメラ設定
-// ====================================================================
-// カメラは「キャラ中心」を固定注視し、球面座標で位置を管理
-// azimuth（水平角）はドラッグで変更可能。elevation・distanceは固定
-let camAzimuth   = Math.PI;   // 初期：キャラ後ろから（+Z方向が前なのでπ）
-const CAM_ELEV   = 0.72;      // 仰角(rad) ≈ 41°（ドラクエ的な見下ろし角）
-const CAM_DIST   = 4.5;       // カメラ距離（固定）
-const CAM_TARGET_Y = 0.9;     // 注視点の高さ（腰あたり）
-let autoCameraEnabled = true; // 自動追跡カメラON/OFF
-
-// カメラ球面座標 → オフセットベクトル変換
-// 返り値はキャラ位置からの相対オフセット（Yはキャラ基準）
-function camSphereToPos(azimuth, elev, dist, yOffset = CAM_TARGET_Y) {
-  return new THREE.Vector3(
-    Math.sin(azimuth) * Math.cos(elev) * dist,
-    Math.sin(elev) * dist + yOffset,
-    Math.cos(azimuth) * Math.cos(elev) * dist,
-  );
-}
-
-// 初期カメラ位置（キャラ後ろから）
-const initCamOfs = camSphereToPos(camAzimuth, CAM_ELEV, CAM_DIST, 0);
-camera.position.set(initCamOfs.x, initCamOfs.y + CAM_TARGET_Y, initCamOfs.z);
-camera.lookAt(0, CAM_TARGET_Y, 0);
-
-// ドラッグでazimuthのみ変化させる軽量マウス処理
-let isDragging = false;
-let dragStartX = 0;
-let dragStartAzimuth = camAzimuth;
-
-renderer.domElement.addEventListener('mousedown', (e) => {
-  if (autoCameraEnabled) { isDragging = true; dragStartX = e.clientX; dragStartAzimuth = camAzimuth; }
+document.getElementById('chkFaceDir').addEventListener('change', (e) => { faceCameraDir = e.target.checked; });
+document.getElementById('chkThirdPerson').addEventListener('change', (e) => {
+  thirdPersonMode = e.target.checked;
+  controls.enabled = !thirdPersonMode;
+  if (!thirdPersonMode) controls.update();
 });
-renderer.domElement.addEventListener('mousemove', (e) => {
-  if (!isDragging) return;
-  const dx = (e.clientX - dragStartX) / window.innerWidth;
-  camAzimuth = dragStartAzimuth - dx * Math.PI * 2;
+
+// キャラクター状態
+const charState = {
+  position: new THREE.Vector3(0, 0, 0),
+  yaw: 0,               // キャラの向き(Y軸回転、ラジアン)
+  speed: 0,             // 現在の移動速度 m/s
+  isCrouching: false,
+  isJumping: false,
+  isFalling: false,
+  jumpVY: 0,
+  landingPhase: false,  // 着地アニメ再生中
+  turn180Phase: false,  // Turn180アニメ再生中
+  turn180Done: false,
+};
+
+// 3人称カメラ状態
+const thirdCam = {
+  yaw: 0,      // 水平角
+  pitch: 0.3,  // 垂直角(rad)
+  distance: 3.5,
+};
+
+// マウス操作でカメラ角度を変える
+let isPointerDown = false;
+let lastPointerX = 0, lastPointerY = 0;
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (!thirdPersonMode) return;
+  isPointerDown = true;
+  lastPointerX = e.clientX;
+  lastPointerY = e.clientY;
 });
-renderer.domElement.addEventListener('mouseup',   () => { isDragging = false; });
-renderer.domElement.addEventListener('mouseleave',() => { isDragging = false; });
-
-// タッチ対応
-let touchStartX = 0;
-let touchStartAz = camAzimuth;
-renderer.domElement.addEventListener('touchstart', (e) => {
-  if (autoCameraEnabled && e.touches.length === 1) {
-    touchStartX = e.touches[0].clientX; touchStartAz = camAzimuth;
-  }
-}, { passive: true });
-renderer.domElement.addEventListener('touchmove', (e) => {
-  if (!autoCameraEnabled || e.touches.length !== 1) return;
-  const dx = (e.touches[0].clientX - touchStartX) / window.innerWidth;
-  camAzimuth = touchStartAz - dx * Math.PI * 2;
-}, { passive: true });
-
-// ====================================================================
-// カメラ方向（azimuth）からキャラの目標向きを計算するヘルパー
-// 座標系メモ:
-//   camAzimuth=π → カメラはZ=-dist（キャラ後ろ）→ カメラが向く方向は+Z = yaw=0
-//   VRMUtils.rotateVRM0 適用後、VRM0モデルはrotation.y=π で+Z方向を向く
-//   → 「カメラ奥=前」をキャラに向かせるには rotation.y = camAzimuth（カメラ位置の逆 = 前方）
-//      具体的: camAzimuth=π → キャラ前方yaw=π → VRM0なら180°+π=... 
-//   シンプルに: キャラ「前方」yaw = camAzimuth（カメラが居る方向の反対 = 奥）
-// ====================================================================
-function getCharFwdYaw() {
-  // カメラはazimuth方向に居る → キャラ前方はazimuth + π（カメラの反対）
-  // ただしVRM0はrotateVRM0でπ追加されているので更にπ → 結果azimuth
-  // VRM1はrotateVRM0が何もしない(rotation.y=0が+Z前方)なので camAzimuth + π
-  // → モデルに依存せず動くよう、実際の挙動ベースで camAzimuth をそのまま使う
-  return camAzimuth;
-}
-
-function getTargetYaw(fwd, back, left, right) {
-  const charFwd = getCharFwdYaw(); // Wキーで向かせるべきyaw
-
-  let inputAngle = 0;
-  if      (fwd  && !back && !left && !right) inputAngle = 0;
-  else if (back && !fwd  && !left && !right) inputAngle = Math.PI;
-  else if (left && !right && !fwd && !back)  inputAngle = Math.PI / 2;
-  else if (right && !left && !fwd && !back)  inputAngle = -Math.PI / 2;
-  else if (fwd  && left)                     inputAngle = Math.PI / 4;
-  else if (fwd  && right)                    inputAngle = -Math.PI / 4;
-  else if (back && left)                     inputAngle = Math.PI * 3 / 4;
-  else if (back && right)                    inputAngle = -Math.PI * 3 / 4;
-  else return null;
-
-  return charFwd + inputAngle;
-}
+window.addEventListener('pointerup', () => { isPointerDown = false; });
+window.addEventListener('pointermove', (e) => {
+  if (!thirdPersonMode || !isPointerDown) return;
+  const dx = e.clientX - lastPointerX;
+  const dy = e.clientY - lastPointerY;
+  lastPointerX = e.clientX;
+  lastPointerY = e.clientY;
+  thirdCam.yaw -= dx * 0.004;
+  thirdCam.pitch = Math.max(-0.1, Math.min(1.0, thirdCam.pitch + dy * 0.004));
+});
+renderer.domElement.addEventListener('wheel', (e) => {
+  if (!thirdPersonMode) return;
+  thirdCam.distance = Math.max(1.0, Math.min(12, thirdCam.distance + e.deltaY * 0.01));
+  e.preventDefault();
+}, { passive: false });
 
 const statusEl = document.getElementById('status');
 
@@ -423,75 +374,67 @@ const statusEl = document.getElementById('status');
 const gltfLoader = new GLTFLoader();
 gltfLoader.register((parser) => new VRMLoaderPlugin(parser));
 
+// FBXアニメーション定義（ファイル名と内部キー名）
+const FBX_ANIMS = {
+  idle:             './Standard Idle.fbx',
+  walk:             './Walking.fbx',
+  walkBack:         './Walking Backwards.fbx',
+  turn180:          './Walking Turn 180.fbx',
+  strafeL:          './Left Strafe Walking.fbx',
+  strafeR:          './Right Strafe Walking.fbx',
+  run:              './Running.fbx',
+  runBack:          './Running Backwards.fbx',
+  runTurn180:       './Running Turn 180.fbx',
+  runStrafeL:       './Left Strafe.fbx',
+  runStrafeR:       './Right Strafe.fbx',
+  crouch:           './Male Crouch Pose.fbx',
+  crouchWalk:       './Crouched Walking.fbx',
+  crouchStrafeL:    './Crouched Sneaking Left.fbx',
+  crouchStrafeR:    './Crouched Sneaking Right.fbx',
+  jump:             './Jumping.fbx',
+  fall:             './Falling Idle.fbx',
+  land:             './Falling to Landing.fbx',
+  stairs:           './Ascending Stairs.fbx',
+};
+
 gltfLoader.load(
   VRM_FILE_PATH,
   async (gltf) => {
     const vrm = gltf.userData.vrm;
-
-    // 表示に不要なデータを削除して軽量化（任意・無くても動作します）
     VRMUtils.removeUnnecessaryVertices(gltf.scene);
     VRMUtils.removeUnnecessaryJoints(gltf.scene);
-
-    // VRM0.x のモデルは正面が後ろ(-Z)を向いているため、自動で前(+Z)向きに補正する
-    // VRM1.0のモデルなら何もしない（バージョンを自動判定）
     VRMUtils.rotateVRM0(vrm);
-
     scene.add(vrm.scene);
     currentVrm = vrm;
     statusEl.textContent = 'VRM読み込み完了。アニメーション読込中...';
-
-    // VRMに入っている表情(Expression)の一覧をUIとコンソールに表示
     setupExpressionUI(vrm);
 
-    // ミクサモのアニメーションを読み込んでVRMに適用する
     mixer = new THREE.AnimationMixer(vrm.scene);
 
-    statusEl.textContent = 'アニメーション読み込み中...';
-
-    // 全アニメーションを並列ロード
-    const loadResults = await Promise.allSettled(
-      Object.entries(ANIM_PATHS).map(async ([key, path]) => {
-        const clip = await loadMixamoAnimation(path, vrm, KEEP_IN_PLACE);
+    // アニメーション一括ロード（失敗したものはスキップ）
+    const keys = Object.keys(FBX_ANIMS);
+    let loaded = 0;
+    for (const key of keys) {
+      try {
+        const clip = await loadMixamoAnimation(FBX_ANIMS[key], vrm, true);
+        clip.name = key;
         const action = mixer.clipAction(clip);
-        action.setLoop(THREE.LoopRepeat, Infinity);
-        // Walking Turn 180 / Running Turn 180 は1回再生
-        if (key === 'walkTurn180' || key === 'runTurn180') {
-          action.setLoop(THREE.LoopOnce, 1);
-          action.clampWhenFinished = true;
-        }
-        // しゃがみポーズは静止させる
-        if (key === 'crouch') {
-          action.setLoop(THREE.LoopOnce, 1);
-          action.clampWhenFinished = true;
-        }
-        // ジャンプも1回
-        if (key === 'jump') {
-          action.setLoop(THREE.LoopOnce, 1);
-          action.clampWhenFinished = true;
-        }
+        action.play();
+        action.setEffectiveWeight(0);
         actions[key] = action;
-        return key;
-      })
-    );
+        loaded++;
+        statusEl.textContent = `アニメーション読込中... (${loaded}/${keys.length})`;
+      } catch (e) {
+        console.warn(`アニメ読込スキップ: ${key} (${FBX_ANIMS[key]})`, e.message);
+      }
+    }
 
-    const loaded = loadResults.filter(r => r.status === 'fulfilled').map(r => r.value);
-    const failed = loadResults.filter(r => r.status === 'rejected');
-    if (failed.length > 0) console.warn('一部アニメーション読み込み失敗:', failed.map(r => r.reason));
+    playAnim('idle');
+    statusEl.textContent = '準備完了！ WASD移動 / Z+WASD走る / Shift:しゃがむ / Space:ジャンプ';
 
-    // 設定パネルのON/OFFトグルを追加
-    addSettingsUI();
-
-    // 初期アニメーション：アイドル
-    playAction('idle');
-
-    // キー入力の設定
-    setupKeyControls();
-
-    // ジャンプ/ターン終了イベント
-    mixer.addEventListener('finished', onActionFinished);
-
-    statusEl.textContent = '準備完了！ W/A/S/D で移動、Z+W で走る、Shift でしゃがむ、Space でジャンプ';
-
+    // 3人称カメラ初期化
+    thirdCam.yaw = charState.yaw + Math.PI;
+    controls.enabled = !thirdPersonMode;
   },
   (progress) => {
     if (progress.total) {
@@ -506,28 +449,21 @@ gltfLoader.load(
 
 /* ====================================================================
    ⑤ 表情(Expression) UI
-   VRMに入っている表情を自動で検出してボタンを生成します。
-   ボタンを押すと vrm.expressionManager.setValue(名前, 1.0) を呼びます。
    ==================================================================== */
 function setupExpressionUI(vrm) {
   const listEl = document.getElementById('exprList');
   listEl.innerHTML = '';
-
   if (!vrm.expressionManager) {
     listEl.textContent = 'このVRMには表情(Expression)が設定されていません';
     return;
   }
-
-  // このVRMが持つ全表情名（プリセット＋VRoidStudio等で作ったカスタム表情）
   const names = Object.keys(vrm.expressionManager.expressionMap);
   console.log('このVRMが持つ表情一覧:', names);
-
   names.forEach((name) => {
     const btn = document.createElement('button');
     btn.className = 'expr-btn';
     btn.textContent = name;
     btn.onclick = () => {
-      // 一旦すべて0にしてから、押した表情だけ1.0にする
       names.forEach((n) => vrm.expressionManager.setValue(n, 0));
       vrm.expressionManager.setValue(name, 1.0);
       document.querySelectorAll('.expr-btn').forEach((b) => b.classList.remove('active'));
@@ -535,7 +471,6 @@ function setupExpressionUI(vrm) {
     };
     listEl.appendChild(btn);
   });
-
   const resetBtn = document.createElement('button');
   resetBtn.className = 'expr-btn';
   resetBtn.id = 'resetExpr';
@@ -548,326 +483,356 @@ function setupExpressionUI(vrm) {
 }
 
 /* ====================================================================
-   設定UIの追加（視点方向を向くON/OFF + 自動追跡カメラON/OFF）
+   ⑥ アニメーション切り替えヘルパー
    ==================================================================== */
-function addSettingsUI() {
-  const uiEl = document.getElementById('ui');
-  uiEl.style.pointerEvents = 'auto';
+function playAnim(name, fadeTime = 0.2, loop = true, onFinish = null) {
+  if (!actions[name]) return false;
+  if (currentActionName === name && loop) return true;
 
-  // 視点方向を向くモード
-  const label1 = document.createElement('label');
-  label1.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:10px;cursor:pointer;';
-  const cb1 = document.createElement('input');
-  cb1.type = 'checkbox';
-  cb1.checked = FACE_CAMERA_DIRECTION;
-  cb1.onchange = () => { FACE_CAMERA_DIRECTION = cb1.checked; };
-  label1.appendChild(cb1);
-  label1.appendChild(document.createTextNode('視点方向を向くモード'));
-  uiEl.appendChild(label1);
+  const next = actions[name];
+  next.loop = loop ? THREE.LoopRepeat : THREE.LoopOnce;
+  next.clampWhenFinished = !loop;
+  next.timeScale = 1;
+  next.time = 0;
+  next.enabled = true;
 
-  // 自動追跡カメラ
-  const label2 = document.createElement('label');
-  label2.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:6px;cursor:pointer;';
-  const cb2 = document.createElement('input');
-  cb2.type = 'checkbox';
-  cb2.checked = autoCameraEnabled;
-  cb2.onchange = () => { autoCameraEnabled = cb2.checked; };
-  label2.appendChild(cb2);
-  label2.appendChild(document.createTextNode('自動追跡カメラ（移動時に追従）'));
-  uiEl.appendChild(label2);
-
-  const hint = document.createElement('div');
-  hint.style.cssText = 'margin-top:8px;font-size:11px;color:#aaa;';
-  hint.innerHTML = 'W/A/S/D:移動　Z+W:走る　Shift:しゃがむ　Space:ジャンプ<br>ドラッグ：カメラ回転';
-  uiEl.appendChild(hint);
-}
-
-/* ====================================================================
-   アニメーション切り替え
-   ==================================================================== */
-function playAction(key, fadeTime = 0.15) {
-  if (!actions[key]) {
-    // フォールバック：アニメーションが存在しない場合はidleへ
-    if (key !== 'idle' && actions['idle']) playAction('idle', fadeTime);
-    return;
-  }
-  if (currentAction === key) return;
-
-  const next = actions[key];
-  const prev = currentAction ? actions[currentAction] : null;
-
-  // ターン・ジャンプ・着地は頭から再生
-  next.reset();
-
-  if (prev && prev !== next) {
-    prev.crossFadeTo(next, fadeTime, true);
+  if (currentAction && currentAction !== next) {
+    currentAction.crossFadeTo(next, fadeTime, true);
+  } else {
+    next.setEffectiveWeight(1);
   }
   next.play();
-  currentAction = key;
-}
+  currentAction = next;
+  currentActionName = name;
 
-/* ====================================================================
-   ターン/ジャンプ 終了時の処理
-   ==================================================================== */
-function onActionFinished(e) {
-  const fa = e.action;
-
-  // walkTurn180終了 → 向きをコードで確定させてから歩行へ
-  if (actions['walkTurn180'] && fa === actions['walkTurn180']) {
-    // アニメが180°回した分をコード側に確定（二重回転防止）
-    snapCharYawToTarget(walkTurn180TargetYaw);
-    inWalkTurn = false;
-    // キーがまだ押されていれば続けて歩く、離していればidle
-    if (pressedKeys.has('w') || pressedKeys.has('s')) {
-      playAction('walk');
-    } else {
-      playAction('idle');
-    }
-  }
-
-  // runTurn180終了 → 向きを確定させてから走行へ
-  if (actions['runTurn180'] && fa === actions['runTurn180']) {
-    snapCharYawToTarget(runTurn180TargetYaw);
-    inRunTurn = false;
-    if (pressedKeys.has('w') || pressedKeys.has('s')) {
-      playAction('run');
-    } else {
-      playAction('idle');
-    }
-  }
-
-  // ジャンプ終了 → Hips Y座標を強制リセットしてidle
-  if (actions['jump'] && fa === actions['jump'] && isJumping) {
-    isJumping = false;
-    // ジャンプアニメで浮いた腰の位置を強制的に初期値に戻す
-    forceResetHipsY();
-    playAction('idle', 0.1);
-  }
-}
-
-// ターン後の向きを「ターン開始前の向き + 180°」に確定する
-function snapCharYawToTarget(yaw) {
-  if (!currentVrm) return;
-  currentVrm.scene.rotation.y = yaw;
-}
-
-// ジャンプ後にhipsのY位置を強制的にrest位置に戻す
-function forceResetHipsY() {
-  if (!currentVrm) return;
-  const hipsNode = currentVrm.humanoid?.getNormalizedBoneNode('hips');
-  if (hipsNode) {
-    hipsNode.position.y = currentVrm.humanoid.normalizedRestPose?.hips?.position?.[1] ?? hipsNode.position.y;
-  }
-}
-
-/* ====================================================================
-   キー入力のセットアップ
-   ==================================================================== */
-const pressedKeys = new Set();
-
-function setupKeyControls() {
-  window.addEventListener('keydown', (e) => {
-    const k = e.key.toLowerCase();
-    if (['w','a','s','d','z',' ','shift'].includes(k) ||
-        ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Shift'].includes(e.key)) {
-      pressedKeys.add(k === 'shift' ? 'shift' : k === ' ' ? 'space' : k);
-      e.preventDefault();
-    }
-  });
-
-  window.addEventListener('keyup', (e) => {
-    const k = e.key.toLowerCase();
-    pressedKeys.delete(k === 'shift' ? 'shift' : k === ' ' ? 'space' : k);
-
-    // Shiftトグル：keydownより keyupで行う（押した瞬間ではなく離した時）
-    if (e.key === 'Shift') {
-      isCrouching = !isCrouching;
-      if (!isCrouching) {
-        playAction('idle');
-      } else {
-        playAction('crouch');
+  // 非ループ時: 終了コールバック登録
+  if (!loop && onFinish) {
+    const dur = next.getClip().duration;
+    // mixerのfinishedイベントで検知
+    const cb = (e) => {
+      if (e.action === next) {
+        mixer.removeEventListener('finished', cb);
+        onFinish();
       }
-    }
+    };
+    mixer.addEventListener('finished', cb);
+  }
+  return true;
+}
+
+/* ====================================================================
+   ⑦ キー入力
+   ==================================================================== */
+const keys = new Set();
+const keyMap = {
+  'w': 'w', 'W': 'w', 'arrowup': 'w',
+  's': 's', 'S': 's', 'arrowdown': 's',
+  'a': 'a', 'A': 'a', 'arrowleft': 'a',
+  'd': 'd', 'D': 'd', 'arrowright': 'd',
+  'z': 'z', 'Z': 'z',
+  'shift': 'shift',
+  ' ': 'space',
+};
+
+window.addEventListener('keydown', (e) => {
+  const k = keyMap[e.key.toLowerCase()] || keyMap[e.key];
+  if (k) {
+    e.preventDefault();
+    const wasDown = keys.has(k);
+    keys.add(k);
+    if (!wasDown) onKeyDown(k);
+  }
+});
+window.addEventListener('keyup', (e) => {
+  const k = keyMap[e.key.toLowerCase()] || keyMap[e.key];
+  if (k) keys.delete(k);
+});
+
+// Shiftはトグル（しゃがみ）
+let crouchToggle = false;
+function onKeyDown(k) {
+  if (k === 'shift') {
+    crouchToggle = !crouchToggle;
+    charState.isCrouching = crouchToggle;
+    if (!crouchToggle) playAnim('idle');
+  }
+  if (k === 'space' && !charState.isJumping && !charState.isFalling) {
+    startJump();
+  }
+}
+
+/* ====================================================================
+   ⑧ ジャンプ・落下物理
+   ==================================================================== */
+const GRAVITY = -9.8;
+const JUMP_VY = 4.5;
+const GROUND_Y = 0;
+
+function startJump() {
+  charState.isJumping = true;
+  charState.isFalling = false;
+  charState.landingPhase = false;
+  charState.jumpVY = JUMP_VY;
+  playAnim('jump', 0.1, false, () => {
+    charState.isFalling = true;
+    charState.isJumping = false;
+    playAnim('fall', 0.15);
   });
 }
 
-/* ====================================================================
-   毎フレームのアニメーション更新
-   ==================================================================== */
+function updatePhysics(delta) {
+  if (charState.isJumping || charState.isFalling) {
+    charState.jumpVY += GRAVITY * delta;
+    charState.position.y += charState.jumpVY * delta;
 
-// SキーTurn180を「一度だけ」発火させるためのフラグ
-let sKeyTurnFired = false;  // OFF時: Sを押した瞬間だけtrue、押し続けはfalse
-let prevBackKey = false;    // 前フレームのSキー状態
-
-function updateInputAnimation(delta) {
-  if (!currentVrm || !mixer) return;
-  if (isJumping) return;
-
-  // スペースでジャンプ
-  if (pressedKeys.has('space') && !isCrouching) {
-    isJumping = true;
-    playAction('jump', 0.1);
-    return;
-  }
-
-  const isRunning = pressedKeys.has('z');
-  const fwd   = pressedKeys.has('w');
-  const back  = pressedKeys.has('s');
-  const left  = pressedKeys.has('a');
-  const right = pressedKeys.has('d');
-  const anyMove = fwd || back || left || right;
-
-  // Sキーの「押した瞬間」を検出（連続発火防止）
-  const backJustPressed = back && !prevBackKey;
-  prevBackKey = back;
-
-  // ターン180再生中はアニメに完全に任せる
-  if (inWalkTurn || inRunTurn) return;
-
-  // ========== キャラ向きをカメラ基準で回転 ==========
-  // ストレイフ専用アニメ使用時はキャラ向きを変えない
-  // FACE_CAMERA_DIR=ON: W=前進(カメラ前方向く)、S=後退アニメ(向き変えない)
-  //                     A/D=ストレイフアニメ(向き変えない)
-  // FACE_CAMERA_DIR=OFF: 全方向、キャラを入力方向に向けてwalk/run再生
-  if (anyMove) {
-    const useStrafe = FACE_CAMERA_DIRECTION && (left || right) && !fwd && !back;
-    const useBackAnim = FACE_CAMERA_DIRECTION && back && !fwd;
-    if (!useStrafe && !useBackAnim && !(inWalkTurn || inRunTurn)) {
-      const targetYaw = getTargetYaw(fwd, back, left, right);
-      if (targetYaw !== null) {
-        let diff = targetYaw - currentVrm.scene.rotation.y;
-        while (diff >  Math.PI) diff -= Math.PI * 2;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        const lerpT = Math.min(1.0, delta * 12);
-        currentVrm.scene.rotation.y += diff * lerpT;
-      }
+    if (charState.position.y <= GROUND_Y) {
+      // 着地
+      charState.position.y = GROUND_Y;
+      charState.isJumping = false;
+      charState.isFalling = false;
+      charState.landingPhase = true;
+      charState.jumpVY = 0;
+      playAnim('land', 0.1, false, () => {
+        charState.landingPhase = false;
+        playAnim('idle', 0.2);
+      });
     }
   }
+}
 
-  // ========== しゃがみ ==========
-  if (isCrouching) {
-    if (!anyMove) { playAction('crouch'); return; }
-    if (left  && FACE_CAMERA_DIRECTION) { playAction('crouchLeft');  return; }
-    if (right && FACE_CAMERA_DIRECTION) { playAction('crouchRight'); return; }
-    playAction('crouchWalk');
-    return;
+/* ====================================================================
+   ⑨ 移動・アニメーション更新
+   ==================================================================== */
+const WALK_SPEED = 1.4;
+const WALK_BACK_SPEED = 0.8;   // 後ろ歩きは遅め
+const RUN_SPEED = 4.0;
+const CROUCH_SPEED = 0.7;
+
+// Turn180 状態管理
+let turn180Active = false;
+let turn180IsRun = false;
+let turn180TargetYaw = 0;
+
+function getInputDir() {
+  // WASDでの方向入力(0または1)
+  return {
+    forward: keys.has('w') ? 1 : 0,
+    back:    keys.has('s') ? 1 : 0,
+    left:    keys.has('a') ? 1 : 0,
+    right:   keys.has('d') ? 1 : 0,
+    run:     keys.has('z'),
+  };
+}
+
+// カメラの水平向き(yaw)を取得
+function getCameraYaw() {
+  // 3人称モードではthirdCam.yaw、そうでなければOrbitControlsのカメラ角
+  if (thirdPersonMode) {
+    return thirdCam.yaw;
   }
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
+  return Math.atan2(dir.x, dir.z);
+}
 
-  if (!anyMove) {
-    prevMovingFwd  = false;
-    prevMovingBack = false;
-    sKeyTurnFired  = false;
-    playAction('idle');
-    return;
-  }
+function updateMovement(delta) {
+  if (!currentVrm) return;
+  if (charState.isJumping || charState.isFalling || charState.landingPhase) return;
 
-  // Sキー離したらフラグリセット
-  if (!back) sKeyTurnFired = false;
+  const inp = getInputDir();
+  const isRunning = inp.run && !charState.isCrouching;
+  const camYaw = getCameraYaw();
 
-  if (isRunning) {
-    // ========== ランニング ==========
-    if (fwd && !back) {
-      if (prevMovingBack && actions['runTurn180']) {
-        runTurn180TargetYaw = currentVrm.scene.rotation.y + Math.PI;
-        inRunTurn = true;
-        playAction('runTurn180', 0.08);
-      } else {
-        playAction('run');
-      }
-      prevMovingFwd = true; prevMovingBack = false;
+  // Turn180中は向き転換アニメを優先し、完了後に移動開始
+  if (turn180Active) return;
 
-    } else if (back && !fwd) {
-      if (prevMovingFwd && actions['runTurn180']) {
-        runTurn180TargetYaw = currentVrm.scene.rotation.y + Math.PI;
-        inRunTurn = true;
-        playAction('runTurn180', 0.08);
-      } else if (FACE_CAMERA_DIRECTION) {
-        // ON: Running Backward アニメ（スピードそのまま）
-        playAction('runBack');
-      } else {
-        // OFF: 向きはgetTargetYawで変えてrun再生
-        playAction('run');
-      }
-      prevMovingFwd = false; prevMovingBack = true;
-
-    } else if (left  && FACE_CAMERA_DIRECTION) { playAction('strafeRunLeft');  }
-    else if   (right && FACE_CAMERA_DIRECTION) { playAction('strafeRunRight'); }
-    else { playAction('run'); }
-
-  } else {
-    // ========== 歩き ==========
-    if (fwd && !back) {
-      if (prevMovingBack && actions['walkTurn180']) {
-        walkTurn180TargetYaw = currentVrm.scene.rotation.y + Math.PI;
-        inWalkTurn = true;
-        playAction('walkTurn180', 0.08);
-      } else {
-        playAction('walk');
-      }
-      prevMovingFwd = true; prevMovingBack = false;
-
-    } else if (back && !fwd) {
-      if (prevMovingFwd && actions['walkTurn180']) {
-        // 前進→後退: Turn180
-        walkTurn180TargetYaw = currentVrm.scene.rotation.y + Math.PI;
-        inWalkTurn = true;
-        playAction('walkTurn180', 0.08);
-      } else if (FACE_CAMERA_DIRECTION) {
-        // ON: Walking Backwards アニメ（スピードそのまま）
-        playAction('walkBack');
-      } else {
-        // OFF: Sを押した瞬間だけTurn180を一回発火、その後はwalk
-        if (backJustPressed && !sKeyTurnFired && actions['walkTurn180']) {
-          sKeyTurnFired = true;
-          walkTurn180TargetYaw = currentVrm.scene.rotation.y + Math.PI;
-          inWalkTurn = true;
-          playAction('walkTurn180', 0.08);
-        } else if (!inWalkTurn) {
-          playAction('walk');
+  // しゃがみ中の動き
+  if (charState.isCrouching) {
+    if (inp.forward) {
+      playAnim('crouchWalk');
+      moveCharacter(camYaw, 0, CROUCH_SPEED, delta);
+    } else if (inp.back) {
+      if (faceCameraDir) {
+        // 逆再生
+        if (actions['crouchWalk']) {
+          if (currentActionName !== 'crouchWalkBack') {
+            playAnim('crouchWalk');
+            actions['crouchWalk'].timeScale = -1;
+            currentActionName = 'crouchWalkBack';
+          }
         }
+        moveCharacter(camYaw, Math.PI, CROUCH_SPEED, delta);
+      } else {
+        playAnim('crouchWalk');
+        moveCharacter(charState.yaw + Math.PI, 0, CROUCH_SPEED, delta);
       }
-      prevMovingFwd = false; prevMovingBack = true;
-
-    } else if (left  && FACE_CAMERA_DIRECTION) { playAction('strafeLeft');  }
-    else if   (right && FACE_CAMERA_DIRECTION) { playAction('strafeRight'); }
-    else { playAction('walk'); }
+    } else if (inp.left) {
+      if (faceCameraDir) {
+        playAnim('crouchStrafeL');
+        moveCharacter(camYaw, -Math.PI / 2, CROUCH_SPEED, delta);
+      } else {
+        charState.yaw += Math.PI / 2 * delta * 3;
+        playAnim('crouchWalk');
+        moveCharacter(charState.yaw, 0, CROUCH_SPEED * 0.5, delta);
+      }
+    } else if (inp.right) {
+      if (faceCameraDir) {
+        playAnim('crouchStrafeR');
+        moveCharacter(camYaw, Math.PI / 2, CROUCH_SPEED, delta);
+      } else {
+        charState.yaw -= Math.PI / 2 * delta * 3;
+        playAnim('crouchWalk');
+        moveCharacter(charState.yaw, 0, CROUCH_SPEED * 0.5, delta);
+      }
+    } else {
+      // しゃがみアイドル
+      playAnim('crouch');
+    }
+    applyCharacterTransform();
+    return;
   }
+
+  // 通常移動
+  let didMove = false;
+
+  if (inp.forward && inp.back) {
+    // 両方押し: 無視
+  } else if (inp.forward) {
+    // 前進中に反対(S)が押されたら turn180
+    const animKey = isRunning ? 'run' : 'walk';
+    playAnim(animKey);
+    if (isRunning) {
+      moveCharacter(camYaw, 0, RUN_SPEED, delta);
+    } else {
+      moveCharacter(camYaw, 0, WALK_SPEED, delta);
+    }
+    // 前進中はカメラをキャラの真後ろへ滑らかに合わせる
+    if (thirdPersonMode) snapCameraBehindCharacter(delta);
+    didMove = true;
+  } else if (inp.back) {
+    if (faceCameraDir) {
+      if (isRunning) {
+        playAnim('runBack');
+        moveCharacter(camYaw, Math.PI, RUN_SPEED * 0.6, delta);
+      } else {
+        playAnim('walkBack');
+        moveCharacter(camYaw, Math.PI, WALK_BACK_SPEED, delta);
+      }
+      if (thirdPersonMode) snapCameraBehindCharacter(delta);
+    } else {
+      // 後ろ向きに転換してから歩く → Turn180
+      const targetYaw = camYaw + Math.PI;  // 後ろ向き
+      startTurn180(targetYaw, isRunning);
+    }
+    didMove = true;
+  } else if (inp.left && !inp.right) {
+    if (faceCameraDir) {
+      // 視点方向を向く＝Wと同じ向き(camYaw)にキャラを向けたまま、左へ平行移動
+      playAnim(isRunning ? 'runStrafeL' : 'strafeL');
+      charState.yaw = camYaw;
+      charState.position.x -= Math.sin(camYaw - Math.PI / 2) * (isRunning ? RUN_SPEED * 0.8 : WALK_SPEED * 0.9) * delta;
+      charState.position.z -= Math.cos(camYaw - Math.PI / 2) * (isRunning ? RUN_SPEED * 0.8 : WALK_SPEED * 0.9) * delta;
+    } else {
+      charState.yaw += Math.PI / 2 * delta * 3;
+      if (isRunning) {
+        moveCharacter(charState.yaw, 0, RUN_SPEED, delta);
+        playAnim('run');
+      } else {
+        moveCharacter(charState.yaw, 0, WALK_SPEED, delta);
+        playAnim('walk');
+      }
+    }
+    if (faceCameraDir && thirdPersonMode) snapCameraBehindCharacter(delta);
+    didMove = true;
+  } else if (inp.right && !inp.left) {
+    if (faceCameraDir) {
+      // 視点方向を向く＝Wと同じ向き(camYaw)にキャラを向けたまま、右へ平行移動
+      playAnim(isRunning ? 'runStrafeR' : 'strafeR');
+      charState.yaw = camYaw;
+      charState.position.x -= Math.sin(camYaw + Math.PI / 2) * (isRunning ? RUN_SPEED * 0.8 : WALK_SPEED * 0.9) * delta;
+      charState.position.z -= Math.cos(camYaw + Math.PI / 2) * (isRunning ? RUN_SPEED * 0.8 : WALK_SPEED * 0.9) * delta;
+    } else {
+      charState.yaw -= Math.PI / 2 * delta * 3;
+      if (isRunning) {
+        moveCharacter(charState.yaw, 0, RUN_SPEED, delta);
+        playAnim('run');
+      } else {
+        moveCharacter(charState.yaw, 0, WALK_SPEED, delta);
+        playAnim('walk');
+      }
+    }
+    if (faceCameraDir && thirdPersonMode) snapCameraBehindCharacter(delta);
+    didMove = true;
+  }
+
+  if (!didMove) {
+    playAnim('idle');
+  }
+
+  applyCharacterTransform();
+}
+
+// moveCharacter: 指定yawの方向にmoveYaw分オフセットして動く
+// moveYaw: 0=前, PI=後ろ, -PI/2=左, PI/2=右
+function moveCharacter(baseYaw, moveYaw, speed, delta) {
+  const angle = baseYaw + moveYaw;
+  // キャラの向きはbaseYawに向ける（ストレーフ時はキャラはbaseYaw向き）
+  charState.yaw = baseYaw;
+  charState.position.x -= Math.sin(angle) * speed * delta;
+  charState.position.z -= Math.cos(angle) * speed * delta;
+}
+
+function applyCharacterTransform() {
+  if (!currentVrm) return;
+  currentVrm.scene.position.copy(charState.position);
+  currentVrm.scene.rotation.y = charState.yaw;
+}
+
+/* Turn180 */
+function startTurn180(targetYaw, isRun) {
+  turn180Active = true;
+  turn180IsRun = isRun;
+  turn180TargetYaw = targetYaw;
+  const animKey = isRun ? 'runTurn180' : 'turn180';
+  playAnim(animKey, 0.1, false, () => {
+    charState.yaw = turn180TargetYaw;
+    turn180Active = false;
+    // Turn180後すぐに歩き/走りへ
+    playAnim(isRun ? 'run' : 'walk', 0.15);
+  });
 }
 
 /* ====================================================================
-   オーバーワールドカメラ更新
+   ⑩ 3人称カメラ更新
+   カメラのyawは、移動入力がある間はキャラの向き(charState.yaw)の
+   真後ろに自動追従させる。マウスドラッグ中や入力なしの時は
+   ユーザーが回したthirdCam.yawをそのまま使う。
    ==================================================================== */
-function updateCamera(delta) {
-  if (!currentVrm) return;
+function updateThirdPersonCamera() {
+  if (!thirdPersonMode || !currentVrm) return;
 
-  if (autoCameraEnabled) {
-    const fwd   = pressedKeys.has('w');
-    const left  = pressedKeys.has('a');
-    const right = pressedKeys.has('d');
+  const target = charState.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+  const sinP = Math.sin(thirdCam.pitch);
+  const cosP = Math.cos(thirdCam.pitch);
+  const sinY = Math.sin(thirdCam.yaw);
+  const cosY = Math.cos(thirdCam.yaw);
 
-    // W/A/D移動中 または ターン中はカメラがキャラ背後へ追従
-    const shouldFollow = (fwd || left || right || inWalkTurn || inRunTurn) && !isJumping;
-    if (shouldFollow) {
-      const charYaw = currentVrm.scene.rotation.y;
-      // キャラ後方azimuth = キャラ前方yaw + π
-      // ただしgetCharFwdYaw()との一貫性: キャラ前方=camAzimuth なので
-      // カメラ後方目標 = charYaw + π → charYawがcamAzimuthに近づくように
-      let targetAz = charYaw + Math.PI;
-      let diff = targetAz - camAzimuth;
-      while (diff >  Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      // ターン中は少し速めに追従
-      const speed = (inWalkTurn || inRunTurn) ? 4.0 : 3.0;
-      camAzimuth += diff * Math.min(1, delta * speed);
-    }
-  }
+  const offset = new THREE.Vector3(
+    thirdCam.distance * cosP * sinY,
+    thirdCam.distance * sinP,
+    thirdCam.distance * cosP * cosY,
+  );
+  camera.position.copy(target).add(offset);
+  camera.lookAt(target);
+}
 
-  // カメラ位置をキャラ中心の球面座標で計算
-  const charPos = new THREE.Vector3();
-  currentVrm.scene.getWorldPosition(charPos);
-  const camOffset = camSphereToPos(camAzimuth, CAM_ELEV, CAM_DIST, 0);
-  camera.position.set(charPos.x + camOffset.x, charPos.y + camOffset.y, charPos.z + camOffset.z);
-  camera.lookAt(charPos.x, charPos.y + CAM_TARGET_Y, charPos.z);
+// キャラ真後ろにカメラyawを滑らかに合わせる（前進中など）
+function snapCameraBehindCharacter(delta, speed = 8) {
+  const targetYaw = charState.yaw + Math.PI; // キャラの正面の反対＝真後ろ
+  let diff = targetYaw - thirdCam.yaw;
+  // -PIからPIに正規化
+  diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+  thirdCam.yaw += diff * Math.min(1, speed * delta);
 }
 
 /* ====================================================================
@@ -884,14 +849,16 @@ window.addEventListener('resize', () => {
    ==================================================================== */
 function animate() {
   requestAnimationFrame(animate);
-  const delta = clock.getDelta();
+  const delta = Math.min(clock.getDelta(), 0.05); // 最大50ms（タブ非アクティブ対策）
 
-  updateInputAnimation(delta);
-  updateCamera(delta);
+  updatePhysics(delta);
+  updateMovement(delta);
+  updateThirdPersonCamera();
 
   if (mixer) mixer.update(delta);
   if (currentVrm) currentVrm.update(delta);
 
+  if (!thirdPersonMode) controls.update();
   renderer.render(scene, camera);
 }
 animate();
