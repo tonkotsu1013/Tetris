@@ -308,7 +308,7 @@ function loadMixamoAnimation(url, vrm, keepInPlace = true) {
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x15151f);
 
-const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 50);
+const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 300);
 camera.position.set(0, 1.4, 3.2);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -318,11 +318,15 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.getElementById('canvas-container').appendChild(renderer.domElement);
 
 // マウス/タッチで自由にいろんな角度から見られるようにする
+// 【拡張】targetを毎フレーム、キャラクターの位置へ追従させることで
+// 「3Dオーバーワールド風」の三人称追従カメラにする(ドラッグでの自由視点回転はそのまま可能)
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 1.0, 0);
 controls.enableDamping = true;
-controls.minDistance = 0.6;
-controls.maxDistance = 8;
+controls.dampingFactor = 0.12;
+controls.minDistance = 0.8;
+controls.maxDistance = 12;
+controls.maxPolarAngle = Math.PI * 0.49; // 地面より下を覗き込めないようにする
 controls.update();
 
 // ライト
@@ -331,14 +335,15 @@ const dirLight = new THREE.DirectionalLight(0xffffff, 1.6);
 dirLight.position.set(1, 2, 1.5);
 scene.add(dirLight);
 
-// 足元の目安になる地面とグリッド
+// 足元の目安になる地面とグリッド(【拡張】オーバーワールド風に広く確保)
+const FLOOR_RADIUS = 60;
 const floor = new THREE.Mesh(
-  new THREE.CircleGeometry(2.2, 48),
+  new THREE.CircleGeometry(FLOOR_RADIUS, 64),
   new THREE.MeshStandardMaterial({ color: 0x23233a, roughness: 1 }),
 );
 floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
-scene.add(new THREE.GridHelper(4, 16, 0x4444aa, 0x2c2c44));
+scene.add(new THREE.GridHelper(FLOOR_RADIUS * 2, 60, 0x4444aa, 0x2c2c44));
 
 const clock = new THREE.Clock();
 let currentVrm = null;
@@ -759,8 +764,14 @@ class CharacterController {
   // LookAtCameraDir=ON：体をカメラの正面方向へ滑らかに追従させる
   faceCameraDirection(delta) {
     this.camera.getWorldDirection(this.tmpCamForward);
-    const targetYaw = Math.atan2(this.tmpCamForward.x, this.tmpCamForward.z);
+    const targetYaw = this.yawFromDirection(this.tmpCamForward.x, this.tmpCamForward.z);
     this.rotateTowards(targetYaw, delta);
+  }
+
+  // ワールド方向ベクトル(dirX, dirZ)を向くために必要な rotation.y を返す。
+  // VRMのローカル前方は +Z なので、そのまま atan2(dirX, dirZ) でよい。
+  yawFromDirection(dirX, dirZ) {
+    return Math.atan2(dirX, dirZ);
   }
 
   rotateTowards(targetYaw, delta) {
@@ -776,7 +787,7 @@ class CharacterController {
     if (charSettings.lookAtCameraDir) {
       this.faceCameraDirection(delta);
     } else {
-      const targetYaw = Math.atan2(moveDir.x, moveDir.z);
+      const targetYaw = this.yawFromDirection(moveDir.x, moveDir.z);
       this.rotateTowards(targetYaw, delta);
     }
   }
@@ -841,7 +852,7 @@ class CharacterController {
   startTurn180(gait, moveDir) {
     const turnKey = gait === 'run' ? 'runTurn180' : 'walkTurn180';
     const followKey = gait; // 'walk' | 'run'
-    const targetYaw = Math.atan2(moveDir.x, moveDir.z);
+    const targetYaw = this.yawFromDirection(moveDir.x, moveDir.z);
     const startYaw = this.vrm.scene.rotation.y;
     let diff = targetYaw - startYaw;
     diff = Math.atan2(Math.sin(diff), Math.cos(diff));
@@ -940,6 +951,19 @@ function animate() {
 
   if (mixer) mixer.update(delta);
   if (currentVrm) currentVrm.update(delta); // 表情・ボーン・LookAt・スプリングボーン等を一括更新
+
+  // 【拡張】オーバーワールド風の追従カメラ：
+  // target をキャラクターの胸あたりへ毎フレーム更新するだけで、
+  // マウスドラッグでの自由な視点回転・ホイールでのズームは
+  // OrbitControls がそのまま維持してくれる(距離・角度は変わらず、
+  // 追従対象だけがキャラクターに切り替わる)。
+  if (currentVrm) {
+    controls.target.set(
+      currentVrm.scene.position.x,
+      currentVrm.scene.position.y + 1.0,
+      currentVrm.scene.position.z,
+    );
+  }
 
   controls.update();
   renderer.render(scene, camera);
