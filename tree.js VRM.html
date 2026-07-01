@@ -69,6 +69,10 @@
 <div id="ui">
   <h1>VRM Viewer</h1>
   <div id="status">読み込み中...</div>
+  <div style="margin: 6px 0; pointer-events: auto;">
+    <label for="vrmModelSelect" style="display:block; margin-bottom:2px;">3Dモデル切り替え：</label>
+    <select id="vrmModelSelect" style="width:100%; padding:4px; border-radius:6px; background:#2e2e4d; color:#fff; border:none;"></select>
+  </div>
   <div>ドラッグ：視点回転 / ホイール：ズーム</div>
   <div>↑：早歩き　↓：ゆっくり</div>
   <div>←→：その場で向きを変える</div>
@@ -107,7 +111,24 @@ import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
    index.html と「同じフォルダ」に以下のファイルを置いてください。
    サブフォルダに入れた場合はパスを './models/xxx.vrm' のように直してください。
    ==================================================================== */
-const VRM_FILE_PATH = './ayame_v1.1.vrm';     // ← VRMファイル名
+/* ====================================================================
+   ① VRMモデルはここに追加します
+   ------------------------------------------------------------------
+   index.html と「同じフォルダ」に .vrm ファイルを置いた上で、
+   下の VRM_MODEL_LIST 配列に 1行追加するだけで、
+   ゲーム画面右上のプルダウンから選べるようになります。
+   （他のコードを書き換える必要はありません）
+
+   書式: { name: '画面に表示する名前', path: './ファイル名.vrm' }
+   サブフォルダに入れた場合は path を './models/xxx.vrm' のように直してください。
+   ==================================================================== */
+const VRM_MODEL_LIST = [
+  { name: 'あやめ', path: './ayame_v1.1.vrm' },
+  // ↓↓↓ ここに追加するだけでモデルを増やせます ↓↓↓
+  // { name: '好きな名前', path: './another_model.vrm' },
+  // { name: 'もう1体', path: './models/another_model2.vrm' },
+];
+
 const WALK_ANIMATION_PATH = './Walking.fbx';  // ← ミクサモ(Mixamo)の歩行アニメーション(FBX)
 
 // 走る/アイドルなど別のモーションを追加したい場合は、ここに増やして
@@ -147,6 +168,26 @@ const CHAR_ANIM_FILES = {
   fallingIdle:      'Falling Idle.fbx',
   landing:          'Falling To Landing.fbx',
 };
+
+/* ====================================================================
+   【拡張】追加のアニメーションファイルを読み込みたいだけの場合は、
+   ここにファイル名を1行追加するだけでOKです（他の場所は書き換え不要）。
+   ------------------------------------------------------------------
+   ・index.html と同じフォルダに置いた .fbx ファイル名をそのまま書いてください。
+   ・拡張子を除いたファイル名がそのまま再生キーになります
+     （例: 'Waving.fbx' を追加 → characterAnimator.play('Waving') で再生可能）。
+   ・自動的に読み込まれ、CharacterAnimator の中でアクションとして使えるようになります。
+   ・キー入力などに実際に割り当てて使いたい場合は、別途 CharacterController /
+     updateStandardMovement 等のロジック側でそのキー名を呼び出すコードが必要です。
+   ・ループ再生させたい場合は、下の CharacterAnimator 内の loopKeys にも
+     同じキー名を追加してください（追加しなければ1回再生になります）。
+   ==================================================================== */
+const EXTRA_ANIMATION_FILES = [
+  // ↓↓↓ ここにファイル名を追加するだけで自動的に読み込まれます ↓↓↓
+  // 'Waving.fbx',
+  // 'Clapping.fbx',
+];
+
 
 // 調整可能なパラメータ
 const CHAR_TUNING = {
@@ -372,72 +413,127 @@ let characterController = null;
 const statusEl = document.getElementById('status');
 
 /* ====================================================================
-   ④ VRMの読み込み
+   ④ VRMの読み込み（モデル切り替え対応）
    ==================================================================== */
 const gltfLoader = new GLTFLoader();
 gltfLoader.register((parser) => new VRMLoaderPlugin(parser));
 
-gltfLoader.load(
-  VRM_FILE_PATH,
-  async (gltf) => {
-    const vrm = gltf.userData.vrm;
-
-    // 表示に不要なデータを削除して軽量化（任意・無くても動作します）
-    VRMUtils.removeUnnecessaryVertices(gltf.scene);
-    VRMUtils.removeUnnecessaryJoints(gltf.scene);
-
-    // VRM0.x のモデルは正面が後ろ(-Z)を向いているため、自動で前(+Z)向きに補正する
-    // VRM1.0のモデルなら何もしない（バージョンを自動判定）
-    VRMUtils.rotateVRM0(vrm);
-
-    scene.add(vrm.scene);
-    currentVrm = vrm;
-    statusEl.textContent = 'VRM読み込み完了。アニメーション読込中...';
-
-    // VRMに入っている表情(Expression)の一覧をUIとコンソールに表示
-    setupExpressionUI(vrm);
-
-    // ミクサモのアニメーションを読み込んでVRMに適用する
-    mixer = new THREE.AnimationMixer(vrm.scene);
-    try {
-      const walkClip = await loadMixamoAnimation(WALK_ANIMATION_PATH, vrm, KEEP_IN_PLACE);
-      walkAction = mixer.clipAction(walkClip);
-      walkAction.play(); // 読み込めたら自動でループ再生開始
-      statusEl.textContent = '準備完了！矢印キーで速度や向きを変えられます';
-
-      /* ----------------------------------------------------------------
-         複数アニメーションを使う場合の拡張例（コメントアウト中）
-         Running.fbx などを追加したら、下のようにもう1本読み込んで
-         キー入力に応じて crossFadeTo で切り替えてください。
-      ----------------------------------------------------------------
-      const runClip = await loadMixamoAnimation('./Running.fbx', vrm, KEEP_IN_PLACE);
-      const runAction = mixer.clipAction(runClip);
-      // 例: ArrowUp を押した瞬間に walk → run へ0.2秒でクロスフェード
-      // walkAction.crossFadeTo(runAction, 0.2, true); runAction.play();
-      ---------------------------------------------------------------- */
-    } catch (e) {
-      console.error('アニメーション読み込み失敗:', e);
-      statusEl.textContent = 'VRMは表示できましたが、アニメーション読込に失敗しました（コンソール参照）';
+// シーン上のジオメトリ/マテリアル/テクスチャをまとめて解放するための小さなヘルパー
+// (モデルを切り替えるたびに古いモデルのメモリが残り続けないようにする)
+function disposeObject3D(root) {
+  root.traverse((obj) => {
+    if (obj.geometry) obj.geometry.dispose();
+    if (obj.material) {
+      const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+      materials.forEach((mat) => {
+        Object.values(mat).forEach((value) => {
+          if (value && value.isTexture) value.dispose();
+        });
+        mat.dispose();
+      });
     }
+  });
+}
 
-    // 【拡張】3人称キャラクターコントローラー / Animator の初期化
-    // (上の④の処理には手を加えず、追加で呼び出すだけ)
-    try {
-      await initExtendedCharacterController(vrm, mixer);
-    } catch (e) {
-      console.error('拡張キャラクターコントローラーの初期化に失敗しました:', e);
-    }
-  },
-  (progress) => {
-    if (progress.total) {
-      statusEl.textContent = `VRM読み込み中... ${Math.round((progress.loaded / progress.total) * 100)}%`;
-    }
-  },
-  (error) => {
-    console.error(error);
-    statusEl.textContent = 'VRMの読み込みに失敗しました。ファイル名/パスを確認してください。';
-  },
-);
+// 現在表示中のVRM・アニメーション・拡張コントローラーをすべて破棄する
+// (モデル切り替え時に、古いモデルのキー入力リスナーやアニメーションが
+//  残って二重に動いてしまうのを防ぐ)
+function disposeCurrentVRM() {
+  if (characterController) {
+    characterController.dispose();
+    characterController = null;
+  }
+  characterAnimator = null;
+
+  if (mixer) {
+    mixer.stopAllAction();
+    mixer = null;
+  }
+  walkAction = null;
+
+  if (currentVrm) {
+    scene.remove(currentVrm.scene);
+    disposeObject3D(currentVrm.scene);
+    currentVrm = null;
+  }
+}
+
+// 指定したパスのVRMを読み込んで表示する。既にモデルが表示されていれば
+// 先に破棄してから読み込む(=プルダウンでの切り替えにも使える共通関数)。
+function loadVRMModel(path) {
+  statusEl.textContent = `VRM読み込み中... (${path})`;
+
+  gltfLoader.load(
+    path,
+    async (gltf) => {
+      disposeCurrentVRM();
+
+      const vrm = gltf.userData.vrm;
+
+      // 表示に不要なデータを削除して軽量化（任意・無くても動作します）
+      VRMUtils.removeUnnecessaryVertices(gltf.scene);
+      VRMUtils.removeUnnecessaryJoints(gltf.scene);
+
+      // VRM0.x のモデルは正面が後ろ(-Z)を向いているため、自動で前(+Z)向きに補正する
+      // VRM1.0のモデルなら何もしない（バージョンを自動判定）
+      VRMUtils.rotateVRM0(vrm);
+
+      scene.add(vrm.scene);
+      currentVrm = vrm;
+      statusEl.textContent = 'VRM読み込み完了。アニメーション読込中...';
+
+      // VRMに入っている表情(Expression)の一覧をUIとコンソールに表示
+      setupExpressionUI(vrm);
+
+      // ミクサモのアニメーションを読み込んでVRMに適用する
+      mixer = new THREE.AnimationMixer(vrm.scene);
+      try {
+        const walkClip = await loadMixamoAnimation(WALK_ANIMATION_PATH, vrm, KEEP_IN_PLACE);
+        walkAction = mixer.clipAction(walkClip);
+        walkAction.play(); // 読み込めたら自動でループ再生開始
+        statusEl.textContent = '準備完了！矢印キーで速度や向きを変えられます';
+      } catch (e) {
+        console.error('アニメーション読み込み失敗:', e);
+        statusEl.textContent = 'VRMは表示できましたが、アニメーション読込に失敗しました（コンソール参照）';
+      }
+
+      // 【拡張】3人称キャラクターコントローラー / Animator の初期化
+      try {
+        await initExtendedCharacterController(vrm, mixer);
+      } catch (e) {
+        console.error('拡張キャラクターコントローラーの初期化に失敗しました:', e);
+      }
+    },
+    (progress) => {
+      if (progress.total) {
+        statusEl.textContent = `VRM読み込み中... ${Math.round((progress.loaded / progress.total) * 100)}%`;
+      }
+    },
+    (error) => {
+      console.error(error);
+      statusEl.textContent = 'VRMの読み込みに失敗しました。ファイル名/パスを確認してください。';
+    },
+  );
+}
+
+// 画面右上（UIパネル内）のプルダウンに VRM_MODEL_LIST の内容を反映し、
+// 選択が変わったら loadVRMModel() でモデルを切り替える
+(function setupVRMModelSelectUI() {
+  const selectEl = document.getElementById('vrmModelSelect');
+  VRM_MODEL_LIST.forEach((model, index) => {
+    const option = document.createElement('option');
+    option.value = String(index);
+    option.textContent = model.name;
+    selectEl.appendChild(option);
+  });
+  selectEl.addEventListener('change', () => {
+    const selected = VRM_MODEL_LIST[Number(selectEl.value)];
+    if (selected) loadVRMModel(selected.path);
+  });
+})();
+
+// 起動時は一覧の先頭のモデルを読み込む
+loadVRMModel(VRM_MODEL_LIST[0].path);
 
 /* ====================================================================
    ⑤ 表情(Expression) UI
@@ -540,7 +636,15 @@ const CLIP_YAW_OFFSET_DEG = {
 };
 
 async function loadAllCharacterAnimations(vrm) {
-  const entries = Object.entries(CHAR_ANIM_FILES);
+  const namedEntries = Object.entries(CHAR_ANIM_FILES); // [key, file] のペア
+  // EXTRA_ANIMATION_FILES は「ファイル名を1行追加するだけ」で読めるように、
+  // 拡張子を除いたファイル名をそのままキー名として自動生成する
+  const extraEntries = EXTRA_ANIMATION_FILES.map((file) => [
+    file.replace(/\.fbx$/i, ''),
+    file,
+  ]);
+  const entries = [...namedEntries, ...extraEntries];
+
   const clipMap = {};
   await Promise.all(entries.map(async ([key, file]) => {
     try {
@@ -662,8 +766,12 @@ class CharacterController {
     this.camera = camera;
 
     this.keys = new Set();
-    window.addEventListener('keydown', (e) => this.onKeyDown(e));
-    window.addEventListener('keyup', (e) => this.onKeyUp(e));
+    // dispose() で確実に解除できるよう、リスナー参照を保持しておく
+    // (モデル切り替え時に古いコントローラーのキー入力が残らないようにするため)
+    this._onKeyDown = (e) => this.onKeyDown(e);
+    this._onKeyUp = (e) => this.onKeyUp(e);
+    window.addEventListener('keydown', this._onKeyDown);
+    window.addEventListener('keyup', this._onKeyUp);
 
     this.isCrouching = false;
     this.verticalVelocity = 0;
@@ -684,12 +792,23 @@ class CharacterController {
     // 押しっぱなし状態のキーが残ると「Dを押しているのにAの入力も生きている」ような
     // 意図しない合成入力になり、アニメーションと実際の移動方向がズレる原因になるため、
     // フォーカスを失ったら入力状態を必ずクリアする。
-    window.addEventListener('blur', () => this.keys.clear());
-    document.addEventListener('visibilitychange', () => {
+    this._onBlur = () => this.keys.clear();
+    this._onVisibilityChange = () => {
       if (document.hidden) this.keys.clear();
-    });
+    };
+    window.addEventListener('blur', this._onBlur);
+    document.addEventListener('visibilitychange', this._onVisibilityChange);
 
     this.animator.play('idle', 0);
+  }
+
+  // モデル切り替え時などに、このコントローラーが登録したイベントリスナーを
+  // すべて解除する(呼び忘れると古いモデル分の入力処理が二重に残ってしまう)
+  dispose() {
+    window.removeEventListener('keydown', this._onKeyDown);
+    window.removeEventListener('keyup', this._onKeyUp);
+    window.removeEventListener('blur', this._onBlur);
+    document.removeEventListener('visibilitychange', this._onVisibilityChange);
   }
 
   onKeyDown(e) {
