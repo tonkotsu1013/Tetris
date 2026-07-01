@@ -167,6 +167,7 @@ const CHAR_TUNING = {
 // OFF : 体は常に実際の移動方向を向く(平歩行/平走行クリップ+コードによる向き変更で表現)
 const charSettings = {
   lookAtCameraDir: true,
+  debug: false, // trueにすると画面右上に方向ベクトル等のデバッグ情報を表示
 };
 
 /* ====================================================================
@@ -484,6 +485,10 @@ function setupExpressionUI(vrm) {
       <input type="checkbox" id="lookAtCameraDirToggle" checked />
       視点方向を向く (LookAtCameraDir)
     </label>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:4px;">
+      <input type="checkbox" id="charDebugToggle" />
+      デバッグ情報を表示
+    </label>
     <div style="opacity:.8;margin-top:4px;">
       WASD：移動 / Z(併用)：走る / Shift：しゃがみ切替 / Space：ジャンプ
     </div>
@@ -492,6 +497,20 @@ function setupExpressionUI(vrm) {
   document.getElementById('lookAtCameraDirToggle').addEventListener('change', (e) => {
     charSettings.lookAtCameraDir = e.target.checked;
   });
+  document.getElementById('charDebugToggle').addEventListener('change', (e) => {
+    charSettings.debug = e.target.checked;
+    charDebugEl.style.display = e.target.checked ? 'block' : 'none';
+  });
+
+  const charDebugEl = document.createElement('div');
+  charDebugEl.id = 'charDebugHud';
+  charDebugEl.style.cssText = `
+    position:fixed; top:8px; right:8px; z-index:9999;
+    background:rgba(0,0,0,0.7); color:#0f0; font:12px/1.5 monospace;
+    padding:8px 10px; border-radius:6px; white-space:pre; display:none;
+    pointer-events:none;
+  `;
+  document.body.appendChild(charDebugEl);
 })();
 
 /* ---- 7-2. 全アニメーションクリップの読み込み ----
@@ -544,21 +563,44 @@ class CharacterAnimator {
 
     this.currentKey = null;
     this.currentAction = null;
+    this._warnedFallbacks = new Set();
   }
 
   has(key) {
     return !!this.actions[key];
   }
 
-  // 通常のループステートへクロスフェードしながら切り替える
-  play(key, fadeDuration = CHAR_TUNING.crossFadeDuration) {
-    if (!this.has(key) || this.currentKey === key) return;
-    const next = this.actions[key];
+  _warnFallbackOnce(missingKey, fallbackKey) {
+    if (this._warnedFallbacks.has(missingKey)) return;
+    this._warnedFallbacks.add(missingKey);
+    console.warn(
+      `[CharacterController] "${CHAR_ANIM_FILES[missingKey] || missingKey}" が読み込めていないため、` +
+      `代わりに "${CHAR_ANIM_FILES[fallbackKey] || fallbackKey}" を再生しています。` +
+      `ファイルが同じフォルダに正しい名前で置かれているか確認してください。`
+    );
+  }
+
+  // 通常のループステートへクロスフェードしながら切り替える。
+  // key のクリップが読み込めていない場合(ファイル未配置など)は、
+  // fallbackKey が指定されていればそちらを代わりに再生する
+  // (無言でアニメーションが固まってしまうのを防ぐため)。
+  play(key, fadeDuration = CHAR_TUNING.crossFadeDuration, fallbackKey = null) {
+    let targetKey = key;
+    if (!this.has(targetKey)) {
+      if (fallbackKey && this.has(fallbackKey)) {
+        this._warnFallbackOnce(key, fallbackKey);
+        targetKey = fallbackKey;
+      } else {
+        return; // フォールバックも無ければ何もしない(直前の状態を維持)
+      }
+    }
+    if (this.currentKey === targetKey) return;
+    const next = this.actions[targetKey];
     next.reset();
     next.fadeIn(fadeDuration);
     next.play();
     if (this.currentAction) this.currentAction.fadeOut(fadeDuration);
-    this.currentKey = key;
+    this.currentKey = targetKey;
     this.currentAction = next;
   }
 
@@ -603,7 +645,9 @@ class CharacterController {
 
     this.isCrouching = false;
     this.verticalVelocity = 0;
-    this.jumpState = 'grounded'; // 'grounded' | 'rising' | 'falling' | 'landing'
+    // 'grounded'（地上・通常状態） | 'rising'（Jumping.fbx再生中、重力で上下動＋強制着地待ち）
+    // 以前あった 'falling' / 'landing' は使用しない(Jumping.fbx終了と同時に強制スナップするため)
+    this.jumpState = 'grounded';
 
     this.lastMoveAxis = null;    // 'forward' | 'backward' | 'strafeLeft' | 'strafeRight' | null
     this.lastGait = 'walk';      // 'walk' | 'run'
@@ -612,6 +656,16 @@ class CharacterController {
     this.tmpCamForward = new THREE.Vector3();
     this.tmpCamRight = new THREE.Vector3();
     this.tmpMoveDir = new THREE.Vector3();
+    this.tmpCrouchDir = new THREE.Vector3(); // しゃがみ移動用：axisから作り直した「アニメと完全一致する」方向ベクトル
+
+    // ウィンドウのフォーカスが外れた瞬間に keyup が飛んでこないケース(Alt+Tab等)対策。
+    // 押しっぱなし状態のキーが残ると「Dを押しているのにAの入力も生きている」ような
+    // 意図しない合成入力になり、アニメーションと実際の移動方向がズレる原因になるため、
+    // フォーカスを失ったら入力状態を必ずクリアする。
+    window.addEventListener('blur', () => this.keys.clear());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.keys.clear();
+    });
 
     this.animator.play('idle', 0);
   }
@@ -641,17 +695,23 @@ class CharacterController {
   }
 
   // 仕様3.：Spaceでジャンプ開始(Jumping.fbx)
+  // ★修正: Jumping.fbx を1回再生したら、Falling Idle / Landing など他のアニメーションは
+  // 一切再生せず、再生終了と同時に強制的に地面(着地位置)へ座標をスナップ・固定する。
+  // これにより、物理演算(重力)のタイミングとアニメーションの長さがズレて
+  // 浮いたまま止まったり、地面にめり込んだりすることを確実に防ぐ。
   tryJump() {
     if (this.jumpState !== 'grounded' || this.isCrouching) return;
     this.jumpState = 'rising';
     this.verticalVelocity = CHAR_TUNING.jumpUpSpeed;
     this.animator.playOnce('jump', {
       onFinished: () => {
-        // Jumping.fbx の再生が終わってもまだ上昇/滞空中なら Falling Idle へ
-        if (this.jumpState === 'rising' || this.jumpState === 'falling') {
-          this.jumpState = 'falling';
-          this.animator.play('fallingIdle');
-        }
+        // ★強制位置固定：Jumping.fbx 再生終了の瞬間に、他は何も再生せず
+        // 座標を地面の高さへスナップして浮遊・ズレを防ぐ
+        this.vrm.scene.position.y = CHAR_TUNING.groundY;
+        this.verticalVelocity = 0;
+        this.jumpState = 'grounded';
+        // ここで landing / fallingIdle は再生しない。次フレームの updateLocomotion が
+        // 現在の入力状況に応じて idle / walk 等へ自然に戻す。
       },
     });
   }
@@ -690,31 +750,41 @@ class CharacterController {
     }
 
     this.updateLocomotion(delta);
+    this.updateDebugHud();
   }
 
-  // 仕様3.：滞空・落下・着地、および強制位置固定(スナップ)
+  updateDebugHud() {
+    if (!charSettings.debug) return;
+    const el = document.getElementById('charDebugHud');
+    if (!el) return;
+    const f = this.tmpCamForward, r = this.tmpCamRight, m = this.tmpMoveDir;
+    const deg = (rad) => ((rad * 180 / Math.PI) % 360 + 360) % 360;
+    el.textContent =
+      `LookAtCameraDir: ${charSettings.lookAtCameraDir ? 'ON' : 'OFF'}\n` +
+      `isCrouching: ${this.isCrouching}\n` +
+      `keys: ${[...this.keys].join(',')}\n` +
+      `camForward: (${f.x.toFixed(2)}, ${f.z.toFixed(2)})\n` +
+      `camRight  : (${r.x.toFixed(2)}, ${r.z.toFixed(2)})\n` +
+      `moveDir   : (${m.x.toFixed(2)}, ${m.z.toFixed(2)})\n` +
+      `axis      : ${this.lastMoveAxis}\n` +
+      `body yaw  : ${deg(this.vrm.scene.rotation.y).toFixed(1)} deg\n` +
+      `position  : (${this.vrm.scene.position.x.toFixed(2)}, ${this.vrm.scene.position.z.toFixed(2)})`;
+  }
+
+  // 仕様3.：滞空中(Jumping.fbx再生中)の重力落下シミュレーション。
+  // 着地の確定・座標固定は tryJump() の onFinished 側でまとめて行う
+  // (Falling Idle / Landing は再生しない仕様のため、ここでは 'rising' 状態の
+  //  上下運動のみを扱う)。
   updateVertical(delta) {
-    if (this.jumpState === 'grounded') return;
+    if (this.jumpState !== 'rising') return;
 
     this.verticalVelocity -= CHAR_TUNING.gravity * delta;
     this.vrm.scene.position.y += this.verticalVelocity * delta;
 
-    if (this.jumpState === 'rising' && this.verticalVelocity <= 0) {
-      this.jumpState = 'falling';
-      this.animator.play('fallingIdle');
-    }
-
-    // 地面まで降りてきたら強制的にスナップして固定する(浮遊・ズレ防止)
-    if (this.jumpState === 'falling' && this.vrm.scene.position.y <= CHAR_TUNING.groundY) {
-      this.vrm.scene.position.y = CHAR_TUNING.groundY; // ★強制位置固定
-      this.verticalVelocity = 0;
-      this.jumpState = 'landing';
-      this.animator.playOnce('landing', {
-        onFinished: () => {
-          this.vrm.scene.position.y = CHAR_TUNING.groundY; // ★着地アニメ終了時にも再度固定
-          this.jumpState = 'grounded';
-        },
-      });
+    // Jumping.fbx の再生時間より先に重力計算で地面へ到達してしまった場合の保険。
+    // ここでも地面より下に沈まないようクランプしておく(実際の状態確定はアニメ終了時)。
+    if (this.vrm.scene.position.y < CHAR_TUNING.groundY) {
+      this.vrm.scene.position.y = CHAR_TUNING.groundY;
     }
   }
 
@@ -824,32 +894,50 @@ class CharacterController {
     }
 
     this.faceTowardsForMovement(moveDir, delta);
-    this.animator.play(animKey);
+    // strafe/backward系クリップが未読込の場合は通常のwalk/runにフォールバックする
+    this.animator.play(animKey, undefined, gait);
     this.applyTranslation(moveDir, speed, delta);
   }
 
   // 表2.の「しゃがみ」状態に対応
+  //
+  // ★修正: 移動方向は「axis(=どのアニメを再生するか決めた判定結果)」から
+  // その場でカメラ基準ベクトルを組み立てて求める(this.tmpCrouchDir)。
+  // 以前は入力を合成した moveDir をそのまま移動にも使っていたため、
+  // 「LookAtCameraDir=ON でしゃがみ中にDを押すと、Dのアニメが再生されているのに
+  // 実際の移動はAの方向に進む」という、再生中のアニメーションと実移動方向が
+  // 食い違う不具合が起こり得た。axis と移動ベクトルの生成元を完全に一致させる
+  // ことで、再生されるアニメと進む方向が常に一致するようにする。
   updateCrouchMovement(axis, moveDir, delta) {
     const onFlag = charSettings.lookAtCameraDir;
     const speed = CHAR_TUNING.crouchSpeed;
     let animKey;
+    const dir = this.tmpCrouchDir;
 
     if (axis === 'strafeLeft') {
       animKey = onFlag ? 'crouchSneakLeft' : 'crouchWalk';
+      dir.copy(this.tmpCamRight).multiplyScalar(-1); // カメラ基準の「左」
     } else if (axis === 'strafeRight') {
       animKey = onFlag ? 'crouchSneakRight' : 'crouchWalk';
+      dir.copy(this.tmpCamRight); // カメラ基準の「右」＝Dキー方向
+    } else if (axis === 'forward') {
+      animKey = 'crouchWalk';
+      dir.copy(this.tmpCamForward);
     } else {
-      animKey = 'crouchWalk'; // forward / backward 共通(backwardは逆再生で表現)
+      animKey = 'crouchWalk'; // backward(逆再生で表現)
+      dir.copy(this.tmpCamForward).multiplyScalar(-1);
     }
 
     this.faceTowardsForMovement(moveDir, delta);
-    this.animator.play(animKey);
+    // crouchSneakLeft/Right が未読込の場合は crouchWalk にフォールバックする
+    this.animator.play(animKey, undefined, 'crouchWalk');
 
-    const action = this.animator.actions[animKey];
+    const action = this.animator.actions[this.animator.currentKey];
     // 後退時は Crouched Walking.fbx を逆再生して後ろ歩きを表現する
     if (action) action.timeScale = (axis === 'backward') ? -1 : 1;
 
-    this.applyTranslation(moveDir, speed, delta);
+    // ★ここが修正点：moveDir ではなく axis から作った dir(再生中アニメと同じ方向)を使って移動する
+    this.applyTranslation(dir, speed, delta);
   }
 
   // OFF設定時、歩行/走行中に進行方向が反転した瞬間に挟む180度ターン
