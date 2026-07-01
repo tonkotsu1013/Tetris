@@ -104,9 +104,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
-import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { MMDLoader } from 'three/addons/loaders/MMDLoader.js';
-import { MMDAnimationHelper } from 'three/addons/animation/MMDAnimationHelper.js';
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
 /* ====================================================================
    ① ファイル名はここで指定します
@@ -125,37 +124,30 @@ import { MMDAnimationHelper } from 'three/addons/animation/MMDAnimationHelper.js
    サブフォルダに入れた場合は path を './models/xxx.vrm' のように直してください。
    ==================================================================== */
 const VRM_MODEL_LIST = [
-  { name: 'あやめ', path: './ayame_v1.1.vrm' },
-  { name: 'ぺこーら', path: './UsadaPekora.pmx' },
-  // { name: 'もう1体', path: './models/another_model2.vrm' },
+  { name: 'あやめ', type: 'vrm', path: './ayame_v1.1.vrm' },
+  // ↓↓↓ ここに追加するだけでモデルを増やせます ↓↓↓
+  // { name: '好きな名前', type: 'vrm', path: './another_model.vrm' },
+  // { name: 'もう1体', type: 'vrm', path: './models/another_model2.vrm' },
 ];
 
 /* ====================================================================
-   ①' MMDモデルはここに追加します
+   【拡張】MMDモデル (.pmx / .pmd) もここに追加すると、上のVRMモデルと
+   同じプルダウンから切り替えて表示できます。
    ------------------------------------------------------------------
-   index.html と「同じフォルダ」に .pmx (または .pmd) ファイルと、
-   その素材(テクスチャ等)一式を置いた上で、下の MMD_MODEL_LIST 配列に
-   1行追加するだけで、VRMと同じプルダウンから選べるようになります。
+   index.html と同じフォルダ(またはサブフォルダ)に .pmx ファイルと、
+   それが参照するテクスチャ一式を置いた上で、下の配列に1行追加してください。
+   （VRMのHumanoidボーンと違い、MMDのボーン名はモデルごとに揺れがあるため、
+   　完全に同じ精度の動きにはならない場合があります。ずれる場合は下の
+   　mixamoMMDRigMap を実際のモデルのボーン名に合わせて調整してください）
 
-   書式: { name: '画面に表示する名前', path: './ファイル名.pmx' }
-   ※MMDモデルは同じ Mixamo の歩行FBX(WALK_ANIMATION_PATH)を
-     ボーン名を変換して流用します(表情/WASD拡張コントローラーは非対応、
-     矢印キーでの簡易操作のみVRMと同じように使えます)。
+   書式: { name: '画面に表示する名前', type: 'mmd', path: './ファイル名.pmx' }
    ==================================================================== */
 const MMD_MODEL_LIST = [
-  // ↓↓↓ ここに追加するだけでMMDモデルを増やせます ↓↓↓
-  // { name: 'MMDモデル名', path: './model.pmx' },
+  // { name: 'MMDモデル名', type: 'mmd', path: './models/sample.pmx' },
 ];
 
-// VRMとMMDをまとめて1つのプルダウンで選べるようにするための統合リスト
-const MODEL_LIST = [
-  ...VRM_MODEL_LIST.map((m) => ({ ...m, type: 'vrm' })),
-  ...MMD_MODEL_LIST.map((m) => ({ ...m, type: 'mmd' })),
-];
-
-// MMDモデルの単位(だいたい8頭身基準)をVRM/実寸メートルに近づけるための倍率。
-// モデルによって大きさが違う場合はここを調整してください。
-const MMD_MODEL_SCALE = 0.08;
+// VRM/MMD混在で1つのプルダウンから選べるようにまとめたもの
+const MODEL_LIST = [...VRM_MODEL_LIST, ...MMD_MODEL_LIST];
 
 const WALK_ANIMATION_PATH = './Walking.fbx';  // ← ミクサモ(Mixamo)の歩行アニメーション(FBX)
 
@@ -301,63 +293,6 @@ const mixamoVRMRigMap = {
 };
 
 /* ====================================================================
-   ②' Mixamo → MMD(PMX標準ボーン名/日本語) 対応表
-   MMDモデルは three-vrm のような "humanoid正規化ボーン" を持たないため、
-   PMXの一般的な標準ボーン名(センター/上半身/左腕 など)に直接対応させます。
-   指ボーン・捩りボーン・IK専用ボーンが無いモデルでも、対応する
-   ボーンが見つからない場合は自動でスキップされます。
-   ==================================================================== */
-const mixamoMMDRigMap = {
-  mixamorigHips: 'センター',
-  mixamorigSpine: '上半身',
-  mixamorigSpine1: '上半身2',
-  mixamorigNeck: '首',
-  mixamorigHead: '頭',
-  mixamorigLeftShoulder: '左肩',
-  mixamorigLeftArm: '左腕',
-  mixamorigLeftForeArm: '左ひじ',
-  mixamorigLeftHand: '左手首',
-  mixamorigLeftHandThumb1: '左親指１',
-  mixamorigLeftHandThumb2: '左親指２',
-  mixamorigLeftHandIndex1: '左人指１',
-  mixamorigLeftHandIndex2: '左人指２',
-  mixamorigLeftHandIndex3: '左人指３',
-  mixamorigLeftHandMiddle1: '左中指１',
-  mixamorigLeftHandMiddle2: '左中指２',
-  mixamorigLeftHandMiddle3: '左中指３',
-  mixamorigLeftHandRing1: '左薬指１',
-  mixamorigLeftHandRing2: '左薬指２',
-  mixamorigLeftHandRing3: '左薬指３',
-  mixamorigLeftHandPinky1: '左小指１',
-  mixamorigLeftHandPinky2: '左小指２',
-  mixamorigLeftHandPinky3: '左小指３',
-  mixamorigRightShoulder: '右肩',
-  mixamorigRightArm: '右腕',
-  mixamorigRightForeArm: '右ひじ',
-  mixamorigRightHand: '右手首',
-  mixamorigRightHandThumb1: '右親指１',
-  mixamorigRightHandThumb2: '右親指２',
-  mixamorigRightHandIndex1: '右人指１',
-  mixamorigRightHandIndex2: '右人指２',
-  mixamorigRightHandIndex3: '右人指３',
-  mixamorigRightHandMiddle1: '右中指１',
-  mixamorigRightHandMiddle2: '右中指２',
-  mixamorigRightHandMiddle3: '右中指３',
-  mixamorigRightHandRing1: '右薬指１',
-  mixamorigRightHandRing2: '右薬指２',
-  mixamorigRightHandRing3: '右薬指３',
-  mixamorigRightHandPinky1: '右小指１',
-  mixamorigRightHandPinky2: '右小指２',
-  mixamorigRightHandPinky3: '右小指３',
-  mixamorigLeftUpLeg: '左足',
-  mixamorigLeftLeg: '左ひざ',
-  mixamorigLeftFoot: '左足首',
-  mixamorigRightUpLeg: '右足',
-  mixamorigRightLeg: '右ひざ',
-  mixamorigRightFoot: '右足首',
-};
-
-/* ====================================================================
    ③ ミクサモのFBXアニメーションを VRM 用 AnimationClip に変換する関数
    pixiv公式 three-vrm のサンプル loadMixamoAnimation.js をベースに、
    「その場から動かさない」処理 (KEEP_IN_PLACE) を追加したものです。
@@ -442,71 +377,227 @@ function loadMixamoAnimation(url, vrm, keepInPlace = true, hipsYawOffsetDeg = 0)
   });
 }
 
+
 /* ====================================================================
-   ③' ミクサモのFBXアニメーションを MMD(SkinnedMesh) 用 AnimationClip に
-   変換する関数。考え方は②'③と同じですが、humanoid正規化ボーンではなく
-   PMXの生ボーン名(mixamoMMDRigMap)に直接トラックを紐づけます。
+   ③' 【拡張】MMDモデル用：Mixamo → MMD ボーン名 対応表 ＆ リターゲット処理
+   ------------------------------------------------------------------
+   VRMのHumanoidボーンには標準名(hips, spineなど)がありますが、
+   MMD(.pmx)にはそれが無く、モデルごとに「下半身」「上半身」等の
+   日本語ボーン名を直接持っています。ここでは多くのMMDモデルで
+   共通して使われる標準的なボーン名を前提に対応表を作っています。
+   （モデルによってボーン名が違う場合は、下記の値を実際のモデルの
+   　ボーン名に書き換えてください）
    ==================================================================== */
-function loadMixamoAnimationForMMD(url, mmdMesh, keepInPlace = true) {
+const mixamoMMDRigMap = {
+  // Hipsの「回転」はここ(下半身)へ適用します。「位置(移動)」は
+  // MMD_HIPS_POSITION_BONE_NAME で指定した別ボーン(センター)へ適用します。
+  mixamorigHips: '下半身',
+  mixamorigSpine: '上半身',
+  mixamorigSpine1: '上半身2',
+  mixamorigSpine2: '上半身3', // 無いモデルも多く、その場合は自動的に無視されます
+  mixamorigNeck: '首',
+  mixamorigHead: '頭',
+
+  mixamorigLeftShoulder: '左肩',
+  mixamorigLeftArm: '左腕',
+  mixamorigLeftForeArm: '左ひじ',
+  mixamorigLeftHand: '左手首',
+  mixamorigLeftHandThumb1: '左親指０',
+  mixamorigLeftHandThumb2: '左親指１',
+  mixamorigLeftHandThumb3: '左親指２',
+  mixamorigLeftHandIndex1: '左人指１',
+  mixamorigLeftHandIndex2: '左人指２',
+  mixamorigLeftHandIndex3: '左人指３',
+  mixamorigLeftHandMiddle1: '左中指１',
+  mixamorigLeftHandMiddle2: '左中指２',
+  mixamorigLeftHandMiddle3: '左中指３',
+  mixamorigLeftHandRing1: '左薬指１',
+  mixamorigLeftHandRing2: '左薬指２',
+  mixamorigLeftHandRing3: '左薬指３',
+  mixamorigLeftHandPinky1: '左小指１',
+  mixamorigLeftHandPinky2: '左小指２',
+  mixamorigLeftHandPinky3: '左小指３',
+
+  mixamorigRightShoulder: '右肩',
+  mixamorigRightArm: '右腕',
+  mixamorigRightForeArm: '右ひじ',
+  mixamorigRightHand: '右手首',
+  mixamorigRightHandThumb1: '右親指０',
+  mixamorigRightHandThumb2: '右親指１',
+  mixamorigRightHandThumb3: '右親指２',
+  mixamorigRightHandIndex1: '右人指１',
+  mixamorigRightHandIndex2: '右人指２',
+  mixamorigRightHandIndex3: '右人指３',
+  mixamorigRightHandMiddle1: '右中指１',
+  mixamorigRightHandMiddle2: '右中指２',
+  mixamorigRightHandMiddle3: '右中指３',
+  mixamorigRightHandRing1: '右薬指１',
+  mixamorigRightHandRing2: '右薬指２',
+  mixamorigRightHandRing3: '右薬指３',
+  mixamorigRightHandPinky1: '右小指１',
+  mixamorigRightHandPinky2: '右小指２',
+  mixamorigRightHandPinky3: '右小指３',
+
+  mixamorigLeftUpLeg: '左足',
+  mixamorigLeftLeg: '左ひざ',
+  mixamorigLeftFoot: '左足首',
+  mixamorigLeftToeBase: '左つま先',
+  mixamorigRightUpLeg: '右足',
+  mixamorigRightLeg: '右ひざ',
+  mixamorigRightFoot: '右足首',
+  mixamorigRightToeBase: '右つま先',
+};
+
+// Hipsの「位置」トラック(前進移動やY方向の重心バウンス)を適用するボーン名。
+// このボーンが無いモデルの場合は、自動的に mixamorigHips の回転先(下半身)へ
+// 位置トラックも一緒に適用するようフォールバックします。
+const MMD_HIPS_POSITION_BONE_NAME = 'センター';
+
+// MMDモデルの正面の向き調整(度)。多くのMMDモデルは three.js に読み込むと
+// +Z方向を向くため、既存コードの前方判定(-Z基準)に合わせて180度回転させています。
+// 手持ちのモデルで前後が逆になる場合は 0 に変更してください。
+const MMD_FRONT_YAW_OFFSET_DEG = 180;
+
+// VRM版 loadMixamoAnimation() と同じ考え方で、MixamoのFBXアニメーションを
+// MMDモデルのスケルトンにリターゲットする。VRMのようなHumanoidの正規化された
+// レストポーズが無いため、読み込み時点のボーンのワールド回転を基準にして
+// 差分だけを取り出す(Mixamo同士のリターゲットと同じ一般的な手法)。
+function loadMixamoAnimationForMMD(url, mmdMesh, keepInPlace = true, hipsYawOffsetDeg = 0) {
   const loader = new FBXLoader();
+  const hipsYawOffsetQuat = new THREE.Quaternion().setFromAxisAngle(
+    new THREE.Vector3(0, 1, 0),
+    THREE.MathUtils.degToRad(hipsYawOffsetDeg),
+  );
 
   return loader.loadAsync(url).then((asset) => {
     const clip = THREE.AnimationClip.findByName(asset.animations, 'mixamo.com') || asset.animations[0];
     if (!clip) throw new Error('FBXの中にアニメーションが見つかりませんでした');
+
+    mmdMesh.updateMatrixWorld(true);
+    const skeleton = mmdMesh.skeleton;
+    const boneByName = {};
+    skeleton.bones.forEach((b) => { boneByName[b.name] = b; });
+
+    const hipsRotationBone = boneByName[mixamoMMDRigMap.mixamorigHips]; // 下半身
+    const hipsPositionBone = boneByName[MMD_HIPS_POSITION_BONE_NAME] || hipsRotationBone; // センター(無ければ下半身で代用)
+    const hipsHeightRefBone = hipsRotationBone || hipsPositionBone || skeleton.bones[0];
+
+    const mixamoHipsNode = asset.getObjectByName('mixamorigHips');
+    const motionHipsHeight = mixamoHipsNode.position.y;
+
+    const worldPos = new THREE.Vector3();
+    hipsHeightRefBone.getWorldPosition(worldPos);
+    const hipsPositionScale = (worldPos.y || 1) / motionHipsHeight;
 
     const tracks = [];
     const restRotationInverse = new THREE.Quaternion();
     const parentRestWorldRotation = new THREE.Quaternion();
     const _quatA = new THREE.Quaternion();
 
-    // ミクサモとMMDでも腰の高さの単位が違うため、比率を求めて位置トラックを補正する
-    const mixamoHipsNode = asset.getObjectByName('mixamorigHips');
-    const motionHipsHeight = mixamoHipsNode.position.y;
-    const mmdCenterBone = mmdMesh.getObjectByName(mixamoMMDRigMap.mixamorigHips);
-    const mmdCenterHeight = mmdCenterBone ? mmdCenterBone.position.y : motionHipsHeight;
-    const hipsPositionScale = mmdCenterHeight / motionHipsHeight;
-
     clip.tracks.forEach((track) => {
       const [mixamoRigName, propertyName] = track.name.split('.');
-      const mmdBoneName = mixamoMMDRigMap[mixamoRigName];
       const mixamoRigNode = asset.getObjectByName(mixamoRigName);
-      const mmdBoneNode = mmdBoneName ? mmdMesh.getObjectByName(mmdBoneName) : null;
+      if (mixamoRigNode == null) return;
 
-      // 対応表に無い/モデルに存在しないボーンは無視する
-      if (mmdBoneNode == null || mixamoRigNode == null) return;
-
-      mixamoRigNode.getWorldQuaternion(restRotationInverse).invert();
-      mixamoRigNode.parent.getWorldQuaternion(parentRestWorldRotation);
-
-      if (track instanceof THREE.QuaternionKeyframeTrack) {
-        for (let i = 0; i < track.values.length; i += 4) {
-          const flat = track.values.slice(i, i + 4);
-          _quatA.fromArray(flat).premultiply(parentRestWorldRotation).multiply(restRotationInverse);
-          _quatA.toArray(flat);
-          flat.forEach((v, idx) => (track.values[idx + i] = v));
-        }
-        tracks.push(new THREE.QuaternionKeyframeTrack(
-          `${mmdBoneNode.name}.quaternion`,
-          track.times,
-          track.values.slice(),
-        ));
-      } else if (track instanceof THREE.VectorKeyframeTrack) {
+      // Hipsの「位置」トラック(前進・上下バウンス)はセンター(無ければ下半身)へ
+      if (propertyName === 'position') {
+        if (mixamoRigName !== 'mixamorigHips' || !hipsPositionBone) return;
         const values = track.values.map((v) => v * hipsPositionScale);
-
-        if (mixamoRigName === 'mixamorigHips' && propertyName === 'position' && keepInPlace) {
+        if (keepInPlace) {
+          // X(左右)とZ(前後)だけ0にする。Y(上下の重心バウンス)はそのまま残す
           for (let i = 0; i < values.length; i += 3) {
             values[i] = 0;
             values[i + 2] = 0;
           }
         }
-        tracks.push(new THREE.VectorKeyframeTrack(`${mmdBoneNode.name}.position`, track.times, values));
+        tracks.push(new THREE.VectorKeyframeTrack(`${hipsPositionBone.name}.position`, track.times, values));
+        return;
       }
+
+      // 対応表に無いボーン(指の一部や補助ボーンなど、モデルにより名前が違うもの)は無視する
+      const mmdBoneName = mixamoMMDRigMap[mixamoRigName];
+      const mmdBoneNode = mmdBoneName ? boneByName[mmdBoneName] : null;
+      if (mmdBoneNode == null) return;
+
+      // レスト(直立)姿勢時の回転を基準に、回転の差分だけを取り出す
+      mixamoRigNode.getWorldQuaternion(restRotationInverse).invert();
+      mixamoRigNode.parent.getWorldQuaternion(parentRestWorldRotation);
+
+      const values = track.values.slice();
+      for (let i = 0; i < values.length; i += 4) {
+        const flat = values.slice(i, i + 4);
+        _quatA.fromArray(flat).premultiply(parentRestWorldRotation).multiply(restRotationInverse);
+        // Hipsのみ、クリップ全体を指定角度だけ追加でY軸回転させたい場合
+        if (hipsYawOffsetDeg !== 0 && mixamoRigName === 'mixamorigHips') {
+          _quatA.premultiply(hipsYawOffsetQuat);
+        }
+        _quatA.toArray(flat);
+        flat.forEach((v, idx) => (values[idx + i] = v));
+      }
+      tracks.push(new THREE.QuaternionKeyframeTrack(`${mmdBoneNode.name}.quaternion`, track.times, values));
     });
 
-    return new THREE.AnimationClip('mmdWalk', clip.duration, tracks);
+    return new THREE.AnimationClip('walk', clip.duration, tracks);
   });
 }
 
+// 読み込んだMMDの SkinnedMesh を、既存のVRM用コード(CharacterController等)が
+// そのまま使えるように「.scene(位置・回転の基準となるObject3D)」と
+// 「.update(delta)(VRMでいう表情/スプリングボーン更新。MMDでは何もしない)」を
+// 持つ簡易アダプタでラップする。こうすることで CharacterController や
+// メインループ側の currentVrm.scene / currentVrm.update(delta) は
+// VRMでもMMDでも一切コードを変えずに動く。
+function createMmdAvatarAdapter(mesh) {
+  const root = new THREE.Group();
+  root.name = 'mmdAvatarRoot';
+  root.rotation.y = THREE.MathUtils.degToRad(MMD_FRONT_YAW_OFFSET_DEG);
+  root.add(mesh);
+  return {
+    isMMD: true,
+    scene: root,
+    mesh,
+    update() {}, // MMDは毎フレームの表情/スプリングボーン更新が不要なため何もしない
+  };
+}
+
+// VRM版 loadAllCharacterAnimations() と同じく、CHAR_ANIM_FILES /
+// EXTRA_ANIMATION_FILES を読み込んでMMD用にリターゲットしたクリップ一式を返す
+async function loadAllCharacterAnimationsForMMD(mesh) {
+  const namedEntries = Object.entries(CHAR_ANIM_FILES);
+  const extraEntries = EXTRA_ANIMATION_FILES.map((file) => [file.replace(/\.fbx$/i, ''), file]);
+  const entries = [...namedEntries, ...extraEntries];
+
+  const clipMap = {};
+  await Promise.all(entries.map(async ([key, file]) => {
+    try {
+      const yawOffsetDeg = CLIP_YAW_OFFSET_DEG[key] || 0;
+      const clip = await loadMixamoAnimationForMMD(`./${file}`, mesh, true, yawOffsetDeg);
+      clip.name = key;
+      clipMap[key] = clip;
+    } catch (err) {
+      console.warn(`[CharacterController/MMD] アニメーション "${file}" の読み込みに失敗しました。`, err);
+    }
+  }));
+  return clipMap;
+}
+
+// VRM版 initExtendedCharacterController() と同じ役割(MMD版)
+async function initExtendedCharacterControllerForMMD(avatar, mesh, mixer) {
+  statusEl.textContent = '拡張アニメーション読込中...(MMD)';
+  const clipMap = await loadAllCharacterAnimationsForMMD(mesh);
+
+  if (Object.keys(clipMap).length === 0) {
+    console.warn('[CharacterController/MMD] 拡張アニメーションが1つも読み込めなかったため、初期化を中止しました。');
+    return;
+  }
+
+  if (walkAction) walkAction.stop();
+
+  characterAnimator = new CharacterAnimator(mixer, clipMap);
+  characterController = new CharacterController(avatar, characterAnimator, camera);
+
+  statusEl.textContent = '準備完了！ WASD：移動 / Z：走る / Shift：しゃがみ / Space：ジャンプ';
+}
 
 /* ====================================================================
    シーンの基本構築
@@ -560,11 +651,6 @@ let walkAction = null;
 let characterAnimator = null;
 let characterController = null;
 
-// MMDモデル用の状態(VRMとは別に保持。同時に表示するのは片方のみ)
-let currentMmd = null;       // { mesh, helper }
-let mmdWalkAction = null;
-let activeModelType = null;  // 'vrm' | 'mmd'（矢印キー操作の切り替えに使用）
-
 const statusEl = document.getElementById('status');
 
 /* ====================================================================
@@ -572,6 +658,9 @@ const statusEl = document.getElementById('status');
    ==================================================================== */
 const gltfLoader = new GLTFLoader();
 gltfLoader.register((parser) => new VRMLoaderPlugin(parser));
+
+// 【拡張】MMD(.pmx/.pmd)読み込み用ローダー
+const mmdLoader = new MMDLoader();
 
 // シーン上のジオメトリ/マテリアル/テクスチャをまとめて解放するための小さなヘルパー
 // (モデルを切り替えるたびに古いモデルのメモリが残り続けないようにする)
@@ -613,24 +702,6 @@ function disposeCurrentVRM() {
   }
 }
 
-// 現在表示中のMMDモデルを破棄する(VRMのdisposeCurrentVRMに相当)
-function disposeCurrentMMD() {
-  mmdWalkAction = null;
-  if (currentMmd) {
-    currentMmd.helper.remove(currentMmd.mesh);
-    scene.remove(currentMmd.mesh);
-    disposeObject3D(currentMmd.mesh);
-    currentMmd = null;
-  }
-}
-
-// VRM/MMDどちらが表示中でもまとめて破棄する(モデル切り替え用の共通関数)
-function disposeCurrentModel() {
-  disposeCurrentVRM();
-  disposeCurrentMMD();
-  activeModelType = null;
-}
-
 // 指定したパスのVRMを読み込んで表示する。既にモデルが表示されていれば
 // 先に破棄してから読み込む(=プルダウンでの切り替えにも使える共通関数)。
 function loadVRMModel(path) {
@@ -639,8 +710,7 @@ function loadVRMModel(path) {
   gltfLoader.load(
     path,
     async (gltf) => {
-      disposeCurrentModel();
-      activeModelType = 'vrm';
+      disposeCurrentVRM();
 
       const vrm = gltf.userData.vrm;
 
@@ -690,67 +760,67 @@ function loadVRMModel(path) {
   );
 }
 
-/* ====================================================================
-   ④' MMDの読み込み（VRMのloadVRMModelに相当）
-   ------------------------------------------------------------------
-   MMD_MODEL_LIST から選んだ .pmx を読み込み、同じ WALK_ANIMATION_PATH
-   (Mixamoの歩行FBX)をMMDボーン名に変換して再生する。
-   表情UI/WASD拡張コントローラーは今回VRM専用のため、MMD選択時は
-   矢印キーでの簡易操作（既存⑥のロジック）のみ使用できる。
-   ==================================================================== */
-const mmdLoader = new MMDLoader();
-
+// 【拡張】指定したパスのMMD(.pmx/.pmd)を読み込んで表示する。
+// loadVRMModel() のMMD版で、役割・流れはVRM版と同じ。
 function loadMMDModel(path) {
-  statusEl.textContent = `MMDモデル読み込み中... (${path})`;
+  statusEl.textContent = `MMD読み込み中... (${path})`;
 
   mmdLoader.load(
     path,
     async (mesh) => {
-      disposeCurrentModel();
-      activeModelType = 'mmd';
+      disposeCurrentVRM();
 
-      mesh.scale.setScalar(MMD_MODEL_SCALE);
-      scene.add(mesh);
+      const avatar = createMmdAvatarAdapter(mesh);
+      scene.add(avatar.scene);
+      // VRMでもMMDでも後続コード(コントローラー・追従カメラ等)が共通で使えるよう、
+      // 既存の currentVrm 変数にそのままMMDアダプタを入れて使い回す
+      currentVrm = avatar;
+      statusEl.textContent = 'MMD読み込み完了。アニメーション読込中...';
 
-      // physics: false … Ammo.js無しで動かすため物理演算(髪・スカート等)は無効
-      const helper = new MMDAnimationHelper({ afterglow: 0 });
-      helper.add(mesh, { physics: false });
-      // 脚などのボーンをアニメーションで直接動かすため、IKソルバーは無効化
-      // (有効のままだと脚IKボーンが競合し、歩行アニメーションが正しく反映されない)
-      helper.enable('ik', false);
+      // MMDには(このビューアでは)表情UIが無いため、その旨を表示するだけ
+      setupExpressionUI(avatar);
 
-      currentMmd = { mesh, helper };
-      statusEl.textContent = 'MMDモデル読み込み完了。アニメーション読込中...';
-
-      // MMDは表情(モーフ)UIを今回対象外にしているため、その旨を表示
-      setupExpressionUI(null);
-
+      mixer = new THREE.AnimationMixer(mesh);
       try {
         const walkClip = await loadMixamoAnimationForMMD(WALK_ANIMATION_PATH, mesh, KEEP_IN_PLACE);
-        const mmdMixer = helper.objects.get(mesh).mixer;
-        mmdWalkAction = mmdMixer.clipAction(walkClip);
-        mmdWalkAction.play();
-        statusEl.textContent = '準備完了！矢印キーで速度や向きを変えられます（MMD）';
+        walkAction = mixer.clipAction(walkClip);
+        walkAction.play();
+        statusEl.textContent = '準備完了！矢印キーで速度や向きを変えられます';
       } catch (e) {
-        console.error('MMD用アニメーション読み込み失敗:', e);
-        statusEl.textContent = 'MMDモデルは表示できましたが、アニメーション読込に失敗しました（コンソール参照）';
+        console.error('アニメーション読み込み失敗:', e);
+        statusEl.textContent = 'MMDは表示できましたが、アニメーション読込に失敗しました（コンソール参照）';
+      }
+
+      try {
+        await initExtendedCharacterControllerForMMD(avatar, mesh, mixer);
+      } catch (e) {
+        console.error('拡張キャラクターコントローラー(MMD)の初期化に失敗しました:', e);
       }
     },
     (progress) => {
       if (progress.total) {
-        statusEl.textContent = `MMDモデル読み込み中... ${Math.round((progress.loaded / progress.total) * 100)}%`;
+        statusEl.textContent = `MMD読み込み中... ${Math.round((progress.loaded / progress.total) * 100)}%`;
       }
     },
     (error) => {
       console.error(error);
-      statusEl.textContent = 'MMDモデルの読み込みに失敗しました。ファイル名/パスを確認してください。';
+      statusEl.textContent = 'MMDの読み込みに失敗しました。ファイル名/パスを確認してください。';
     },
   );
 }
 
+// モデルのtypeに応じてVRM/MMDどちらの読み込み関数を呼ぶかを振り分ける
+function loadModel(model) {
+  if (model.type === 'mmd') {
+    loadMMDModel(model.path);
+  } else {
+    loadVRMModel(model.path);
+  }
+}
+
 // 画面右上（UIパネル内）のプルダウンに MODEL_LIST(VRM+MMD) の内容を反映し、
-// 選択が変わったら型(type)に応じて loadVRMModel() / loadMMDModel() を呼び分ける
-(function setupModelSelectUI() {
+// 選択が変わったら loadModel() でモデルを切り替える
+(function setupVRMModelSelectUI() {
   const selectEl = document.getElementById('vrmModelSelect');
   MODEL_LIST.forEach((model, index) => {
     const option = document.createElement('option');
@@ -760,18 +830,12 @@ function loadMMDModel(path) {
   });
   selectEl.addEventListener('change', () => {
     const selected = MODEL_LIST[Number(selectEl.value)];
-    if (!selected) return;
-    if (selected.type === 'mmd') loadMMDModel(selected.path);
-    else loadVRMModel(selected.path);
+    if (selected) loadModel(selected);
   });
 })();
 
 // 起動時は一覧の先頭のモデルを読み込む
-if (MODEL_LIST[0]?.type === 'mmd') {
-  loadMMDModel(MODEL_LIST[0].path);
-} else {
-  loadVRMModel(MODEL_LIST[0].path);
-}
+loadModel(MODEL_LIST[0]);
 
 /* ====================================================================
    ⑤ 表情(Expression) UI
@@ -782,10 +846,10 @@ function setupExpressionUI(vrm) {
   const listEl = document.getElementById('exprList');
   listEl.innerHTML = '';
 
-  if (!vrm || !vrm.expressionManager) {
-    listEl.textContent = vrm
-      ? 'このVRMには表情(Expression)が設定されていません'
-      : 'MMDモデルは今回のビューアでは表情(モーフ)UI未対応です';
+  if (!vrm.expressionManager) {
+    listEl.textContent = vrm.isMMD
+      ? 'MMDモデルには表情(Expression)UIは未対応です'
+      : 'このVRMには表情(Expression)が設定されていません';
     return;
   }
 
@@ -1388,20 +1452,17 @@ window.addEventListener('keyup', (e) => {
 });
 
 function updateInputAnimation(delta) {
-  // VRM表示中はwalkAction、MMD表示中はmmdWalkActionを操作対象にする
-  const activeWalkAction = activeModelType === 'mmd' ? mmdWalkAction : walkAction;
-  if (activeWalkAction) {
+  if (walkAction) {
     let targetTimeScale = 1.0;
     if (pressedKeys.has('ArrowUp')) targetTimeScale = 1.7; // 早歩き
     if (pressedKeys.has('ArrowDown')) targetTimeScale = 0.6; // ゆっくり
-    activeWalkAction.timeScale = targetTimeScale;
+    walkAction.timeScale = targetTimeScale;
   }
 
-  const activeRoot = activeModelType === 'mmd' ? currentMmd?.mesh : currentVrm?.scene;
-  if (activeRoot) {
+  if (currentVrm) {
     const turnSpeed = 1.6; // rad/sec
-    if (pressedKeys.has('ArrowLeft')) activeRoot.rotation.y += turnSpeed * delta;
-    if (pressedKeys.has('ArrowRight')) activeRoot.rotation.y -= turnSpeed * delta;
+    if (pressedKeys.has('ArrowLeft')) currentVrm.scene.rotation.y += turnSpeed * delta;
+    if (pressedKeys.has('ArrowRight')) currentVrm.scene.rotation.y -= turnSpeed * delta;
   }
 }
 
@@ -1429,9 +1490,6 @@ function animate() {
   if (mixer) mixer.update(delta);
   if (currentVrm) currentVrm.update(delta); // 表情・ボーン・LookAt・スプリングボーン等を一括更新
 
-  // 【MMD拡張】MMDAnimationHelperがミキサー更新・IK・付与ボーン等をまとめて処理する
-  if (currentMmd) currentMmd.helper.update(delta);
-
   // 【拡張】オーバーワールド風の追従カメラ：
   // target をキャラクターの胸あたりへ毎フレーム更新するだけで、
   // マウスドラッグでの自由な視点回転・ホイールでのズームは
@@ -1442,12 +1500,6 @@ function animate() {
       currentVrm.scene.position.x,
       currentVrm.scene.position.y + 1.0,
       currentVrm.scene.position.z,
-    );
-  } else if (currentMmd) {
-    controls.target.set(
-      currentMmd.mesh.position.x,
-      currentMmd.mesh.position.y + 1.0,
-      currentMmd.mesh.position.z,
     );
   }
 
