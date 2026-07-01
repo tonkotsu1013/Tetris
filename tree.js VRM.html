@@ -769,9 +769,12 @@ class CharacterController {
   }
 
   // ワールド方向ベクトル(dirX, dirZ)を向くために必要な rotation.y を返す。
-  // VRMのローカル前方は +Z なので、そのまま atan2(dirX, dirZ) でよい。
+  // three-vrm でロードしたモデルはローカル前方が -Z (glTF/VRM1.0の正面方向の慣習。
+  // VRM0.xモデルも既存コードの VRMUtils.rotateVRM0() により同じ -Z 前方に補正済み)
+  // なので、符号を反転した atan2(-dirX, -dirZ) を使う。
+  // ※もし手持ちのモデルで前後が逆になる場合は、ここの符号を反転してください。
   yawFromDirection(dirX, dirZ) {
-    return Math.atan2(dirX, dirZ);
+    return Math.atan2(-dirX, -dirZ);
   }
 
   rotateTowards(targetYaw, delta) {
