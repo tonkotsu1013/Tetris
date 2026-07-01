@@ -91,13 +91,19 @@
   ====================================================================
   importmap: three.js / three-vrm / addons をCDN(jsdelivr)から読み込む設定。
   バージョンを変えたい場合はここの数字を変更してください。
+
+  ★注意: MMDLoader(PMX読み込み)はthree.js本体からr172以降で削除されている
+  ため、あえて少し古いバージョン(0.171.0)に固定しています。three@0.172.0
+  以降にバージョンアップするとMMD(PMX)モデルの読み込みができなくなります
+  (VRM側は @pixiv/three-vrm が three.js 0.137以降に幅広く対応しているため、
+  0.171.0でも問題なく動作します)。
   ====================================================================
 -->
 <script type="importmap">
 {
   "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+    "three": "https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.171.0/examples/jsm/",
     "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3/lib/three-vrm.module.min.js"
   }
 }
@@ -147,7 +153,7 @@ const VRM_MODEL_LIST = [
    サブフォルダに入れた場合は path を './models/xxx.pmx' のように直してください。
    ==================================================================== */
 const PMX_MODEL_LIST = [
-  { name: 'ぺこーら', path: './Usada Pekora.pmx' },
+  { name: 'ペコーら', path: './Usada Pekora.pmx' },
   // ↓↓↓ ここに追加するだけでMMDモデルを増やせます ↓↓↓
   // { name: '好きな名前', path: './another_model.pmx' },
 ];
