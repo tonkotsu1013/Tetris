@@ -661,8 +661,9 @@ class CharacterController {
     this.camera.getWorldDirection(this.tmpCamForward);
     this.tmpCamForward.y = 0;
     this.tmpCamForward.normalize();
-    // 右方向 = 前方ベクトルをY軸まわりに-90度回転したもの
-    this.tmpCamRight.set(this.tmpCamForward.z, 0, -this.tmpCamForward.x);
+    // 右方向 = 前方ベクトル(Fx,Fz)を基準にした screen-right。
+    // Y-upの右手系で right = cross(forward, up) = (-Fz, 0, Fx)。
+    this.tmpCamRight.set(-this.tmpCamForward.z, 0, this.tmpCamForward.x);
 
     const wsInput = (this.keys.has('KeyW') ? 1 : 0) - (this.keys.has('KeyS') ? 1 : 0);
     const adInput = (this.keys.has('KeyD') ? 1 : 0) - (this.keys.has('KeyA') ? 1 : 0);
@@ -733,7 +734,8 @@ class CharacterController {
     }
 
     // 入力方向が前後左右どれに最も近いかを、カメラ基準で判定する
-    const rightVec = new THREE.Vector3(this.tmpCamForward.z, 0, -this.tmpCamForward.x);
+    // (this.tmpCamRightはcomputeCameraRelativeMoveDir内で最新のカメラ向きに更新済み)
+    const rightVec = this.tmpCamRight;
     const fwdDot = moveDir.dot(this.tmpCamForward);
     const rightDot = moveDir.dot(rightVec);
 
