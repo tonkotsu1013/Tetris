@@ -237,8 +237,16 @@ const mixamoVRMRigMap = {
    「その場から動かさない」処理 (KEEP_IN_PLACE) を追加したものです。
    https://github.com/pixiv/three-vrm/tree/dev/packages/three-vrm-core/examples/humanoidAnimation
    ==================================================================== */
-function loadMixamoAnimation(url, vrm, keepInPlace = true) {
+function loadMixamoAnimation(url, vrm, keepInPlace = true, hipsYawOffsetDeg = 0) {
   const loader = new FBXLoader();
+  // Hips(ルートボーン)だけをY軸まわりに指定角度だけ回転させておくと、
+  // Hipsを親とする全身がまとめて回るため、クリップ全体を丸ごと
+  // 「指定角度だけ回転させた向き」で再生できる。
+  const hipsYawOffsetQuat = new THREE.Quaternion().setFromAxisAngle(
+    new THREE.Vector3(0, 1, 0),
+    THREE.MathUtils.degToRad(hipsYawOffsetDeg),
+  );
+
   return loader.loadAsync(url).then((asset) => {
     // Mixamoから書き出されたFBXは、アニメーション名が "mixamo.com" になっていることが多い
     const clip = THREE.AnimationClip.findByName(asset.animations, 'mixamo.com') || asset.animations[0];
@@ -272,7 +280,12 @@ function loadMixamoAnimation(url, vrm, keepInPlace = true) {
       if (track instanceof THREE.QuaternionKeyframeTrack) {
         for (let i = 0; i < track.values.length; i += 4) {
           const flat = track.values.slice(i, i + 4);
-          _quatA.fromArray(flat).premultiply(parentRestWorldRotation).multiply(restRotationInverse).toArray(flat);
+          _quatA.fromArray(flat).premultiply(parentRestWorldRotation).multiply(restRotationInverse);
+          // ★このクリップだけ体全体を指定角度回転させたい場合(Hipsのみ)
+          if (hipsYawOffsetDeg !== 0 && mixamoRigName === 'mixamorigHips') {
+            _quatA.premultiply(hipsYawOffsetQuat);
+          }
+          _quatA.toArray(flat);
           flat.forEach((v, idx) => (track.values[idx + i] = v));
         }
         tracks.push(new THREE.QuaternionKeyframeTrack(
@@ -302,6 +315,7 @@ function loadMixamoAnimation(url, vrm, keepInPlace = true) {
     return new THREE.AnimationClip('walk', clip.duration, tracks);
   });
 }
+
 
 /* ====================================================================
    シーンの基本構築
@@ -518,12 +532,20 @@ function setupExpressionUI(vrm) {
    第3引数 keepInPlace=true により、すべてのクリップで Hips の
    X/Z位置(根本の前後左右移動)をその場0に固定し、移動は本コントローラーが
    コード側で行う(=仕様1.の「ルート位置・回転を固定」を満たす)。 */
+
+// クリップ単位で体(Hips)を追加でY軸回転させたい場合はここに角度(度)を指定する。
+// Crouched Sneaking Right.fbx は向きが実際の再生に対して180度反転していたため補正。
+const CLIP_YAW_OFFSET_DEG = {
+  crouchSneakRight: 180,
+};
+
 async function loadAllCharacterAnimations(vrm) {
   const entries = Object.entries(CHAR_ANIM_FILES);
   const clipMap = {};
   await Promise.all(entries.map(async ([key, file]) => {
     try {
-      const clip = await loadMixamoAnimation(`./${file}`, vrm, true);
+      const yawOffsetDeg = CLIP_YAW_OFFSET_DEG[key] || 0;
+      const clip = await loadMixamoAnimation(`./${file}`, vrm, true, yawOffsetDeg);
       clip.name = key;
       clipMap[key] = clip;
     } catch (err) {
