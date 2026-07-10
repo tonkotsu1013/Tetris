@@ -2701,6 +2701,50 @@ console.log('%c  openMapEditor()   - マップエディターを開く', 'color:
 console.log('%c  _mcSound.toggle() - サウンドON/OFF', 'color:#8b949e');
 console.log('%c  _mcAchievements.createPanel() - 実績パネル', 'color:#8b949e');
 console.log('%c  _mcReplay.exportJSON() - リプレイデータ出力', 'color:#8b949e');
+
+// ── グローバル公開 (複数<script>ブロック間で参照するため) ──
+if (typeof KeyboardShortcuts !== 'undefined') window.KeyboardShortcuts = KeyboardShortcuts;
+if (typeof NetStats !== 'undefined') window.NetStats = NetStats;
+if (typeof ParticleSystem !== 'undefined') window.ParticleSystem = ParticleSystem;
+if (typeof SoundSystem !== 'undefined') window.SoundSystem = SoundSystem;
+if (typeof MinimapSystem !== 'undefined') window.MinimapSystem = MinimapSystem;
+if (typeof SettingsPanel !== 'undefined') window.SettingsPanel = SettingsPanel;
+if (typeof FPSCounter !== 'undefined') window.FPSCounter = FPSCounter;
+if (typeof ReplaySystem !== 'undefined') window.ReplaySystem = ReplaySystem;
+if (typeof AchievementSystem !== 'undefined') window.AchievementSystem = AchievementSystem;
+if (typeof AdvancedHUD !== 'undefined') window.AdvancedHUD = AdvancedHUD;
+if (typeof MapEditor !== 'undefined') window.MapEditor = MapEditor;
+if (typeof ChatCommands !== 'undefined') window.ChatCommands = ChatCommands;
+if (typeof ConnectionMonitor !== 'undefined') window.ConnectionMonitor = ConnectionMonitor;
+if (typeof EmoteSystem !== 'undefined') window.EmoteSystem = EmoteSystem;
+if (typeof TutorialSystem !== 'undefined') window.TutorialSystem = TutorialSystem;
+if (typeof LocalLeaderboard !== 'undefined') window.LocalLeaderboard = LocalLeaderboard;
+if (typeof ScreenshotUtil !== 'undefined') window.ScreenshotUtil = ScreenshotUtil;
+if (typeof PaintHistory !== 'undefined') window.PaintHistory = PaintHistory;
+if (typeof BGMSystem !== 'undefined') window.BGMSystem = BGMSystem;
+if (typeof GAME_VERSION !== 'undefined') window.GAME_VERSION = GAME_VERSION;
+if (typeof MAPS !== 'undefined') window.MAPS = MAPS;
+if (typeof PAINT_COLORS !== 'undefined') window.PAINT_COLORS = PAINT_COLORS;
+if (typeof STATE !== 'undefined') window.STATE = STATE;
+if (typeof showToast !== 'undefined') window.showToast = showToast;
+if (typeof el !== 'undefined') window.el = el;
+if (typeof showScreen !== 'undefined') window.showScreen = showScreen;
+if (typeof drawGame !== 'undefined') window.drawGame = drawGame;
+if (typeof appendChat !== 'undefined') window.appendChat = appendChat;
+if (typeof showResult !== 'undefined') window.showResult = showResult;
+if (typeof updateLobbyUI !== 'undefined') window.updateLobbyUI = updateLobbyUI;
+if (typeof enterLobby !== 'undefined') window.enterLobby = enterLobby;
+if (typeof joinRoom !== 'undefined') window.joinRoom = joinRoom;
+if (typeof updateScoreboard !== 'undefined') window.updateScoreboard = updateScoreboard;
+if (typeof updateMini !== 'undefined') window.updateMini = updateMini;
+if (typeof updateRoleHUD !== 'undefined') window.updateRoleHUD = updateRoleHUD;
+if (typeof updateHpBar !== 'undefined') window.updateHpBar = updateHpBar;
+if (typeof updateHUDPhase !== 'undefined') window.updateHUDPhase = updateHUDPhase;
+if (typeof startTimerUI !== 'undefined') window.startTimerUI = startTimerUI;
+if (typeof TrailSystem !== 'undefined') window.TrailSystem = TrailSystem;
+if (typeof SpectatorCamera !== 'undefined') window.SpectatorCamera = SpectatorCamera;
+if (typeof LightingSystem !== 'undefined') window.LightingSystem = LightingSystem;
+if (typeof MapRenderer !== 'undefined') window.MapRenderer = MapRenderer;
 </script>
 
 
@@ -3485,12 +3529,12 @@ const GAME_VERSION = {
     'PaintHistory', 'BGMSystem'
   ],
   info() {
-    console.table({
-      'バージョン': this.version,
-      'ビルド日': this.build,
-      'モジュール数': this.modules.length,
-      '搭載モジュール': this.modules.join(', ')
-    });
+    console.log(
+      '%cめっちゃカメレオン ' + this.version + ' (' + this.build + ')' +
+      '\nモジュール数: ' + this.modules.length +
+      '\n搭載: ' + this.modules.join(', '),
+      'color:#39d353;font-weight:bold'
+    );
   }
 };
 window.GAME_VERSION = GAME_VERSION;
@@ -4362,7 +4406,7 @@ window.addEventListener('load', () => {
     });
 
     // Net stats toggle with N key
-    KeyboardShortcuts && KeyboardShortcuts.register('n', () => NetStats.toggle());
+    if (typeof KeyboardShortcuts !== 'undefined') KeyboardShortcuts.register('n', () => NetStats.toggle());
 
     console.log('🦎 All modules loaded:', GAME_VERSION.modules.length, 'modules');
   }, 2100);
@@ -4637,7 +4681,8 @@ window.addEventListener('load', () => {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MODULE 27: BRUSH CURSOR PREVIEW
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-(function() {
+window.addEventListener('load', function() {
+  // MODULE 27: BRUSH CURSOR PREVIEW (load後に実行)
   const cur = document.createElement('div');
   cur.id = 'brush-cursor';
   document.body.appendChild(cur);
@@ -4645,22 +4690,23 @@ window.addEventListener('load', () => {
   document.addEventListener('mousemove', e => {
     const pc = document.getElementById('paint-canvas');
     if (!pc || !pc.classList.contains('active')) { cur.style.display = 'none'; return; }
-    const sz = (STATE && STATE.paint ? STATE.paint.brushSize : 4) * 2;
+    const sz = (window.STATE && STATE.paint ? STATE.paint.brushSize : 4) * 2;
     cur.style.display = 'block';
     cur.style.left = e.clientX + 'px';
     cur.style.top  = e.clientY + 'px';
     cur.style.width  = sz + 'px';
     cur.style.height = sz + 'px';
-    cur.style.borderColor = STATE && STATE.paint && STATE.paint.tool === 'eraser'
-      ? 'rgba(255,100,100,.8)' : (STATE && STATE.paint ? STATE.paint.color : '#fff');
+    cur.style.borderColor = window.STATE && STATE.paint && STATE.paint.tool === 'eraser'
+      ? 'rgba(255,100,100,.8)' : (window.STATE && STATE.paint ? STATE.paint.color : '#fff');
   });
   document.addEventListener('mouseleave', () => { cur.style.display = 'none'; });
-})();
+});
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MODULE 28: PHASE VIGNETTE
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-(function() {
+window.addEventListener('load', function() {
+  // MODULE 28: PHASE VIGNETTE
   let vignette = null;
   function setPhaseVignette(phase) {
     const gm = document.querySelector('.game-main');
@@ -4669,16 +4715,14 @@ window.addEventListener('load', () => {
     vignette = document.createElement('div');
     vignette.className = phase === 'hunt' ? 'hunt-vignette' : 'paint-vignette';
     gm.appendChild(vignette);
-    gm.className = `game-main phase-${phase}`;
+    gm.className = 'game-main phase-' + phase;
   }
-  window.addEventListener('load', () => {
-    setTimeout(() => {
-      if (window.STATE && window.STATE.socket) {
-        STATE.socket.on('game:phase', d => setPhaseVignette(d.phase));
-      }
-    }, 1300);
-  });
-})();
+  setTimeout(() => {
+    if (window.STATE && window.STATE.socket) {
+      STATE.socket.on('game:phase', d => setPhaseVignette(d.phase));
+    }
+  }, 1300);
+});
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MODULE 29: SCORE FLOATER
@@ -4721,7 +4765,7 @@ window.addEventListener('load', () => {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MODULE 30: LOBBY WAITING ANIMATION
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-(function() {
+document.addEventListener('DOMContentLoaded', function() {
   function addWaitingDots() {
     const readyCount = document.getElementById('lobby-ready-count');
     if (!readyCount) return;
@@ -4743,7 +4787,7 @@ window.addEventListener('load', () => {
       addWaitingDots();
     }
   }, 2000);
-})();
+});
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MODULE 31: ADVANCED PAINT TOOLS
@@ -4903,7 +4947,7 @@ const AdvancedPaint = (function() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MODULE 32: COLOR PICKER (EYEDROPPER)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-(function() {
+document.addEventListener('DOMContentLoaded', function() {
   function addEyedropperTool() {
     const toolBtns = document.querySelector('.tool-btns');
     if (!toolBtns || document.getElementById('tool-eyedrop')) return;
@@ -4948,12 +4992,12 @@ const AdvancedPaint = (function() {
     });
   }
   window.addEventListener('load', () => setTimeout(addEyedropperTool, 2300));
-})();
+});
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MODULE 33: CUSTOM COLOR INPUT
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-(function() {
+document.addEventListener('DOMContentLoaded', function() {
   function addCustomColorInput() {
     const palette = document.getElementById('color-palette');
     if (!palette || document.getElementById('custom-color-input')) return;
@@ -4973,12 +5017,12 @@ const AdvancedPaint = (function() {
     palette.appendChild(wrap);
   }
   window.addEventListener('load', () => setTimeout(addCustomColorInput, 2000));
-})();
+});
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MODULE 34: ROOM SEARCH / FILTER
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-(function() {
+document.addEventListener('DOMContentLoaded', function() {
   function addRoomSearch() {
     const header = document.querySelector('.browser-header');
     if (!header || document.getElementById('room-search')) return;
@@ -5013,12 +5057,12 @@ const AdvancedPaint = (function() {
     header.insertBefore(sel, header.querySelector('#btn-refresh-rooms'));
   }
   window.addEventListener('load', () => setTimeout(addRoomSearch, 1500));
-})();
+});
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MODULE 35: CLOCK & SESSION TIMER
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-(function() {
+document.addEventListener('DOMContentLoaded', function() {
   const sessionStart = Date.now();
   function addClock() {
     const hud = document.querySelector('.game-hud');
@@ -5038,12 +5082,12 @@ const AdvancedPaint = (function() {
     }, 1000);
   }
   window.addEventListener('load', () => setTimeout(addClock, 1700));
-})();
+});
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MODULE 36: PLAYER READY TIMER
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-(function() {
+document.addEventListener('DOMContentLoaded', function() {
   let countdownEl = null;
   let cdInterval  = null;
 
@@ -5087,7 +5131,7 @@ const AdvancedPaint = (function() {
     if (cdInterval) { clearInterval(cdInterval); cdInterval = null; }
     if (countdownEl) { countdownEl.remove(); countdownEl = null; }
   }
-})();
+});
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MODULE 37: PLAYER TRAIL EFFECT (hunt phase)
@@ -5148,7 +5192,7 @@ window.addEventListener('load', () => {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MODULE 38: DISCONNECT HANDLER UI
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-(function() {
+document.addEventListener('DOMContentLoaded', function() {
   let reconnectBanner = null;
   let reconnectTimer  = null;
   let attempt = 0;
@@ -5197,12 +5241,12 @@ window.addEventListener('load', () => {
       });
     }, 1300);
   });
-})();
+});
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MODULE 39: FINAL TOUCH — EASTER EGG
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-(function() {
+document.addEventListener('DOMContentLoaded', function() {
   const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
   let idx = 0;
   document.addEventListener('keydown', e => {
@@ -5256,7 +5300,7 @@ window.addEventListener('load', () => {
       });
     }
   }
-})();
+});
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MODULE 40: TRAIL RENDERING HOOK INTO DRAW GAME
