@@ -26,6 +26,27 @@ db.serialize(() => {
 db.run(`CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, sender_code TEXT, receiver_code TEXT, group_id INTEGER, message TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)`);
 db.run(`CREATE TABLE IF NOT EXISTS chat_groups (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, owner_code TEXT)`);
     db.run(`CREATE TABLE IF NOT EXISTS group_members (group_id INTEGER, user_code TEXT, PRIMARY KEY (group_id, user_code))`);
+
+    // ── めっちゃカメレオン用テーブル ──────────────────────────────
+    db.run(`CREATE TABLE IF NOT EXISTS camereon_rooms (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        host_code TEXT,
+        password TEXT,
+        map TEXT DEFAULT 'hideout',
+        max_players INTEGER DEFAULT 8,
+        is_public INTEGER DEFAULT 1,
+        phase TEXT DEFAULT 'lobby',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    db.run(`CREATE TABLE IF NOT EXISTS camereon_stats (
+        user_code TEXT PRIMARY KEY,
+        games_played INTEGER DEFAULT 0,
+        games_won INTEGER DEFAULT 0,
+        total_score INTEGER DEFAULT 0,
+        kills INTEGER DEFAULT 0,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -35,6 +56,247 @@ const onlineUsers = {};
 const socketMap = {};   
 let matchmakingQueue = [];
 const activeMatches = {}; 
+
+// ── めっちゃカメレオン 状態管理 ────────────────────────────────────────────
+const camereonRooms   = new Map(); // roomId -> Room
+const camereonPlayers = new Map(); // socketId -> { roomId, playerData }
+
+const CAMEREON_CONFIG = {
+    PAINT_TIME:    60,
+    HUNT_TIME:     90,
+    MIN_PLAYERS:    2,
+    MAX_PLAYERS:   10,
+    HUNTER_RATIO: 0.25,
+    BULLET_DAMAGE:  34,
+    CHAMELEON_HP:  100,
+    SCORE_SURVIVE: 200,
+    SCORE_FOUND:    50,
+    LOBBY_COUNTDOWN: 5,
+    ROOMS_MAX:      50,
+};
+
+function camereonMakeRoom(id, name, hostCode, opts = {}) {
+    return {
+        id, name, host: hostCode,
+        password: opts.password || null,
+        phase: 'lobby',
+        players: new Map(),
+        chat: [],
+        timer: null, timerEnd: 0,
+        map: opts.map || 'hideout',
+        paintData: new Map(),
+        createdAt: Date.now(),
+        maxPlayers: Math.min(opts.maxPlayers || 8, CAMEREON_CONFIG.MAX_PLAYERS),
+        isPublic: opts.isPublic !== false,
+        gameCount: 0,
+    };
+}
+
+function camereonMakePlayer(socketId, code, name, color) {
+    const colors = ['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FECA57','#FF9FF3','#54A0FF','#5F27CD'];
+    return {
+        id: socketId, code: code || null, name: name || `ゲスト${Math.floor(Math.random()*9999)}`,
+        role: 'chameleon', hp: CAMEREON_CONFIG.CHAMELEON_HP, alive: true,
+        score: 0, x: 0.5, y: 0.5, pose: 'idle',
+        color: color || colors[Math.floor(Math.random() * colors.length)],
+        isReady: false, kills: 0, paintStrokes: [],
+    };
+}
+
+function camereonPlayerView(p) {
+    return {
+        id: p.id, name: p.name, role: p.role, hp: p.hp, alive: p.alive,
+        score: p.score, x: p.x, y: p.y, pose: p.pose, color: p.color,
+        isReady: p.isReady, kills: p.kills, paintStrokes: p.paintStrokes,
+    };
+}
+
+function camereonRoomPublic(r) {
+    return {
+        id: r.id, name: r.name, host: r.host, phase: r.phase,
+        playerCount: r.players.size, maxPlayers: r.maxPlayers,
+        map: r.map, isPublic: r.isPublic, hasPassword: !!r.password,
+        gameCount: r.gameCount, createdAt: r.createdAt,
+    };
+}
+
+function camereonRoomFull(r) {
+    const players = [];
+    r.players.forEach(p => players.push(camereonPlayerView(p)));
+    return { ...camereonRoomPublic(r), players, chat: r.chat.slice(-50), timerEnd: r.timerEnd };
+}
+
+function camereonBroadcast(r) {
+    io.to('camereon_' + r.id).emit('camereon:room:update', camereonRoomFull(r));
+}
+
+function camereonChat(r, from, text, type = 'system') {
+    const msg = { id: Date.now() + Math.random(), from, text, type, ts: Date.now() };
+    r.chat.push(msg);
+    if (r.chat.length > 200) r.chat.shift();
+    io.to('camereon_' + r.id).emit('camereon:chat:message', msg);
+}
+
+function camereonAssignRoles(r) {
+    const arr = Array.from(r.players.values());
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    const hunterCount = Math.max(1, Math.floor(arr.length * CAMEREON_CONFIG.HUNTER_RATIO));
+    arr.forEach((p, i) => {
+        p.role  = i < hunterCount ? 'hunter' : 'chameleon';
+        p.hp    = CAMEREON_CONFIG.CHAMELEON_HP;
+        p.alive = true;
+        p.x     = 0.1 + Math.random() * 0.8;
+        p.y     = 0.1 + Math.random() * 0.8;
+        p.paintStrokes = [];
+        r.paintData.set(p.id, []);
+    });
+}
+
+function camereonCheckHuntOver(r) {
+    const chams = Array.from(r.players.values()).filter(p => p.role === 'chameleon');
+    if (chams.length > 0 && chams.every(p => !p.alive)) {
+        camereonEndHunt(r, 'hunter_win');
+    }
+}
+
+function camereonEndHunt(r, reason) {
+    if (r.phase === 'result') return;
+    camereonClearTimer(r);
+    r.phase = 'result';
+
+    const result = { reason, winner: reason === 'hunter_win' ? 'hunters' : 'chameleons', players: [] };
+    r.players.forEach(p => {
+        if (p.role === 'chameleon' && p.alive) p.score += CAMEREON_CONFIG.SCORE_SURVIVE;
+        result.players.push(camereonPlayerView(p));
+    });
+    result.players.sort((a, b) => b.score - a.score);
+
+    io.to('camereon_' + r.id).emit('camereon:game:result', result);
+    camereonChat(r, 'SYSTEM',
+        reason === 'hunter_win' ? '🔫 ハンター勝利！全カメレオンを発見！' : '🦎 カメレオン勝利！生き残りました！'
+    );
+    r.gameCount++;
+
+    // DBに統計保存
+    r.players.forEach(p => {
+        if (!p.code) return;
+        const won = (result.winner === 'hunters' && p.role === 'hunter') ||
+                    (result.winner === 'chameleons' && p.role === 'chameleon' && p.alive) ? 1 : 0;
+        db.run(`INSERT INTO camereon_stats (user_code, games_played, games_won, total_score, kills)
+                VALUES (?, 1, ?, ?, ?)
+                ON CONFLICT(user_code) DO UPDATE SET
+                    games_played = games_played + 1,
+                    games_won    = games_won + ?,
+                    total_score  = total_score + ?,
+                    kills        = kills + ?,
+                    updated_at   = CURRENT_TIMESTAMP`,
+            [p.code, won, p.score, p.kills, won, p.score, p.kills]);
+    });
+
+    // 12秒後にロビーへ
+    setTimeout(() => {
+        if (!camereonRooms.has(r.id)) return;
+        r.phase = 'lobby';
+        r.players.forEach(p => {
+            p.isReady = false; p.role = 'chameleon';
+            p.hp = CAMEREON_CONFIG.CHAMELEON_HP; p.alive = true; p.paintStrokes = [];
+        });
+        r.paintData.clear();
+        camereonBroadcast(r);
+        camereonChat(r, 'SYSTEM', '🏠 ロビーに戻りました。');
+    }, 12000);
+}
+
+function camereonClearTimer(r) {
+    if (r.timer) { clearTimeout(r.timer); r.timer = null; }
+}
+
+function camereonStartPaint(r) {
+    r.phase = 'paint';
+    camereonAssignRoles(r);
+    const players = Array.from(r.players.values()).map(camereonPlayerView);
+
+    io.to('camereon_' + r.id).emit('camereon:game:phase', {
+        phase: 'paint', duration: CAMEREON_CONFIG.PAINT_TIME, map: r.map, players
+    });
+    // 各プレイヤーに役割を個別通知
+    r.players.forEach((p, sid) => {
+        io.to(sid).emit('camereon:player:role', { role: p.role, hp: p.hp, x: p.x, y: p.y });
+    });
+    camereonChat(r, 'SYSTEM', `🎨 ペイントフェーズ開始！${CAMEREON_CONFIG.PAINT_TIME}秒で擬態してください！`);
+
+    r.timerEnd = Date.now() + CAMEREON_CONFIG.PAINT_TIME * 1000;
+    r.timer = setTimeout(() => { if (camereonRooms.has(r.id)) camereonStartHunt(r); }, CAMEREON_CONFIG.PAINT_TIME * 1000);
+
+    [30, 10].forEach(sec => {
+        setTimeout(() => {
+            if (camereonRooms.has(r.id) && r.phase === 'paint')
+                io.to('camereon_' + r.id).emit('camereon:timer:warning', { seconds: sec, phase: 'paint' });
+        }, (CAMEREON_CONFIG.PAINT_TIME - sec) * 1000);
+    });
+}
+
+function camereonStartHunt(r) {
+    r.phase = 'hunt';
+    const players = Array.from(r.players.values()).map(camereonPlayerView);
+
+    io.to('camereon_' + r.id).emit('camereon:game:phase', {
+        phase: 'hunt', duration: CAMEREON_CONFIG.HUNT_TIME, map: r.map, players
+    });
+    camereonChat(r, 'SYSTEM', '🔫 ハントフェーズ開始！カメレオンは逃げろ！');
+
+    r.timerEnd = Date.now() + CAMEREON_CONFIG.HUNT_TIME * 1000;
+    r.timer = setTimeout(() => { if (camereonRooms.has(r.id) && r.phase === 'hunt') camereonEndHunt(r, 'time_up'); }, CAMEREON_CONFIG.HUNT_TIME * 1000);
+
+    [60, 30, 10].forEach(sec => {
+        setTimeout(() => {
+            if (camereonRooms.has(r.id) && r.phase === 'hunt')
+                io.to('camereon_' + r.id).emit('camereon:timer:warning', { seconds: sec, phase: 'hunt' });
+        }, (CAMEREON_CONFIG.HUNT_TIME - sec) * 1000);
+    });
+}
+
+function camereonHandleLeave(socketId) {
+    const entry = camereonPlayers.get(socketId);
+    if (!entry) return;
+    const r      = camereonRooms.get(entry.roomId);
+    const player = entry.player;
+    camereonPlayers.delete(socketId);
+    if (!r) return;
+
+    r.players.delete(socketId);
+
+    if (r.players.size === 0) {
+        camereonClearTimer(r);
+        camereonRooms.delete(r.id);
+        return;
+    }
+    if (r.host === socketId) {
+        r.host = r.players.keys().next().value;
+        const newHost = r.players.get(r.host);
+        camereonChat(r, 'SYSTEM', `👑 ${newHost.name} がホストになりました。`);
+    }
+    camereonChat(r, 'SYSTEM', `👋 ${player.name} が退出しました。`);
+    if (r.phase === 'hunt' && player.role === 'chameleon') {
+        player.alive = false;
+        camereonCheckHuntOver(r);
+    }
+    if (r.phase !== 'result') camereonBroadcast(r);
+}
+
+// 5分ごとに空き部屋を掃除
+setInterval(() => {
+    const now = Date.now();
+    camereonRooms.forEach((r, id) => {
+        if (r.players.size === 0 && now - r.createdAt > 60000) {
+            camereonClearTimer(r);
+            camereonRooms.delete(id);
+        }
+    });
+}, 5 * 60 * 1000);
 
 io.on('connection', (socket) => {
 // 1. 厳密なログイン処理
@@ -429,138 +691,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ========== ビリヤード用イベント ==========
-    
-    // ゲーム設定の送信（ビリヤード）
-    socket.on('set_game_config', (data) => {
-        const user = onlineUsers[socket.id];
-        if (!user || !data.matchId || !activeMatches[data.matchId]) return;
-        
-        const match = activeMatches[data.matchId];
-        const opponentCode = match.p1 === user.code ? match.p2 : match.p1;
-        const opponentSocketId = socketMap[opponentCode];
-        
-        if (opponentSocketId) {
-            io.to(opponentSocketId).emit('game_start', {
-                rule: data.rule,
-                firstPlayer: data.firstPlayer
-            });
-            socket.emit('game_start', {
-                rule: data.rule,
-                firstPlayer: data.firstPlayer
-            });
-        }
-    });
-    
-    // ボール状態の更新（ビリヤード）
-    socket.on('update_ball_state', (data) => {
-        const user = onlineUsers[socket.id];
-        if (!user || !data.matchId || !activeMatches[data.matchId]) return;
-        
-        const match = activeMatches[data.matchId];
-        const opponentCode = match.p1 === user.code ? match.p2 : match.p1;
-        const opponentSocketId = socketMap[opponentCode];
-        
-        if (opponentSocketId) {
-            io.to(opponentSocketId).emit('ball_state', {
-                balls: data.balls
-            });
-        }
-    });
-    
-    // プレイヤーのショット通知（ビリヤード）
-    socket.on('player_shot', (data) => {
-        const user = onlineUsers[socket.id];
-        if (!user || !data.matchId || !activeMatches[data.matchId]) return;
-        
-        const match = activeMatches[data.matchId];
-        const opponentCode = match.p1 === user.code ? match.p2 : match.p1;
-        const opponentSocketId = socketMap[opponentCode];
-        
-        if (opponentSocketId) {
-            io.to(opponentSocketId).emit('opponent_shot', {
-                angle: data.angle,
-                power: data.power,
-                spinX: data.spinX,
-                spinY: data.spinY
-            });
-        }
-    });
-    
-    // ターン変更（ビリヤード）
-    socket.on('change_turn', (data) => {
-        const user = onlineUsers[socket.id];
-        if (!user || !data.matchId || !activeMatches[data.matchId]) return;
-        
-        const match = activeMatches[data.matchId];
-        const opponentCode = match.p1 === user.code ? match.p2 : match.p1;
-        const opponentSocketId = socketMap[opponentCode];
-        
-        if (opponentSocketId) {
-            io.to(opponentSocketId).emit('turn_change', {
-                currentPlayer: data.newPlayer
-            });
-        }
-    });
-    
-    // ゲーム終了（ビリヤード）
-    socket.on('game_over', (data) => {
-        const user = onlineUsers[socket.id];
-        if (!user || !data.matchId || !activeMatches[data.matchId]) return;
-        
-        const match = activeMatches[data.matchId];
-        const opponentCode = match.p1 === user.code ? match.p2 : match.p1;
-        const opponentSocketId = socketMap[opponentCode];
-        
-        if (opponentSocketId) {
-            const result = data.winner === opponentCode ? 'win' : 'lose';
-            io.to(opponentSocketId).emit('game_result', {
-                result: result,
-                reason: 'game_over'
-            });
-        }
-        
-        // マッチ履歴を記録
-        if (!match.dbId) {
-            db.run(
-                `INSERT INTO match_history (p1_code, p2_code, p1_type, p2_type, winner_code) VALUES (?, ?, ?, ?, ?)`,
-                [match.p1, match.p2, 'billiards', 'billiards', data.winner],
-                function(err) {
-                    if (!err) match.dbId = this.lastID;
-                }
-            );
-        }
-        
-        delete activeMatches[data.matchId];
-        if (onlineUsers[socket.id]) onlineUsers[socket.id].status = 'idle';
-        if (onlineUsers[opponentSocketId]) onlineUsers[opponentSocketId].status = 'idle';
-        io.emit('friends_data_update');
-    });
-    
-    // マッチから離脱
-    socket.on('leave_match', (matchId) => {
-        const user = onlineUsers[socket.id];
-        if (!user || !matchId || !activeMatches[matchId]) return;
-        
-        const match = activeMatches[matchId];
-        const opponentCode = match.p1 === user.code ? match.p2 : match.p1;
-        const opponentSocketId = socketMap[opponentCode];
-        
-        if (opponentSocketId) {
-            io.to(opponentSocketId).emit('game_result', {
-                result: 'win',
-                reason: 'opponent_left'
-            });
-            if (onlineUsers[opponentSocketId]) onlineUsers[opponentSocketId].status = 'idle';
-        }
-        
-        if (onlineUsers[socket.id]) onlineUsers[socket.id].status = 'idle';
-        delete activeMatches[matchId];
-        io.emit('friends_data_update');
-    });
-    
-    // ========== ビリヤード用イベント終了 ==========
-
 // --------------------------------------------------
     // グループボイスチャットのシグナリング
     socket.on('group_vc_signal', (data) => {
@@ -688,6 +818,250 @@ io.on('connection', (socket) => {
     // --------------------------------------------------
     // ----- ここまで追加 -----
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // めっちゃカメレオン Socket.IO イベント
+    // 既存の onlineUsers/socketMap は参照するが上書きしない。
+    // 全イベント名は 'camereon:' プレフィックスで名前衝突を防ぐ。
+    // ══════════════════════════════════════════════════════════════════════════
+
+    // ── 部屋一覧 ─────────────────────────────────────────────────────────────
+    socket.on('camereon:rooms:list', (cb) => {
+        const list = [];
+        camereonRooms.forEach(r => {
+            if (r.isPublic && r.phase === 'lobby') list.push(camereonRoomPublic(r));
+        });
+        list.sort((a, b) => b.createdAt - a.createdAt);
+        if (typeof cb === 'function') cb({ ok: true, rooms: list.slice(0, 20) });
+    });
+
+    // ── 部屋作成 ─────────────────────────────────────────────────────────────
+    socket.on('camereon:room:create', (data, cb) => {
+        if (camereonRooms.size >= CAMEREON_CONFIG.ROOMS_MAX)
+            return cb && cb({ ok: false, error: 'サーバーが満室です。' });
+
+        // ログイン済みユーザーのcodeを使う、なければゲスト
+        const existingUser = onlineUsers[socket.id];
+        const playerCode   = existingUser ? existingUser.code : null;
+        const playerName   = data.playerName || (existingUser ? existingUser.name : null) || `ゲスト${Math.floor(Math.random()*9999)}`;
+
+        const roomId = Math.random().toString(36).slice(2, 10).toUpperCase();
+        const r = camereonMakeRoom(roomId, data.name || `${playerName}の部屋`, socket.id, {
+            password: data.password, map: data.map,
+            maxPlayers: data.maxPlayers, isPublic: data.isPublic,
+        });
+        const player = camereonMakePlayer(socket.id, playerCode, playerName, existingUser ? undefined : data.color);
+        player.isReady = true;
+        r.players.set(socket.id, player);
+        camereonRooms.set(roomId, r);
+        camereonPlayers.set(socket.id, { roomId, player });
+
+        socket.join('camereon_' + roomId);
+        camereonChat(r, 'SYSTEM', `🦎 ${player.name} が部屋を作成しました！`);
+
+        if (typeof cb === 'function') cb({ ok: true, room: camereonRoomFull(r), playerId: socket.id });
+    });
+
+    // ── 部屋参加 ─────────────────────────────────────────────────────────────
+    socket.on('camereon:room:join', (data, cb) => {
+        const r = camereonRooms.get(data.roomId);
+        if (!r) return cb && cb({ ok: false, error: '部屋が見つかりません。' });
+        if (r.players.size >= r.maxPlayers) return cb && cb({ ok: false, error: '部屋が満員です。' });
+        if (r.phase !== 'lobby') return cb && cb({ ok: false, error: 'ゲームはすでに始まっています。' });
+        if (r.password && r.password !== data.password) return cb && cb({ ok: false, error: 'パスワードが違います。' });
+
+        const existingUser = onlineUsers[socket.id];
+        const playerCode   = existingUser ? existingUser.code : null;
+        const playerName   = data.playerName || (existingUser ? existingUser.name : null) || `ゲスト${Math.floor(Math.random()*9999)}`;
+
+        const player = camereonMakePlayer(socket.id, playerCode, playerName);
+        r.players.set(socket.id, player);
+        camereonPlayers.set(socket.id, { roomId: data.roomId, player });
+
+        socket.join('camereon_' + data.roomId);
+        camereonBroadcast(r);
+        camereonChat(r, 'SYSTEM', `👋 ${player.name} が参加しました！`);
+
+        if (typeof cb === 'function') cb({ ok: true, room: camereonRoomFull(r), playerId: socket.id });
+    });
+
+    // ── 退出 ──────────────────────────────────────────────────────────────────
+    socket.on('camereon:room:leave', () => {
+        const entry = camereonPlayers.get(socket.id);
+        if (!entry) return;
+        socket.leave('camereon_' + entry.roomId);
+        camereonHandleLeave(socket.id);
+    });
+
+    // ── 準備完了 ──────────────────────────────────────────────────────────────
+    socket.on('camereon:player:ready', (isReady, cb) => {
+        const entry = camereonPlayers.get(socket.id);
+        if (!entry) return;
+        const r = camereonRooms.get(entry.roomId);
+        if (!r || r.phase !== 'lobby') return;
+        entry.player.isReady = !!isReady;
+        camereonBroadcast(r);
+
+        if (r.players.size >= CAMEREON_CONFIG.MIN_PLAYERS) {
+            const allReady = Array.from(r.players.values()).every(p => p.isReady);
+            if (allReady) {
+                camereonChat(r, 'SYSTEM', `⏳ ${CAMEREON_CONFIG.LOBBY_COUNTDOWN}秒後にゲーム開始...`);
+                setTimeout(() => {
+                    if (camereonRooms.has(r.id) && r.phase === 'lobby') camereonStartPaint(r);
+                }, CAMEREON_CONFIG.LOBBY_COUNTDOWN * 1000);
+            }
+        }
+        if (typeof cb === 'function') cb({ ok: true });
+    });
+
+    // ── ペイントストローク ────────────────────────────────────────────────────
+    socket.on('camereon:paint:stroke', (stroke) => {
+        const entry = camereonPlayers.get(socket.id);
+        if (!entry) return;
+        const r = camereonRooms.get(entry.roomId);
+        if (!r || r.phase !== 'paint' || entry.player.role !== 'chameleon') return;
+        entry.player.paintStrokes.push(stroke);
+        if (!r.paintData.has(socket.id)) r.paintData.set(socket.id, []);
+        r.paintData.get(socket.id).push(stroke);
+        socket.to('camereon_' + r.id).emit('camereon:paint:stroke', { playerId: socket.id, stroke });
+    });
+
+    socket.on('camereon:paint:clear', () => {
+        const entry = camereonPlayers.get(socket.id);
+        if (!entry) return;
+        const r = camereonRooms.get(entry.roomId);
+        if (!r || r.phase !== 'paint' || entry.player.role !== 'chameleon') return;
+        entry.player.paintStrokes = [];
+        r.paintData.set(socket.id, []);
+        socket.to('camereon_' + r.id).emit('camereon:paint:clear', { playerId: socket.id });
+    });
+
+    // ── 移動（ハントフェーズ）────────────────────────────────────────────────
+    socket.on('camereon:player:move', (pos) => {
+        const entry = camereonPlayers.get(socket.id);
+        if (!entry) return;
+        const r = camereonRooms.get(entry.roomId);
+        const p = entry.player;
+        if (!r || r.phase !== 'hunt' || !p.alive) return;
+        p.x = Math.max(0, Math.min(1, pos.x));
+        p.y = Math.max(0, Math.min(1, pos.y));
+        p.pose = pos.pose || p.pose;
+        socket.to('camereon_' + r.id).emit('camereon:player:moved', { id: socket.id, x: p.x, y: p.y, pose: p.pose });
+    });
+
+    // ── 射撃（ハンター）──────────────────────────────────────────────────────
+    socket.on('camereon:hunter:shoot', (data, cb) => {
+        const entry = camereonPlayers.get(socket.id);
+        if (!entry) return cb && cb({ ok: false });
+        const r      = camereonRooms.get(entry.roomId);
+        const hunter = entry.player;
+        if (!r || r.phase !== 'hunt' || hunter.role !== 'hunter' || !hunter.alive)
+            return cb && cb({ ok: false });
+
+        const HIT_RADIUS = 0.06;
+        let hit = null;
+        r.players.forEach(p => {
+            if (p.role === 'chameleon' && p.alive) {
+                const dx = p.x - data.targetX, dy = p.y - data.targetY;
+                if (Math.sqrt(dx*dx + dy*dy) < HIT_RADIUS) {
+                    if (!hit) hit = p;
+                }
+            }
+        });
+
+        io.to('camereon_' + r.id).emit('camereon:hunter:bullet', {
+            from: socket.id, targetX: data.targetX, targetY: data.targetY,
+            bulletId: data.bulletId, hit: hit ? hit.id : null,
+        });
+
+        if (hit) {
+            hit.hp -= CAMEREON_CONFIG.BULLET_DAMAGE;
+            if (hit.hp <= 0) {
+                hit.hp = 0; hit.alive = false;
+                hunter.kills++;
+                hunter.score += CAMEREON_CONFIG.SCORE_FOUND;
+                io.to('camereon_' + r.id).emit('camereon:player:eliminated', {
+                    playerId: hit.id, playerName: hit.name,
+                    hunterId: socket.id, hunterName: hunter.name,
+                });
+                camereonChat(r, 'SYSTEM', `💥 ${hunter.name} が ${hit.name} を発見！`);
+                camereonCheckHuntOver(r);
+            } else {
+                io.to('camereon_' + r.id).emit('camereon:player:damaged', { playerId: hit.id, hp: hit.hp, damage: CAMEREON_CONFIG.BULLET_DAMAGE });
+            }
+            if (typeof cb === 'function') cb({ ok: true, hit: hit.id, hp: hit.hp, alive: hit.alive });
+        } else {
+            if (typeof cb === 'function') cb({ ok: true, hit: null });
+        }
+    });
+
+    // ── チャット ──────────────────────────────────────────────────────────────
+    socket.on('camereon:chat:send', (text) => {
+        const entry = camereonPlayers.get(socket.id);
+        if (!entry) return;
+        const r = camereonRooms.get(entry.roomId);
+        if (!r) return;
+        const sanitized = String(text).slice(0, 120).trim();
+        if (!sanitized) return;
+        const msg = {
+            id: Date.now() + Math.random(), from: entry.player.name,
+            fromId: socket.id, text: sanitized,
+            type: (!entry.player.alive && r.phase === 'hunt') ? 'spectator' : 'chat',
+            ts: Date.now(),
+        };
+        r.chat.push(msg);
+        if (r.chat.length > 200) r.chat.shift();
+        io.to('camereon_' + r.id).emit('camereon:chat:message', msg);
+    });
+
+    // ── ホスト操作 ────────────────────────────────────────────────────────────
+    socket.on('camereon:host:forceStart', (cb) => {
+        const entry = camereonPlayers.get(socket.id);
+        if (!entry) return cb && cb({ ok: false });
+        const r = camereonRooms.get(entry.roomId);
+        if (!r || r.host !== socket.id) return cb && cb({ ok: false, error: 'ホストのみ操作可能です。' });
+        if (r.phase !== 'lobby') return cb && cb({ ok: false });
+        if (r.players.size < CAMEREON_CONFIG.MIN_PLAYERS)
+            return cb && cb({ ok: false, error: `最低${CAMEREON_CONFIG.MIN_PLAYERS}人必要です。` });
+        camereonStartPaint(r);
+        if (typeof cb === 'function') cb({ ok: true });
+    });
+
+    socket.on('camereon:host:setMap', (mapId, cb) => {
+        const entry = camereonPlayers.get(socket.id);
+        if (!entry) return cb && cb({ ok: false });
+        const r = camereonRooms.get(entry.roomId);
+        if (!r || r.host !== socket.id || r.phase !== 'lobby') return cb && cb({ ok: false });
+        const validMaps = ['hideout','osaka','backrooms','forest','school','space'];
+        if (!validMaps.includes(mapId)) return cb && cb({ ok: false, error: '無効なマップです。' });
+        r.map = mapId;
+        camereonBroadcast(r);
+        camereonChat(r, 'SYSTEM', `🗺️ マップが「${mapId}」に変更されました。`);
+        if (typeof cb === 'function') cb({ ok: true });
+    });
+
+    // ── Ping ──────────────────────────────────────────────────────────────────
+    socket.on('camereon:ping', (ts, cb) => { if (typeof cb === 'function') cb(ts); });
+
+    // ── 統計取得 ──────────────────────────────────────────────────────────────
+    socket.on('camereon:get_stats', (targetCode, cb) => {
+        const code = targetCode || (onlineUsers[socket.id] ? onlineUsers[socket.id].code : null);
+        if (!code) return cb && cb({ ok: false, error: 'ログインが必要です。' });
+        db.get(`SELECT * FROM camereon_stats WHERE user_code = ?`, [code], (err, row) => {
+            cb && cb({ ok: true, stats: row || { user_code: code, games_played:0, games_won:0, total_score:0, kills:0 } });
+        });
+    });
+
+    // ── 部屋同期（再接続用）──────────────────────────────────────────────────
+    socket.on('camereon:room:sync', (roomId, cb) => {
+        const r = camereonRooms.get(roomId);
+        if (!r) return cb && cb({ ok: false, error: '部屋が見つかりません。' });
+        cb && cb({ ok: true, room: camereonRoomFull(r) });
+    });
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // (めっちゃカメレオン イベントここまで)
+    // ══════════════════════════════════════════════════════════════════════════
+
     socket.on('disconnect', () => {
         const user = onlineUsers[socket.id];
         if (user) {
@@ -718,10 +1092,40 @@ io.on('connection', (socket) => {
             delete onlineUsers[socket.id];
             io.emit('friends_data_update');
         }
+
+        // めっちゃカメレオン: ログイン状態に関わらず退出処理
+        if (camereonPlayers.has(socket.id)) {
+            const entry = camereonPlayers.get(socket.id);
+            if (entry) socket.leave('camereon_' + entry.roomId);
+            camereonHandleLeave(socket.id);
+        }
+    });
+});
+
+// ── めっちゃカメレオン REST API ───────────────────────────────────────────────
+app.get('/api/camereon/rooms', (req, res) => {
+    const list = [];
+    camereonRooms.forEach(r => { if (r.isPublic) list.push(camereonRoomPublic(r)); });
+    res.json({ rooms: list, total: camereonRooms.size });
+});
+
+app.get('/api/camereon/stats/:code', (req, res) => {
+    db.get(`SELECT * FROM camereon_stats WHERE user_code = ?`, [req.params.code], (err, row) => {
+        res.json(row || { user_code: req.params.code, games_played:0, games_won:0, total_score:0, kills:0 });
+    });
+});
+
+app.get('/api/camereon/ranking', (req, res) => {
+    db.all(`SELECT cs.*, u.name FROM camereon_stats cs LEFT JOIN users u ON cs.user_code = u.code
+            ORDER BY cs.total_score DESC LIMIT 20`, [], (err, rows) => {
+        res.json({ ranking: rows || [] });
     });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
+    console.log(`🦎 めっちゃカメレオン モジュール: 有効`);
+    console.log(`   /api/camereon/rooms    - 部屋一覧`);
+    console.log(`   /api/camereon/ranking  - ランキング`);
 });
