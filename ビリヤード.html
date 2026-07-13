@@ -12,8 +12,20 @@
         /* 視点ステータス */
         #status { position: absolute; top: 20px; left: 20px; color: #fff; font-size: 14px; background: rgba(0,0,0,0.7); padding: 8px 12px; border-radius: 5px; }
         
-        /* コントロールパネル */
-        #control-panel { position: absolute; top: 75px; left: 20px; background: rgba(0,0,0,0.8); border: 1px solid #444; border-radius: 5px; padding: 12px; color: white; pointer-events: auto; font-size: 13px; display: flex; flex-direction: column; gap: 8px; }
+        /* 歯車ボタン */
+        #gear-btn { position: absolute; top: 75px; left: 20px; width: 38px; height: 38px; background: rgba(0,0,0,0.75); border: 1px solid #555; border-radius: 8px; color: #ccc; font-size: 22px; display: flex; align-items: center; justify-content: center; cursor: pointer; pointer-events: auto; transition: background 0.2s, color 0.2s; z-index: 20; user-select: none; }
+        #gear-btn:hover { background: rgba(60,60,60,0.95); color: #fff; }
+
+        /* 設定モーダル */
+        #settings-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1100; align-items: center; justify-content: center; }
+        #settings-backdrop { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.55); }
+        #settings-panel { position: relative; background: #1a1a1a; border: 1px solid #555; border-radius: 10px; padding: 20px 24px; color: white; font-size: 13px; display: flex; flex-direction: column; gap: 10px; min-width: 260px; box-shadow: 0 8px 32px rgba(0,0,0,0.7); }
+        #settings-panel h2 { margin: 0 0 6px 0; font-size: 15px; color: #ddd; border-bottom: 1px solid #444; padding-bottom: 8px; }
+        #settings-close { position: absolute; top: 12px; right: 14px; background: none; border: none; color: #aaa; font-size: 20px; cursor: pointer; line-height: 1; }
+        #settings-close:hover { color: #fff; }
+
+        /* コントロールパネル（モーダル内用） */
+        #control-panel { display: flex; flex-direction: column; gap: 8px; }
         .toggle-container { display: flex; align-items: center; gap: 8px; }
         .toggle-container label { cursor: pointer; }
         
@@ -59,10 +71,62 @@
         .menu-btn { background: #333; border: 2px solid #666; color: white; font-size: 20px; padding: 15px 40px; margin: 10px; border-radius: 8px; cursor: pointer; transition: 0.2s; width: 200px; font-weight: bold; }
         .menu-btn:hover { background: #555; border-color: #fff; transform: scale(1.05); }
 
+        /* 変則テーブル モード用スタイル */
+        .variant-shape-btn {
+            background: #1a2a3a; border: 1px solid #2196F3; color: #cfe8ff;
+            font-size: 12px; padding: 8px 4px; border-radius: 6px; cursor: pointer;
+            transition: all 0.15s; text-align: center;
+        }
+        .variant-shape-btn:hover { background: #234156; border-color: #64b5f6; }
+        .variant-shape-btn.selected { background: #2196F3; border-color: #fff; color: #fff; font-weight: bold; }
+
         @keyframes pulse {
             0% { transform: translate(-50%, -100%) scale(1); }
             50% { transform: translate(-50%, -100%) scale(1.08); }
             100% { transform: translate(-50%, -100%) scale(1); }
+        }
+
+        /* ボム・ボール専用スタイル */
+        .ball-label.bomb-ball {
+            background: rgba(180, 40, 0, 0.92);
+            border: 2px solid #ff6600;
+            color: #fff;
+            font-size: 13px;
+            box-shadow: 0 0 10px rgba(255, 80, 0, 0.8);
+            animation: bomb-pulse 0.9s infinite;
+        }
+        @keyframes bomb-pulse {
+            0%   { transform: translate(-50%, -100%) scale(1);    box-shadow: 0 0 8px rgba(255,80,0,0.8); }
+            50%  { transform: translate(-50%, -100%) scale(1.12); box-shadow: 0 0 18px rgba(255,160,0,1); }
+            100% { transform: translate(-50%, -100%) scale(1);    box-shadow: 0 0 8px rgba(255,80,0,0.8); }
+        }
+
+        /* 爆発演出オーバーレイ */
+        #explosion-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 500; display: none;
+        }
+        #explosion-canvas {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        }
+        #explosion-flash {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at var(--ex) var(--ey),
+                rgba(255,255,200,1) 0%, rgba(255,180,0,0.95) 12%,
+                rgba(255,60,0,0.85) 28%, rgba(180,20,0,0.5) 50%, transparent 72%);
+            opacity: 0;
+        }
+        #explosion-msg {
+            position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 56px; font-weight: 900; color: #fff;
+            text-shadow: 0 0 10px #fff, 0 0 30px #ffaa00, 0 0 60px #ff4400, 0 0 100px #ff0000;
+            opacity: 0; white-space: nowrap; letter-spacing: 3px;
+        }
+        #explosion-sub {
+            position: absolute; top: 58%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 22px; font-weight: bold; color: #ffdd88;
+            text-shadow: 0 0 10px #ff6600;
+            opacity: 0; white-space: nowrap;
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -71,25 +135,154 @@
 
 <div id="start-overlay">
     <h1 style="font-size: 36px; margin-bottom: 5px; color: #4CAF50;">3D BILLIARDS</h1>
-    <p style="color: #aaa; margin-bottom: 30px;">ゲームモードを選択してください</p>
+    <p style="color: #aaa; margin-bottom: 20px;">ゲームモードを選択してください</p>
+
+    <!-- ボム・プール設定 -->
+    <div style="background: rgba(255,80,0,0.15); border: 2px solid #ff6600; border-radius: 10px; padding: 14px 24px; margin-bottom: 20px; width: 240px; text-align:left;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+            <input type="checkbox" id="bomb-mode-toggle" style="width:18px;height:18px;cursor:pointer; accent-color:#ff6600;">
+            <label for="bomb-mode-toggle" style="color:#ff9933; font-weight:bold; font-size:16px; cursor:pointer;">💣 ボム・プール モード</label>
+        </div>
+        <div style="color:#ccc; font-size:11px; line-height:1.6;">
+            盤面にボム・ボールが登場！（個数は下のスライダーで変更）<br>
+            ・手玉が最初にボムに当たる → <span style="color:#FF5252;">自爆ファウル</span><br>
+            ・的球を経由してボムに当たる → <span style="color:#4CAF50;">戦略的誘爆</span><br>
+            ・的球がボムに直接当たる → <span style="color:#4CAF50;">戦略的誘爆</span><br>
+            爆発後、ボムはランダム再配置されます。
+        </div>
+        <!-- スタート画面スライダー -->
+        <div style="margin-top:10px; display:flex; flex-direction:column; gap:6px; border-top:1px solid #664400; padding-top:8px;">
+            <div style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                <span style="color:#ffaa44; width:42px;">💣 個数</span>
+                <input type="range" id="start-slider-count" min="1" max="10" step="1" value="1"
+                    style="flex:1; accent-color:#ff6600; cursor:pointer;"
+                    oninput="document.getElementById('start-val-count').textContent=this.value; var ig=document.getElementById('slider-count'); if(ig){ig.value=this.value; document.getElementById('val-count').textContent=this.value;} BOMB_COUNT=parseInt(this.value);">
+                <span id="start-val-count" style="color:#fff; width:28px; text-align:right;">1</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                <span style="color:#ffaa44; width:42px;">💥 威力</span>
+                <input type="range" id="start-slider-force" min="0.2" max="3" step="0.1" value="1.5"
+                    style="flex:1; accent-color:#ff6600; cursor:pointer;"
+                    oninput="document.getElementById('start-val-force').textContent=this.value; document.getElementById('slider-force').value=this.value; document.getElementById('val-force').textContent=this.value; BOMB_FORCE=parseFloat(this.value);">
+                <span id="start-val-force" style="color:#fff; width:28px; text-align:right;">1.5</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                <span style="color:#ffaa44; width:42px;">🔴 範囲</span>
+                <input type="range" id="start-slider-radius" min="1" max="25" step="1" value="8"
+                    style="flex:1; accent-color:#ff6600; cursor:pointer;"
+                    oninput="document.getElementById('start-val-radius').textContent=this.value; document.getElementById('slider-radius').value=this.value; document.getElementById('val-radius').textContent=this.value; BOMB_RADIUS=parseFloat(this.value);">
+                <span id="start-val-radius" style="color:#fff; width:28px; text-align:right;">8</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 変則テーブル設定 -->
+    <div style="background: rgba(33,150,243,0.12); border: 2px solid #2196F3; border-radius: 10px; padding: 14px 24px; margin-bottom: 20px; width: 240px; text-align:left;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+            <input type="checkbox" id="variant-mode-toggle" style="width:18px;height:18px;cursor:pointer; accent-color:#2196F3;" onchange="onVariantToggleChange()">
+            <label for="variant-mode-toggle" style="color:#64b5f6; font-weight:bold; font-size:16px; cursor:pointer;">🔷 変則テーブル モード</label>
+        </div>
+        <div id="variant-shape-select" style="display:none; flex-direction:column; gap:6px;">
+            <div style="color:#ccc; font-size:11px; margin-bottom:4px;">テーブル形状を選択:</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px;">
+                <button type="button" class="variant-shape-btn selected" data-shape="L_SHAPE" onclick="selectVariantShape('L_SHAPE')">L字型</button>
+                <button type="button" class="variant-shape-btn" data-shape="T_SHAPE" onclick="selectVariantShape('T_SHAPE')">T字型</button>
+                <button type="button" class="variant-shape-btn" data-shape="CROSS" onclick="selectVariantShape('CROSS')">十字型</button>
+                <button type="button" class="variant-shape-btn" data-shape="HEXAGON" onclick="selectVariantShape('HEXAGON')">六角形</button>
+                <button type="button" class="variant-shape-btn" data-shape="OCTAGON" onclick="selectVariantShape('OCTAGON')">八角形</button>
+                <button type="button" class="variant-shape-btn" data-shape="STAR" onclick="selectVariantShape('STAR')">星形</button>
+            </div>
+            <div style="color:#ccc; font-size:11px; line-height:1.5; margin-top:6px; border-top:1px solid #1e3a52; padding-top:6px;">
+                障害物（山・バンパー・壁）をスライダーで追加できます。
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                <span style="color:#64b5f6; width:58px;">⛰️ 山</span>
+                <input type="range" id="obstacle-mountain" min="0" max="5" step="1" value="0"
+                    style="flex:1; accent-color:#2196F3; cursor:pointer;"
+                    oninput="document.getElementById('val-mountain').textContent=this.value;">
+                <span id="val-mountain" style="color:#fff; width:20px; text-align:right;">0</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                <span style="color:#64b5f6; width:58px;">🔵 バンパー</span>
+                <input type="range" id="obstacle-bumper" min="0" max="5" step="1" value="0"
+                    style="flex:1; accent-color:#2196F3; cursor:pointer;"
+                    oninput="document.getElementById('val-bumper').textContent=this.value;">
+                <span id="val-bumper" style="color:#fff; width:20px; text-align:right;">0</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                <span style="color:#64b5f6; width:58px;">🧱 壁</span>
+                <input type="range" id="obstacle-wall" min="0" max="5" step="1" value="0"
+                    style="flex:1; accent-color:#2196F3; cursor:pointer;"
+                    oninput="document.getElementById('val-wall').textContent=this.value;">
+                <span id="val-wall" style="color:#fff; width:20px; text-align:right;">0</span>
+            </div>
+        </div>
+    </div>
+
     <button class="menu-btn" onclick="startGame('9BALL')">9-Ball</button>
     <button class="menu-btn" onclick="startGame('8BALL')">8-Ball</button>
+
+    <!-- スタート画面の歯車ボタン -->
+    <div style="position:absolute; top:16px; right:16px; width:38px; height:38px; background:rgba(255,255,255,0.1); border:1px solid #555; border-radius:8px; color:#ccc; font-size:22px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background 0.2s;" onclick="openSettings()" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'" title="設定">⚙️</div>
+</div>
+
+<!-- 設定モーダル -->
+<div id="settings-modal">
+    <div id="settings-backdrop" onclick="closeSettings()"></div>
+    <div id="settings-panel">
+        <h2>⚙️ 設定</h2>
+        <button id="settings-close" onclick="closeSettings()">✕</button>
+        <div id="control-panel">
+            <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
+                <span>🔊 音量</span>
+                <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.7"
+                    style="flex:1; accent-color:#4CAF50; cursor:pointer;"
+                    oninput="masterVolume=parseFloat(this.value); document.getElementById('volume-val').textContent=Math.round(this.value*100)+'%';">
+                <span id="volume-val" style="color:#fff; width:36px; text-align:right;">70%</span>
+            </div>
+            <div class="toggle-container">
+                <input type="checkbox" id="turn-switch" checked style="cursor:pointer;">
+                <label for="turn-switch">ユーザー交代: <span id="turn-switch-status" style="font-weight:bold; color:#4CAF50;">ON</span></label>
+            </div>
+            <div class="toggle-container">
+                <input type="checkbox" id="ui-display-switch" checked style="cursor:pointer;">
+                <label for="ui-display-switch">情報UIを表示する</label>
+            </div>
+            <div class="toggle-container" id="bomb-toggle-row" style="display:none;">
+                <input type="checkbox" id="bomb-mode-ingame" style="cursor:pointer; accent-color:#ff6600;">
+                <label for="bomb-mode-ingame" style="color:#ff9933;">💣 ボム・プール: <span id="bomb-switch-status" style="font-weight:bold; color:#FF5252;">OFF</span></label>
+            </div>
+            <div id="bomb-sliders" style="display:none; flex-direction:column; gap:6px; padding-top:4px; border-top:1px solid #444;">
+                <div style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                    <span style="color:#ffaa44; width:42px;">💣 個数</span>
+                    <input type="range" id="slider-count" min="1" max="10" step="1" value="1"
+                        style="flex:1; accent-color:#ff6600; cursor:pointer;"
+                        oninput="document.getElementById('val-count').textContent=this.value; var s=document.getElementById('start-slider-count'); if(s){s.value=this.value; document.getElementById('start-val-count').textContent=this.value;} BOMB_COUNT=parseInt(this.value); syncBombCount();">
+                    <span id="val-count" style="color:#fff; width:28px; text-align:right;">1</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                    <span style="color:#ffaa44; width:42px;">💥 威力</span>
+                    <input type="range" id="slider-force" min="0.2" max="3" step="0.1" value="1.5"
+                        style="flex:1; accent-color:#ff6600; cursor:pointer;"
+                        oninput="document.getElementById('val-force').textContent=this.value; var s=document.getElementById('start-slider-force'); if(s){s.value=this.value; document.getElementById('start-val-force').textContent=this.value;} BOMB_FORCE=parseFloat(this.value);">
+                    <span id="val-force" style="color:#fff; width:28px; text-align:right;">1.5</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                    <span style="color:#ffaa44; width:42px;">🔴 範囲</span>
+                    <input type="range" id="slider-radius" min="1" max="25" step="1" value="8"
+                        style="flex:1; accent-color:#ff6600; cursor:pointer;"
+                        oninput="document.getElementById('val-radius').textContent=this.value; var s=document.getElementById('start-slider-radius'); if(s){s.value=this.value; document.getElementById('start-val-radius').textContent=this.value;} BOMB_RADIUS=parseFloat(this.value);">
+                    <span id="val-radius" style="color:#fff; width:28px; text-align:right;">8</span>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div id="ui-layer">
     <div id="status">視点: 俯瞰 (OVERVIEW)</div>
-    
-    <div id="control-panel">
-        <div class="toggle-container">
-            <input type="checkbox" id="turn-switch" checked style="cursor:pointer;">
-            <label for="turn-switch">ユーザー交代: <span id="turn-switch-status" style="font-weight:bold; color:#4CAF50;">ON</span></label>
-        </div>
-        <div class="toggle-container">
-            <input type="checkbox" id="ui-display-switch" checked style="cursor:pointer;">
-            <label for="ui-display-switch">情報UIを表示する</label>
-        </div>
-    </div>
-    
+    <!-- 歯車ボタン -->
+    <div id="gear-btn" onclick="openSettings()" title="設定">⚙️</div>
     <div id="scoreboard">
         <div id="game-mode-title">9-BALL</div>
         <div id="player-turn">Player 1 のターン</div>
@@ -122,6 +315,14 @@
 <div id="labels-container" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; overflow:hidden;"></div>
 <div id="canvas-container"></div>
 
+<!-- 爆発演出 -->
+<div id="explosion-overlay">
+    <canvas id="explosion-canvas"></canvas>
+    <div id="explosion-flash"></div>
+    <div id="explosion-msg"></div>
+    <div id="explosion-sub"></div>
+</div>
+
 <script>
 const TABLE_W = 30;
 const TABLE_L = 60;
@@ -134,8 +335,8 @@ const RESTITUTION = 0.975;
 const POCKET_RADIUS = 1.95;   
 const STOP_THRESHOLD = 0.005; 
 
-// === 追加：空気抵抗係数 ===
-const AIR_DRAG_COEF = 0.015; // 速度の2乗に比例して減速させる係数（ゲームプレイに合わせて微調整してください）
+// 空気抵抗係数
+const AIR_DRAG_COEF = 0.015; 
 
 let scene, camera, overviewCamera, renderer, cueBall, hitMarker, tableCloth;
 let balls = [];
@@ -170,7 +371,18 @@ let targetBallAtShotStart = null;
 let playerGroup = { 1: null, 2: null }; 
 let calledPocket = 0; 
 
-const pockets = [
+// ボム・プール設定
+let bombModeEnabled = false;
+let BOMB_RADIUS = 8;        // 爆発範囲（スライダーで変更可）
+let BOMB_FORCE  = 1.5;      // 爆風の基本速度（スライダーで変更可）
+let BOMB_COUNT  = 1;        // ボム個数（スライダーで変更可）
+let bombBalls = [];            // ボム・ボールの参照リスト（複数対応）
+let bombBall = null;           // 爆発処理用：現在爆発中のボム
+// isFirstContact は廃止。firstHitBall === null で代替判定
+let bombExploding = false;     // 爆発アニメーション中フラグ
+let pendingFoulAfterBomb = false; // 爆発後ファウル確定フラグ
+
+let pockets = [
     { x: -TABLE_W/2, z: -TABLE_L/2, name: "左上 (コーナー)" }, 
     { x:  TABLE_W/2, z: -TABLE_L/2, name: "右上 (コーナー)" },
     { x: -TABLE_W/2, z: 0,           name: "左中 (サイド)" },   
@@ -184,6 +396,106 @@ const BOUNDS_Z = TABLE_L / 2 - BALL_R;
 
 let tableWalls = [];
 let visualFramerails = [];
+
+// ===== 変則テーブル モード =====
+let variantModeEnabled = false;   // スタート画面のチェックボックス状態
+let variantShapeKey = 'L_SHAPE';  // 選択中の形状キー
+let ACTIVE_VARIANT_SHAPE = null;  // ゲーム開始時に確定する形状（nullなら通常テーブル）
+let OBSTACLE_COUNTS = { mountain: 0, bumper: 0, wall: 0 };
+let obstacles = [];                // 現在の障害物リスト {type, x, z, radius} or {type, x1,z1,x2,z2}
+let obstacleMeshes = [];
+let currentTablePolygon = null;   // 変則テーブルの外周ポリゴン（当たり判定・配置判定用）
+
+// 変則テーブルの形状定義（単位:1unit = 15）
+// 各ポリゴンは時計回り/反時計回りいずれでも可。凸頂点に自動でポケットが配置される。
+const VARIANT_SHAPES = {
+    L_SHAPE: {
+        label: 'L字型',
+        polygon: [
+            {x:-22,z:-22}, {x:0,z:-22}, {x:0,z:0}, {x:22,z:0}, {x:22,z:22}, {x:-22,z:22}
+        ],
+        rack: { x: -11, apexZ: -10, cueZ: 12 }
+    },
+    T_SHAPE: {
+        label: 'T字型',
+        polygon: [
+            {x:-33,z:-22}, {x:33,z:-22}, {x:33,z:0}, {x:11,z:0},
+            {x:11,z:22}, {x:-11,z:22}, {x:-11,z:0}, {x:-33,z:0}
+        ],
+        rack: { x: 0, apexZ: -10, cueZ: 12 }
+    },
+    CROSS: {
+        label: '十字型',
+        polygon: [
+            {x:-11,z:-33}, {x:11,z:-33}, {x:11,z:-11}, {x:33,z:-11},
+            {x:33,z:11}, {x:11,z:11}, {x:11,z:33}, {x:-11,z:33},
+            {x:-11,z:11}, {x:-33,z:11}, {x:-33,z:-11}, {x:-11,z:-11}
+        ],
+        rack: { x: 0, apexZ: -15, cueZ: 15 }
+    },
+    HEXAGON: {
+        label: '六角形',
+        polygon: (() => {
+            const R = 26, pts = [];
+            for (let k = 0; k < 6; k++) {
+                const a = (-90 + 60 * k) * Math.PI / 180;
+                pts.push({ x: R * Math.cos(a), z: R * Math.sin(a) });
+            }
+            return pts;
+        })(),
+        rack: { x: 0, apexZ: -15, cueZ: 15 }
+    },
+    OCTAGON: {
+        label: '八角形',
+        polygon: (() => {
+            const R = 28, pts = [];
+            for (let k = 0; k < 8; k++) {
+                const a = (-90 + 45 * k) * Math.PI / 180;
+                pts.push({ x: R * Math.cos(a), z: R * Math.sin(a) });
+            }
+            return pts;
+        })(),
+        rack: { x: 0, apexZ: -16, cueZ: 16 }
+    },
+    STAR: {
+        label: '星形',
+        polygon: (() => {
+            const Ro = 30, Ri = 17, pts = [];
+            for (let i = 0; i < 12; i++) {
+                const a = (-90 + 30 * i) * Math.PI / 180;
+                const r = (i % 2 === 0) ? Ro : Ri;
+                pts.push({ x: r * Math.cos(a), z: r * Math.sin(a) });
+            }
+            return pts;
+        })(),
+        rack: { x: 0, apexZ: -14, cueZ: 14 }
+    }
+};
+
+function onVariantToggleChange() {
+    variantModeEnabled = document.getElementById('variant-mode-toggle').checked;
+    document.getElementById('variant-shape-select').style.display = variantModeEnabled ? 'flex' : 'none';
+}
+function selectVariantShape(key) {
+    variantShapeKey = key;
+    document.querySelectorAll('.variant-shape-btn').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.shape === key);
+    });
+}
+
+// 設定モーダル開閉
+function openSettings() {
+    const modal = document.getElementById('settings-modal');
+    modal.style.display = 'flex';
+}
+function closeSettings() {
+    const modal = document.getElementById('settings-modal');
+    modal.style.display = 'none';
+}
+// Escキーで閉じる
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSettings();
+});
 
 document.getElementById('turn-switch').addEventListener('change', (e) => {
     const statusText = document.getElementById('turn-switch-status');
@@ -267,6 +579,7 @@ class BilliardBall {
         this.active = true;
         this.camDistance = 0; 
         this.isFalling = false;
+        this.isMoving = false; // 高速化用の移動フラグ
         
         const geometry = new THREE.SphereGeometry(BALL_R, 32, 32);
         const material = new THREE.MeshStandardMaterial({ map: createBallTexture(colorStr, num), roughness: 0.12, metalness: 0.1 });
@@ -297,18 +610,21 @@ class BilliardBall {
         }
     }
     
-    update(dtFactor) {
-        if (!this.active) {
-            if(this.labelEl && this.labelEl.parentNode) this.labelEl.parentNode.removeChild(this.labelEl);
+    update(dtFactor, skipVisualUpdate = false) {
+        if (!this.active || this.isFalling) return;
+
+        let speed = Math.hypot(this.vx, this.vz);
+        
+        // 物理的に静止している場合は計算を早期スキップ
+        if (speed === 0 && Math.abs(this.spinX) < 0.05 && Math.abs(this.spinY) < 0.05) {
+            this.spinX = 0; this.spinY = 0;
+            this.isMoving = false;
             return;
         }
-
-        if (this.isFalling) return;
+        this.isMoving = true;
         
         this.mesh.position.x += this.vx * dtFactor; 
         this.mesh.position.z += this.vz * dtFactor;
-        
-        let speed = Math.hypot(this.vx, this.vz);
         
         let currentFriction = 0.985; 
         if (speed > 0) {
@@ -322,31 +638,27 @@ class BilliardBall {
         currentFriction = Math.pow(currentFriction, dtFactor);
 
         if (speed > 0.0002 || Math.abs(this.spinY) > 0.05) {
-            this.mesh.rotateOnWorldAxis(new THREE.Vector3(0, 0, -1), (this.vx * dtFactor) / BALL_R);
-            this.mesh.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), (this.vz * dtFactor) / BALL_R);
+            if (!skipVisualUpdate) {
+                this.mesh.rotateOnWorldAxis(new THREE.Vector3(0, 0, -1), (this.vx * dtFactor) / BALL_R);
+                this.mesh.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), (this.vz * dtFactor) / BALL_R);
+            }
             
-            // 左右スピンによるカーブ効果
             let dirX = speed > 0 ? this.vx / speed : 0;
-            let dirZ = speed > 0 ? this.vz / speed : -1; // 停止時は手前向きを基準
+            let dirZ = speed > 0 ? this.vz / speed : -1;
             if (speed > 0) {
                 let curveEffect = this.spinX * 0.0012 * dtFactor; 
                 this.vx += -dirZ * curveEffect; 
                 this.vz += dirX * curveEffect;
             }
             
-            // --- 【大幅修正】縦スピン（押し・引き）がラシャに噛み付いて手球を引っ張る力を激増(4.5倍以上) ---
-            // これにより、的球に当たって前進速度を失った瞬間に、バックスピンによって強烈に手前へ戻る推進力がかかります
             let spinDriveX = 0;
             let spinDriveZ = 0;
-
-            // ★バックスピン（this.spinY が負）の時だけ係数を弱める（例: 0.022 → 0.006）
             let spinCoef = this.spinY < 0 ? 0.0001 : 0.022;
 
             if (speed > 0.01) {
                 spinDriveX = dirX * this.spinY * spinCoef * dtFactor;
                 spinDriveZ = dirZ * this.spinY * spinCoef * dtFactor;
             } else {
-                // ほぼ停止状態のときは、純粋に狙っているアングル（あるいは回転軸）の方向へ引き戻す
                 let backAngle = aimAngle;
                 spinDriveX = -Math.sin(backAngle) * this.spinY * spinCoef * dtFactor;
                 spinDriveZ = -Math.cos(backAngle) * this.spinY * spinCoef * dtFactor;
@@ -355,22 +667,19 @@ class BilliardBall {
             this.vz += spinDriveZ;
         }
         
-        this.mesh.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), this.spinX * 0.05 * dtFactor);
+        if (!skipVisualUpdate) {
+            this.mesh.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), this.spinX * 0.05 * dtFactor);
+        }
         
-        // === 追加：空気抵抗の適用 ===
+        // 空気抵抗の適用
         if (speed > 0) {
-            // 空気抵抗力は速度の2乗に比例: F = C * v^2
             let dragForce = AIR_DRAG_COEF * (speed * speed) * dtFactor;
-            
-            // 速度ベクトルから空気抵抗分を差し引くための係数を計算（逆走防止のため 0 以下にはしない）
             let airDragFactor = Math.max(0, 1.0 - (dragForce / speed));
-            
             this.vx *= airDragFactor;
             this.vz *= airDragFactor;
         }
-        // ============================
 
-        // 最後にラシャ（床面）の摩擦を適用
+        // 床面摩擦
         this.vx *= currentFriction; 
         this.vz *= currentFriction;
         
@@ -379,9 +688,12 @@ class BilliardBall {
         
         if (speed < STOP_THRESHOLD && Math.abs(this.spinX) < 0.05 && Math.abs(this.spinY) < 0.05) { 
             this.vx = 0; this.vz = 0; this.spinX = 0; this.spinY = 0;
+            this.isMoving = false;
         }
 
-        this.updateLabelVisuals();
+        if (!skipVisualUpdate) {
+            this.updateLabelVisuals();
+        }
     }
 
     updateLabelVisuals() {
@@ -439,18 +751,86 @@ class BilliardBall {
 }
 
 function updateLabelsDepthOrder() {
-    let sorted = balls.filter(b => b.active && b.labelEl).sort((a, b) => a.camDistance - b.camDistance);
+    let sorted = balls.filter(b => b.active && b.labelEl && !b.isBomb).sort((a, b) => a.camDistance - b.camDistance);
     sorted.forEach((ball, index) => {
         let zIndexBase = 100 + (sorted.length - index);
         ball.labelEl.style.zIndex = zIndexBase;
+    });
+    // ボムラベルを最前面に
+    bombBalls.forEach(b => {
+        if (b.active && b.labelEl) b.labelEl.style.zIndex = 200;
     });
 }
 
 function startGame(mode) {
     gameMode = mode;
+    bombModeEnabled = document.getElementById('bomb-mode-toggle').checked;
+
+    // 変則テーブル設定の確定
+    ACTIVE_VARIANT_SHAPE = variantModeEnabled ? variantShapeKey : null;
+    OBSTACLE_COUNTS = {
+        mountain: parseInt(document.getElementById('obstacle-mountain').value) || 0,
+        bumper: parseInt(document.getElementById('obstacle-bumper').value) || 0,
+        wall: parseInt(document.getElementById('obstacle-wall').value) || 0
+    };
+
     document.getElementById('start-overlay').style.display = 'none';
-    document.getElementById('game-mode-title').innerText = mode === '9BALL' ? '9-BALL MODE' : '8-BALL MODE';
+    
+    let modeTitle = mode === '9BALL' ? '9-BALL MODE' : '8-BALL MODE';
+    if (bombModeEnabled) modeTitle += '  💣';
+    if (ACTIVE_VARIANT_SHAPE) modeTitle += '  🔷' + VARIANT_SHAPES[ACTIVE_VARIANT_SHAPE].label;
+    document.getElementById('game-mode-title').innerText = modeTitle;
+
+    // ゲーム内ボムトグルの初期化
+    const bombToggleRow = document.getElementById('bomb-toggle-row');
+    const bombIngame = document.getElementById('bomb-mode-ingame');
+    bombToggleRow.style.display = 'flex';
+    bombIngame.checked = bombModeEnabled;
+    updateBombToggleStatus();
+
+    const bombSliders = document.getElementById('bomb-sliders');
+    const sliderForce  = document.getElementById('slider-force');
+    const sliderRadius = document.getElementById('slider-radius');
+    const valForce     = document.getElementById('val-force');
+    const valRadius    = document.getElementById('val-radius');
+
+    function syncBombSliders() {
+        bombSliders.style.display = bombModeEnabled ? 'flex' : 'none';
+    }
+    syncBombSliders();
+
+    bombIngame.addEventListener('change', () => {
+        bombModeEnabled = bombIngame.checked;
+        updateBombToggleStatus();
+        syncBombSliders();
+        if (bombModeEnabled && bombBalls.length === 0) {
+            spawnBombBall();
+        } else if (!bombModeEnabled && bombBalls.length > 0) {
+            removeBombBall();
+        }
+    });
+
+    sliderForce.addEventListener('input', () => {
+        BOMB_FORCE = parseFloat(sliderForce.value);
+        valForce.innerText = BOMB_FORCE.toFixed(1);
+    });
+    sliderRadius.addEventListener('input', () => {
+        BOMB_RADIUS = parseInt(sliderRadius.value);
+        valRadius.innerText = BOMB_RADIUS;
+    });
+
     init();
+}
+
+function updateBombToggleStatus() {
+    const status = document.getElementById('bomb-switch-status');
+    if (bombModeEnabled) {
+        status.innerText = 'ON 💥';
+        status.style.color = '#ff9933';
+    } else {
+        status.innerText = 'OFF';
+        status.style.color = '#888';
+    }
 }
 
 function init() {
@@ -472,7 +852,10 @@ function init() {
     scene.add(dirLight);
 
     createTable3D(); 
-    createBalls3D(); 
+    rebuildPocketCallPanel();
+    createBalls3D();
+    bombBalls = []; bombBall = null;
+    if (bombModeEnabled) spawnBombBall();
     createGuideLine();
 
     hitMarker = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), new THREE.MeshBasicMaterial({color: 0xff0000, depthTest: false}));
@@ -556,7 +939,7 @@ function is8BallTargetNow() {
     let group = playerGroup[currentPlayer];
     if (!group) return false; 
     
-    let hasGroupBalls = balls.some(b => b.active && !b.isCue && b.num !== 8 && 
+    let hasGroupBalls = balls.some(b => b.active && !b.isCue && !b.isBomb && b.num !== 8 && 
         ((group === 'LOW' && b.num <= 7) || (group === 'HIGH' && b.num >= 9))
     );
     return !hasGroupBalls; 
@@ -581,6 +964,25 @@ function createCustomCushionMesh(vertices, material) {
 }
 
 function createTable3D() {
+    if (ACTIVE_VARIANT_SHAPE) {
+        createVariantTable3D(ACTIVE_VARIANT_SHAPE);
+        return;
+    }
+
+    // 通常の長方形テーブル（変則テーブル関連の状態をリセット）
+    currentTablePolygon = null;
+    obstacles = [];
+    obstacleMeshes.forEach(m => scene.remove(m));
+    obstacleMeshes = [];
+    pockets = [
+        { x: -TABLE_W/2, z: -TABLE_L/2, name: "左上 (コーナー)" },
+        { x:  TABLE_W/2, z: -TABLE_L/2, name: "右上 (コーナー)" },
+        { x: -TABLE_W/2, z: 0,           name: "左中 (サイド)" },
+        { x:  TABLE_W/2, z: 0,           name: "右中 (サイド)" },
+        { x: -TABLE_W/2, z:  TABLE_L/2, name: "左下 (コーナー)" },
+        { x:  TABLE_W/2, z:  TABLE_L/2, name: "右下 (コーナー)" }
+    ];
+
     tableCloth = new THREE.Mesh(new THREE.BoxGeometry(TABLE_W, 0.2, TABLE_L), new THREE.MeshStandardMaterial({ color: 0x0a6c36, roughness: 0.6 }));
     tableCloth.position.y = -0.1; tableCloth.receiveShadow = true; scene.add(tableCloth);
 
@@ -720,8 +1122,253 @@ function createTable3D() {
     ];
 }
 
+// ===== 変則テーブル 生成システム =====
+
+function polygonSignedArea(poly) {
+    let area = 0;
+    for (let i = 0; i < poly.length; i++) {
+        const a = poly[i], b = poly[(i + 1) % poly.length];
+        area += a.x * b.z - b.x * a.z;
+    }
+    return area / 2;
+}
+
+// 頂点iが凸角かどうか判定（凸角には自動的にポケットを配置する）
+function isConvexVertex(poly, i, orientationSign) {
+    const n = poly.length;
+    const prev = poly[(i - 1 + n) % n];
+    const cur = poly[i];
+    const next = poly[(i + 1) % n];
+    const v1x = cur.x - prev.x, v1z = cur.z - prev.z;
+    const v2x = next.x - cur.x, v2z = next.z - cur.z;
+    const cross = v1x * v2z - v1z * v2x;
+    return (cross * orientationSign) > 0;
+}
+
+function pointInPolygon(x, z, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const xi = poly[i].x, zi = poly[i].z, xj = poly[j].x, zj = poly[j].z;
+        const intersect = ((zi > z) !== (zj > z)) &&
+            (x < (xj - xi) * (z - zi) / (zj - zi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
+// 頂点の内角に応じて、ポケット口が塞がれないようクッションの切り欠き距離を動的に計算する
+// （星形の先端のように角度が鋭い場所ほど、大きく切り欠かないとポケットの口が塞がってしまう）
+function computeTrimDistance(poly, i) {
+    const n = poly.length;
+    const prev = poly[(i - 1 + n) % n];
+    const cur = poly[i];
+    const next = poly[(i + 1) % n];
+    const ax = prev.x - cur.x, az = prev.z - cur.z;
+    const bx = next.x - cur.x, bz = next.z - cur.z;
+    const la = Math.hypot(ax, az), lb = Math.hypot(bx, bz);
+    if (la < 0.001 || lb < 0.001) return POCKET_RADIUS;
+    let cosA = (ax * bx + az * bz) / (la * lb);
+    cosA = Math.max(-1, Math.min(1, cosA));
+    const angle = Math.acos(cosA); // 頂点の内角
+    const sinHalf = Math.max(Math.sin(angle / 2), 0.15);
+    let d = (POCKET_RADIUS * 1.5) / sinHalf;
+    d = Math.min(d, la * 0.45, lb * 0.45);
+    return Math.max(d, POCKET_RADIUS);
+}
+
+// ポリゴンの各辺からポケット分だけ切り欠いたクッション線分を生成
+function buildVariantWalls(poly, trimDistances) {
+    const n = poly.length;
+    const walls = [];
+    for (let i = 0; i < n; i++) {
+        const a = poly[i], b = poly[(i + 1) % n];
+        let ax = a.x, az = a.z, bx = b.x, bz = b.z;
+        const dx = bx - ax, dz = bz - az;
+        const len = Math.hypot(dx, dz);
+        if (len < 0.001) continue;
+        const ux = dx / len, uz = dz / len;
+        const trimA = trimDistances[i] || 0;
+        const trimB = trimDistances[(i + 1) % n] || 0;
+        ax += ux * trimA; az += uz * trimA;
+        bx -= ux * trimB; bz -= uz * trimB;
+        walls.push({ x1: ax, z1: az, x2: bx, z2: bz });
+    }
+    return walls;
+}
+
+function createVariantTable3D(shapeKey) {
+    const cfg = VARIANT_SHAPES[shapeKey];
+    const poly = cfg.polygon;
+    currentTablePolygon = poly;
+
+    // 凸頂点を検出してポケットとして登録し、頂点ごとの切り欠き距離も計算する
+    const area = polygonSignedArea(poly);
+    const sign = area >= 0 ? 1 : -1;
+    const pocketNames = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩', '⑪', '⑫'];
+    pockets = [];
+    const trimDistances = poly.map(() => 0);
+    poly.forEach((p, i) => {
+        if (isConvexVertex(poly, i, sign)) {
+            trimDistances[i] = computeTrimDistance(poly, i);
+            pockets.push({ x: p.x, z: p.z, name: `変則ポケット${pocketNames[pockets.length] || (pockets.length+1)}` });
+        }
+    });
+
+    // クロス地面（フェルト）
+    const shape = new THREE.Shape();
+    poly.forEach((p, i) => {
+        if (i === 0) shape.moveTo(p.x, p.z); else shape.lineTo(p.x, p.z);
+    });
+    shape.closePath();
+    const clothGeom = new THREE.ShapeGeometry(shape);
+    clothGeom.rotateX(Math.PI / 2); // XZ平面に寝かせる（Shapeはx,y平面なのでyをzへ）
+    tableCloth = new THREE.Mesh(clothGeom, new THREE.MeshStandardMaterial({ color: 0x0a6c36, roughness: 0.6, side: THREE.DoubleSide }));
+    tableCloth.position.y = -0.09;
+    tableCloth.receiveShadow = true;
+    scene.add(tableCloth);
+
+    // クッション（壁）の生成
+    tableWalls = buildVariantWalls(poly, trimDistances);
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x3d2314, roughness: 0.4 });
+    const h = 1.0, cushionW = 1.2;
+    visualFramerails = [];
+    tableWalls.forEach(w => {
+        const dx = w.x2 - w.x1, dz = w.z2 - w.z1;
+        const len = Math.hypot(dx, dz);
+        if (len < 0.05) return;
+        const angle = Math.atan2(dx, dz);
+        const midX = (w.x1 + w.x2) / 2, midZ = (w.z1 + w.z2) / 2;
+        // 内側の面がポリゴン境界に一致するよう、外向き法線方向へ半分オフセット
+        const nx = Math.cos(angle), nz = -Math.sin(angle);
+        const outward = pointInPolygon(midX + nx * 0.5, midZ + nz * 0.5, poly) ? -1 : 1;
+        const box = new THREE.Mesh(new THREE.BoxGeometry(cushionW, h, len), frameMat);
+        box.position.set(midX + nx * outward * cushionW / 2, h / 2, midZ + nz * outward * cushionW / 2);
+        box.rotation.y = angle;
+        box.castShadow = true; box.receiveShadow = true;
+        scene.add(box); visualFramerails.push(box);
+    });
+
+    // ポケット（見た目）
+    pockets.forEach(p => {
+        const rim = new THREE.Mesh(new THREE.CylinderGeometry(POCKET_RADIUS + 0.1, POCKET_RADIUS + 0.1, 0.4, 32), new THREE.MeshBasicMaterial({ color: 0x151515 }));
+        rim.position.set(p.x, -0.35, p.z); scene.add(rim);
+        const cup = new THREE.Mesh(new THREE.CylinderGeometry(POCKET_RADIUS, POCKET_RADIUS - 0.1, 3.5, 32), new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.5 }));
+        cup.position.set(p.x, -2.0, p.z); cup.receiveShadow = true; scene.add(cup);
+    });
+
+    // 障害物（山・バンパー・壁）を生成
+    generateObstacles(poly, pockets, cfg.rack);
+    createObstacles3D();
+}
+
+// 障害物のランダム配置
+function generateObstacles(poly, pocketList, rackInfo) {
+    obstacles = [];
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    poly.forEach(p => { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); });
+
+    const margin = 2.5;
+    const rackMinZ = Math.min(rackInfo.apexZ, rackInfo.cueZ) - 8;
+    const rackMaxZ = Math.max(rackInfo.apexZ, rackInfo.cueZ) + 4;
+
+    function isSafeSpot(x, z, radius) {
+        if (!pointInPolygon(x, z, poly)) return false;
+        if (Math.abs(x - rackInfo.x) < 6.5 && z > rackMinZ && z < rackMaxZ) return false;
+        for (const p of pocketList) {
+            if (Math.hypot(p.x - x, p.z - z) < POCKET_RADIUS + radius + 2.2) return false;
+        }
+        for (const o of obstacles) {
+            const oR = o.radius || 2;
+            if (Math.hypot(o.x - x, o.z - z) < oR + radius + 1.2) return false;
+        }
+        // 壁ぎわに寄りすぎない
+        for (const w of tableWalls) {
+            const segX = w.x2 - w.x1, segZ = w.z2 - w.z1;
+            const lenSq = segX * segX + segZ * segZ;
+            if (lenSq === 0) continue;
+            let t = ((x - w.x1) * segX + (z - w.z1) * segZ) / lenSq;
+            t = Math.max(0, Math.min(1, t));
+            const cx = w.x1 + t * segX, cz = w.z1 + t * segZ;
+            if (Math.hypot(x - cx, z - cz) < radius + 1.8) return false;
+        }
+        return true;
+    }
+
+    function placeCircleObstacle(type, radius) {
+        for (let attempt = 0; attempt < 200; attempt++) {
+            const x = minX + margin + Math.random() * (maxX - minX - margin * 2);
+            const z = minZ + margin + Math.random() * (maxZ - minZ - margin * 2);
+            if (isSafeSpot(x, z, radius)) {
+                obstacles.push({ type, x, z, radius });
+                return;
+            }
+        }
+    }
+
+    function placeWallObstacle() {
+        for (let attempt = 0; attempt < 200; attempt++) {
+            const x = minX + margin + Math.random() * (maxX - minX - margin * 2);
+            const z = minZ + margin + Math.random() * (maxZ - minZ - margin * 2);
+            const len = 4 + Math.random() * 3;
+            const angle = Math.random() * Math.PI;
+            const x1 = x - Math.cos(angle) * len / 2, z1 = z - Math.sin(angle) * len / 2;
+            const x2 = x + Math.cos(angle) * len / 2, z2 = z + Math.sin(angle) * len / 2;
+            if (isSafeSpot(x1, z1, 0.6) && isSafeSpot(x2, z2, 0.6) && isSafeSpot(x, z, 0.6)) {
+                obstacles.push({ type: 'wall', x, z, radius: len / 2 + 0.6, x1, z1, x2, z2 });
+                return;
+            }
+        }
+    }
+
+    for (let i = 0; i < OBSTACLE_COUNTS.mountain; i++) placeCircleObstacle('mountain', 2.2);
+    for (let i = 0; i < OBSTACLE_COUNTS.bumper; i++) placeCircleObstacle('bumper', 1.5);
+    for (let i = 0; i < OBSTACLE_COUNTS.wall; i++) placeWallObstacle();
+}
+
+function createObstacles3D() {
+    obstacleMeshes.forEach(m => scene.remove(m));
+    obstacleMeshes = [];
+
+    obstacles.forEach(o => {
+        if (o.type === 'mountain') {
+            const cone = new THREE.Mesh(
+                new THREE.ConeGeometry(o.radius, 1.6, 20),
+                new THREE.MeshStandardMaterial({ color: 0x6b5847, roughness: 0.9 })
+            );
+            cone.position.set(o.x, 0.8, o.z);
+            cone.castShadow = true; cone.receiveShadow = true;
+            scene.add(cone); obstacleMeshes.push(cone);
+        } else if (o.type === 'bumper') {
+            const cyl = new THREE.Mesh(
+                new THREE.CylinderGeometry(o.radius, o.radius, 1.1, 24),
+                new THREE.MeshStandardMaterial({ color: 0xff3366, emissive: 0x660018, roughness: 0.3, metalness: 0.3 })
+            );
+            cyl.position.set(o.x, 0.55, o.z);
+            cyl.castShadow = true; cyl.receiveShadow = true;
+            scene.add(cyl); obstacleMeshes.push(cyl);
+        } else if (o.type === 'wall') {
+            const dx = o.x2 - o.x1, dz = o.z2 - o.z1;
+            const len = Math.hypot(dx, dz);
+            const angle = Math.atan2(dx, dz);
+            const box = new THREE.Mesh(
+                new THREE.BoxGeometry(0.9, 1.0, len),
+                new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.6 })
+            );
+            box.position.set(o.x, 0.5, o.z);
+            box.rotation.y = angle;
+            box.castShadow = true; box.receiveShadow = true;
+            scene.add(box); obstacleMeshes.push(box);
+        }
+    });
+}
+
 function createBalls3D() {
-    cueBall = new BilliardBall(0, 15, '#ffffff', true, 0); balls.push(cueBall);
+    let rackX = 0, apexZ = -15, cueZ = 15;
+    if (ACTIVE_VARIANT_SHAPE) {
+        const r = VARIANT_SHAPES[ACTIVE_VARIANT_SHAPE].rack;
+        rackX = r.x; apexZ = r.apexZ; cueZ = r.cueZ;
+    }
+    cueBall = new BilliardBall(rackX, cueZ, '#ffffff', true, 0); balls.push(cueBall);
     
     const colors = {
         1: '#ffcc00', 2: '#0033cc', 3: '#cc0000', 4: '#660099', 5: '#ff6600',
@@ -730,7 +1377,7 @@ function createBalls3D() {
         14: '#006633', 15: '#990000'
     };
     
-    const startZ = -15, spacing = BALL_R * 2.055;
+    const startZ = apexZ, spacing = BALL_R * 2.055;
 
     if (gameMode === '9BALL') {
         const rackPos = [
@@ -741,7 +1388,7 @@ function createBalls3D() {
             {dx:0, dz:-4, num:8}
         ];
         rackPos.forEach(p => {
-            balls.push(new BilliardBall(p.dx * spacing, startZ + p.dz * spacing, colors[p.num], false, p.num));
+            balls.push(new BilliardBall(rackX + p.dx * spacing, startZ + p.dz * spacing, colors[p.num], false, p.num));
         });
     } else {
         const rackPos8 = [
@@ -752,7 +1399,7 @@ function createBalls3D() {
             {dx:-2, dz:-4, num:13}, {dx:-1, dz:-4, num:6}, {dx:0, dz:-4, num:14}, {dx:1, dz:-4, num:7}, {dx:2, dz:-4, num:15}
         ];
         rackPos8.forEach(p => {
-            balls.push(new BilliardBall(p.dx * spacing, startZ + p.dz * spacing, colors[p.num], false, p.num));
+            balls.push(new BilliardBall(rackX + p.dx * spacing, startZ + p.dz * spacing, colors[p.num], false, p.num));
         });
     }
 }
@@ -763,23 +1410,40 @@ function createGuideLine() {
     guideLine.position.y = BALL_R; scene.add(guideLine);
 }
 
-function areBallsStopped() { 
-    return balls.every(b => !b.active || (b.vx === 0 && b.vz === 0 && Math.abs(b.spinX) < 0.05 && Math.abs(b.spinY) < 0.05)); 
+function areBallsStopped() {
+    if (bombExploding) return false; // 爆発演出中は停止扱いにしない
+    return balls.every(b => !b.active || (b.vx === 0 && b.vz === 0 && Math.abs(b.spinX) < 0.05 && Math.abs(b.spinY) < 0.05));
 }
 
 function getLowestTargetBall() {
     let min = 99;
-    balls.forEach(b => { if (!b.isCue && b.active && b.num < min) min = b.num; });
+    balls.forEach(b => { if (!b.isCue && !b.isBomb && b.active && b.num < min) min = b.num; });
     return min === 99 ? null : min;
 }
 
 function selectCalledPocket(index) {
     calledPocket = index;
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < pockets.length; i++) {
         const btn = document.getElementById(`p-btn-${i}`);
+        if (!btn) continue;
         if(i === index) btn.classList.add('selected');
         else btn.classList.remove('selected');
     }
+}
+
+// 変則テーブルではポケット数が変わるため、ポケット指定パネルを実際のポケット数に合わせて再構築する
+function rebuildPocketCallPanel() {
+    const grid = document.querySelector('#pocket-call-panel .pocket-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    pockets.forEach((p, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'pocket-btn';
+        btn.id = `p-btn-${i}`;
+        btn.textContent = p.name;
+        btn.onclick = () => selectCalledPocket(i);
+        grid.appendChild(btn);
+    });
 }
 
 function updateGameUI() {
@@ -875,7 +1539,8 @@ function onMouseDown(e) {
             let targetZ = Math.max(-BOUNDS_Z, Math.min(BOUNDS_Z, pt.z));
             
             let collision = balls.some(b => b !== cueBall && b.active && Math.hypot(b.mesh.position.x - targetX, b.mesh.position.z - targetZ) < BALL_R * 2.1);
-            if (!collision) {
+            let insideTable = currentTablePolygon ? pointInPolygon(targetX, targetZ, currentTablePolygon) : true;
+            if (!collision && insideTable) {
                 cueBall.mesh.position.set(targetX, BALL_R, targetZ);
                 cueBall.isFalling = false;
                 cueBall.mesh.position.y = BALL_R;
@@ -936,16 +1601,19 @@ function onMouseUp() {
     if (shotPower > 0.5) {
         isFreeBallMode = false;
         shotInProgress = true; firstHitBall = null; pocketedBallsThisTurn = []; cueBallPocketed = false;
+        pendingFoulAfterBomb = false;
         targetBallAtShotStart = getLowestTargetBall();
         setGameMessage(""); 
         applyUiVisibility();
 
         let deflect = -spinOffset.x * 0.012; 
+        soundCueHit(shotPower);
         cueBall.vx = -Math.sin(aimAngle + deflect) * shotPower * 0.038;
         cueBall.vz = -Math.cos(aimAngle + deflect) * shotPower * 0.038;
         
         cueBall.spinX = -spinOffset.x * shotPower * 0.6; 
         cueBall.spinY = spinOffset.y * shotPower * 0.6; 
+        cueBall.isMoving = true;
         
         viewMode = 'OVERVIEW'; document.getElementById('status').innerText = "視点: 俯瞰 (OVERVIEW)";
         
@@ -971,12 +1639,27 @@ function startFreeBall() {
 
 function evaluateShot() {
     const isTurnSwitchOn = document.getElementById('turn-switch').checked;
+
+    // ボムファウルが確定している場合は即フリーボール
+    if (bombModeEnabled && pendingFoulAfterBomb) {
+        pendingFoulAfterBomb = false;
+        if (isTurnSwitchOn) currentPlayer = currentPlayer === 1 ? 2 : 1;
+        soundFoul();
+        setGameMessage(`💣 自爆ファウル！ Player ${currentPlayer} のフリーボール。`, true);
+        updateGameUI();
+        balls.forEach(b => { if(b.active && !b.isBomb) b.setLabelText(); });
+        applyUiVisibility();
+        startFreeBall();
+        triggerUiTimer();
+        return;
+    }
+
     if (gameMode === '9BALL') {
         evaluate9Ball(isTurnSwitchOn);
     } else {
         evaluate8Ball(isTurnSwitchOn);
     }
-    balls.forEach(b => { if(b.active) b.setLabelText(); });
+    balls.forEach(b => { if(b.active && !b.isBomb) b.setLabelText(); });
     applyUiVisibility();
 }
 
@@ -986,23 +1669,36 @@ function evaluate9Ball(isTurnSwitchOn) {
 
     if (cueBallPocketed) { isFoul = true; msg = "ファウル！手球がポケットに落ちました（スクラッチ）。"; }
     else if (!firstHitBall) { isFoul = true; msg = "ファウル！手球がどの的球にも当たりませんでした（ノーヒット）。"; }
-    else if (firstHitBall.num !== targetBallAtShotStart) { isFoul = true; msg = `ファウル！最初に最小の${targetBallAtShotStart}番ではなく、${firstHitBall.num}番のボールに当たりました。`; }
+    else if (!firstHitBall.isBomb && firstHitBall.num !== targetBallAtShotStart) { isFoul = true; msg = `ファウル！最初に最小の${targetBallAtShotStart}番ではなく、${firstHitBall.num}番のボールに当たりました。`; }
 
     let nineBallPocketed = pocketedBallsThisTurn.find(info => info.ball.num === 9);
 
     if (isFoul) {
         if (nineBallPocketed) { 
             let b9 = nineBallPocketed.ball;
-            b9.active = true; b9.isFalling = false; b9.mesh.position.set(0, BALL_R, -15);
-            b9.vx = b9.vz = 0; scene.add(b9.mesh);
+            b9.active = true; b9.isFalling = false;
+            // スポット（フットスポット）に戻す。他の球と重なる場合は上方向にずらす
+            let spotCandidates = [[0,-15],[0,-10],[0,-5],[0,0],[0,5],[0,10]];
+            let placed = false;
+            for (let t of spotCandidates) {
+                let blocked = balls.some(b => b !== b9 && b.active && Math.hypot(b.mesh.position.x - t[0], b.mesh.position.z - t[1]) < BALL_R * 2.2);
+                if (!blocked) { b9.mesh.position.set(t[0], BALL_R, t[1]); placed = true; break; }
+            }
+            if (!placed) b9.mesh.position.set(0, BALL_R, -15);
+            b9.vx = b9.vz = 0;
+            scene.add(b9.mesh);
+            if (b9.labelEl) { b9.labelEl.style.display = ''; b9.setLabelText(); }
+            msg += " 9番はスポットに戻されました。";
         }
         if (isTurnSwitchOn) currentPlayer = currentPlayer === 1 ? 2 : 1;
+        soundFoul();
         setGameMessage(msg + ` Player ${currentPlayer} のフリーボール。`, true);
         updateGameUI();
         startFreeBall(); 
     } else {
         if (nineBallPocketed) {
             gameState = 'GAMEOVER';
+            soundVictory();
             setGameMessage(`🎉 Player ${currentPlayer} の勝利！！！ (9番のボールイン) 🎉`, false);
             return;
         }
@@ -1027,10 +1723,10 @@ function evaluate8Ball(isTurnSwitchOn) {
     else if (!firstHitBall) { isFoul = true; msg = "ファウル！手球がどの的球にも当たりませんでした（ノーヒット）。"; }
     else if (playerGroup[currentPlayer]) {
         let g = playerGroup[currentPlayer];
-        let hasGroupBalls = balls.some(b => b.active && !b.isCue && b.num !== 8 && ((g === 'LOW' && b.num <= 7) || (g === 'HIGH' && b.num >= 9)));
+        let hasGroupBalls = balls.some(b => b.active && !b.isCue && !b.isBomb && b.num !== 8 && ((g === 'LOW' && b.num <= 7) || (g === 'HIGH' && b.num >= 9)));
         if (hasGroupBalls) {
-            if (g === 'LOW' && firstHitBall.num > 7) { isFoul = true; msg = "ファウル！自分のローボール(赤枠)以外に先頭衝突しました。"; }
-            if (g === 'HIGH' && (firstHitBall.num <= 7 || firstHitBall.num === 8)) { isFoul = true; msg = "ファウル！自分のハイボール(青枠)以外に先頭衝突しました。"; }
+            if (firstHitBall && !firstHitBall.isBomb && g === 'LOW' && firstHitBall.num > 7) { isFoul = true; msg = "ファウル！自分のローボール(赤枠)以外に先頭衝突しました。"; }
+            if (firstHitBall && !firstHitBall.isBomb && g === 'HIGH' && (firstHitBall.num <= 7 || firstHitBall.num === 8)) { isFoul = true; msg = "ファウル！自分のハイボール(青枠)以外に先頭衝突しました。"; }
         } else {
             if (firstHitBall.num !== 8) { msg = "ファウル！8番(黒球)に最初に当ててください。"; }
         }
@@ -1040,12 +1736,13 @@ function evaluate8Ball(isTurnSwitchOn) {
 
     if (eightBallPocketed) {
         let g = playerGroup[currentPlayer];
-        let hasGroupBalls = g ? balls.some(b => b.active && !b.isCue && b.num !== 8 && ((g === 'LOW' && b.num <= 7) || (g === 'HIGH' && b.num >= 9))) : true;
+        let hasGroupBalls = g ? balls.some(b => b.active && !b.isCue && !b.isBomb && b.num !== 8 && ((g === 'LOW' && b.num <= 7) || (g === 'HIGH' && b.num >= 9))) : true;
         gameState = 'GAMEOVER';
         if (hasGroupBalls || isFoul || eightBallPocketed.pocketIdx !== calledPocket) {
             let detail = eightBallPocketed.pocketIdx !== calledPocket ? "（指定外のポケットに入ったため）" : "（グループ完遂前またはファウル発生のため）";
             setGameMessage(`❌ Player ${currentPlayer} の負け！ ${detail} ❌`, true);
         } else {
+            soundVictory();
             setGameMessage(`🎉🎉 Player ${currentPlayer} の勝利！！！ (8番のボール コールショット成功) 🎉🎉`, false);
         }
         return;
@@ -1053,6 +1750,7 @@ function evaluate8Ball(isTurnSwitchOn) {
 
     if (isFoul) {
         if (isTurnSwitchOn) currentPlayer = nextPlayer;
+        soundFoul();
         setGameMessage(msg + ` Player ${currentPlayer} のフリーボール。`, true);
         updateGameUI();
         startFreeBall();
@@ -1089,23 +1787,431 @@ function evaluate8Ball(isTurnSwitchOn) {
     triggerUiTimer();
 }
 
-function updatePhysicsSingleStep(dtFactor) {
-    balls.forEach(b => b.update(dtFactor));
+// ===== ボム・プール ロジック =====
+
+// ボム・ボールのテクスチャ生成
+function createBombTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+
+    // 赤黒グラデーション背景
+    const grad = ctx.createRadialGradient(128, 100, 10, 128, 128, 128);
+    grad.addColorStop(0, '#ff4400');
+    grad.addColorStop(0.5, '#cc1100');
+    grad.addColorStop(1, '#330000');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 256, 256);
+
+    // 爆弾マーク 💣
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 80px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('💣', 128, 118);
+
+    // "BOMB" テキスト
+    ctx.fillStyle = '#ffdd00';
+    ctx.font = 'bold 32px sans-serif';
+    ctx.fillText('BOMB', 128, 198);
+
+    return new THREE.CanvasTexture(canvas);
+}
+
+// ボム・ボールを1個生成してbombBallsとballsに追加
+function spawnOneBomb() {
+    const pos = findSafeBombPosition();
+    const geo = new THREE.SphereGeometry(BALL_R, 32, 32);
+    const mat = new THREE.MeshStandardMaterial({
+        map: createBombTexture(), roughness: 0.12, metalness: 0.1,
+        emissive: new THREE.Color(0.3, 0.05, 0),
+        emissiveIntensity: 0.4
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(pos.x, BALL_R, pos.z);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    scene.add(mesh);
+
+    const b = {
+        isCue: false, isBomb: true, num: 0,
+        vx: 0, vz: 0, spinX: 0, spinY: 0,
+        active: true, isFalling: false, isMoving: false,
+        camDistance: 0, mesh: mesh,
+        labelEl: null
+    };
+
+    const label = document.createElement('div');
+    label.className = 'ball-label bomb-ball';
+    label.innerText = '💣 BOMB';
+    document.getElementById('labels-container').appendChild(label);
+    b.labelEl = label;
+
+    bombBalls.push(b);
+    balls.push(b);
+    return b;
+}
+
+// BOMB_COUNT個のボムを一括配置
+function spawnBombBall() {
+    for (let i = 0; i < BOMB_COUNT; i++) spawnOneBomb();
+}
+
+// 全ボムを除去
+function removeBombBall() {
+    bombBalls.forEach(b => {
+        if (b.mesh) scene.remove(b.mesh);
+        if (b.labelEl) b.labelEl.remove();
+        const idx = balls.indexOf(b);
+        if (idx !== -1) balls.splice(idx, 1);
+    });
+    bombBalls = [];
+    bombBall = null;
+}
+
+// ゲーム中にボム個数が変わったとき同期する
+function syncBombCount() {
+    if (!bombModeEnabled) return;
+    const current = bombBalls.filter(b => b.active).length + bombBalls.filter(b => !b.active).length;
+    const diff = BOMB_COUNT - bombBalls.length;
+    if (diff > 0) {
+        for (let i = 0; i < diff; i++) spawnOneBomb();
+    } else if (diff < 0) {
+        const excess = bombBalls.splice(diff); // 末尾から削除
+        excess.forEach(b => {
+            if (b.mesh) scene.remove(b.mesh);
+            if (b.labelEl) b.labelEl.remove();
+            const idx = balls.indexOf(b);
+            if (idx !== -1) balls.splice(idx, 1);
+        });
+    }
+}
+
+// 安全なランダム座標を探す
+function findSafeBombPosition() {
+    const margin = BALL_R * 2.5;
+    const maxX = TABLE_W / 2 - BALL_R - 1;
+    const maxZ = TABLE_L / 2 - BALL_R - 1;
+    let attempts = 0;
+    while (attempts < 300) {
+        attempts++;
+        const x = (Math.random() * 2 - 1) * maxX;
+        const z = (Math.random() * 2 - 1) * maxZ;
+
+        // 他のボールと重ならないか
+        const overlapsball = balls.some(b => {
+            if (!b.active || b.isBomb) return false;
+            return Math.hypot(b.mesh.position.x - x, b.mesh.position.z - z) < margin;
+        });
+        if (overlapsball) continue;
+
+        // ポケットと重ならないか
+        const overlapsPocket = pockets.some(p =>
+            Math.hypot(p.x - x, p.z - z) < POCKET_RADIUS + BALL_R + 0.5
+        );
+        if (overlapsPocket) continue;
+
+        return { x, z };
+    }
+    // フォールバック（中央付近）
+    return { x: 5, z: 5 };
+}
+
+// ボム爆発メイン関数（targetBomb: 爆発するボムオブジェクト）
+function triggerExplosion(isFoul, targetBomb) {
+    if (bombExploding || !targetBomb || !targetBomb.active) return;
+    bombExploding = true;
+    pendingFoulAfterBomb = isFoul;
+    bombBall = targetBomb; // respawnBomb用に保存
+
+    const bombX = targetBomb.mesh.position.x;
+    const bombZ = targetBomb.mesh.position.z;
+
+    // スクリーン座標で爆発フラッシュ位置を計算
+    const bombWorldPos = new THREE.Vector3(bombX, BALL_R, bombZ);
+    bombWorldPos.project(camera);
+    const flashPx = (bombWorldPos.x + 1) / 2 * window.innerWidth;
+    const flashPy = (-bombWorldPos.y + 1) / 2 * window.innerHeight;
+    const flashX = ((bombWorldPos.x + 1) / 2 * 100).toFixed(1) + '%';
+    const flashY = ((-bombWorldPos.y + 1) / 2 * 100).toFixed(1) + '%';
+
+    // ===== 爆風：全球に大きな速度を付与 =====
+    balls.forEach(b => {
+        if (!b.active || b === targetBomb || b.isFalling) return;
+        const dx = b.mesh.position.x - bombX;
+        const dz = b.mesh.position.z - bombZ;
+        const dist = Math.hypot(dx, dz);
+        if (dist < BOMB_RADIUS) {
+            // 距離0の場合はランダム方向に吹き飛ばす
+            if (dist < 0.1) {
+                const angle = Math.random() * Math.PI * 2;
+                b.vx = Math.cos(angle) * BOMB_FORCE;
+                b.vz = Math.sin(angle) * BOMB_FORCE;
+            } else {
+                // 近いほど強く、遠いほど弱く（二乗減衰）
+                const strength = BOMB_FORCE * Math.pow(1 - dist / BOMB_RADIUS, 0.6);
+                b.vx += (dx / dist) * strength;
+                b.vz += (dz / dist) * strength;
+            }
+            // スピンもランダムに加える（見た目の迫力アップ）
+            if (b.spinX !== undefined) {
+                b.spinX += (Math.random() - 0.5) * 4;
+                b.spinY += (Math.random() - 0.5) * 3;
+            }
+            b.isMoving = true;
+        }
+    });
+
+    // ボムを一時非表示
+    targetBomb.active = false;
+    targetBomb.mesh.position.set(0, -100, 0);
+    if (targetBomb.labelEl) targetBomb.labelEl.style.display = 'none';
+
+    // ===== 爆発演出：パーティクル + フラッシュ =====
+    const overlay = document.getElementById('explosion-overlay');
+    const exCanvas = document.getElementById('explosion-canvas');
+    const flash    = document.getElementById('explosion-flash');
+    const msg      = document.getElementById('explosion-msg');
+
+    exCanvas.width  = window.innerWidth;
+    exCanvas.height = window.innerHeight;
+    const ctx2d = exCanvas.getContext('2d');
+
+    // パーティクル生成
+    const particles = [];
+    const PTOTAL = 120;
+    for (let i = 0; i < PTOTAL; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 3 + Math.random() * 18;
+        const size  = 3 + Math.random() * 10;
+        const life  = 0.55 + Math.random() * 0.45;
+        // 色：白→黄→橙→赤→暗灰
+        const colors = ['#ffffff','#fff5a0','#ffe066','#ffaa00','#ff6600','#ff3300','#cc1100','#880000'];
+        const color  = colors[Math.floor(Math.random() * colors.length)];
+        particles.push({
+            x: flashPx, y: flashPy,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            size, color, life, maxLife: life, t: 0,
+            gravity: 0.18 + Math.random() * 0.22,
+            isDebris: Math.random() < 0.3   // 一部は破片（細長い）
+        });
+    }
+    // 衝撃波リング
+    const rings = [
+        { r: 0, maxR: 280, life: 1.0, color: 'rgba(255,200,80,' },
+        { r: 0, maxR: 180, life: 0.8, color: 'rgba(255,120,0,' }
+    ];
+
+    // 爆発音
+    soundExplosion();
+
+    // フラッシュ点灯
+    flash.style.setProperty('--ex', flashX);
+    flash.style.setProperty('--ey', flashY);
+    flash.style.transition = 'none';
+    flash.style.opacity = '1';
+
+    // テキスト
+    msg.innerText = '💥 爆発！';
+    msg.style.color = '#fff';
+
+    overlay.style.display = 'block';
+
+    // テキストをポップイン
+    setTimeout(() => {
+        msg.style.transition = 'opacity 0.08s, transform 0.15s';
+        msg.style.opacity = '1';
+        msg.style.transform = 'translate(-50%, -50%) scale(1.15)';
+        setTimeout(() => { msg.style.transform = 'translate(-50%, -50%) scale(1)'; }, 150);
+    }, 60);
+
+    // フラッシュフェードアウト開始
+    setTimeout(() => {
+        flash.style.transition = 'opacity 0.35s';
+        flash.style.opacity = '0';
+    }, 80);
+
+    // パーティクルアニメーション
+    let startTime = null;
+    const DURATION = 1800; // ms
+    function animParticles(ts) {
+        if (!startTime) startTime = ts;
+        const elapsed = ts - startTime;
+        const progress = Math.min(elapsed / DURATION, 1);
+
+        ctx2d.clearRect(0, 0, exCanvas.width, exCanvas.height);
+
+        // 衝撃波リング
+        rings.forEach(ring => {
+            ring.r = ring.maxR * Math.pow(progress * 1.4, 0.6);
+            const alpha = Math.max(0, ring.life * (1 - progress * 1.4));
+            if (alpha > 0 && ring.r > 0) {
+                ctx2d.beginPath();
+                ctx2d.arc(flashPx, flashPy, Math.min(ring.r, ring.maxR), 0, Math.PI * 2);
+                ctx2d.strokeStyle = ring.color + alpha.toFixed(2) + ')';
+                ctx2d.lineWidth = 4 + (1 - progress) * 8;
+                ctx2d.stroke();
+            }
+        });
+
+        // パーティクル描画
+        particles.forEach(p => {
+            p.t += 0.022;
+            if (p.t > p.maxLife) return;
+            p.x  += p.vx;
+            p.y  += p.vy;
+            p.vy += p.gravity;
+            p.vx *= 0.97;
+            const a = Math.max(0, 1 - p.t / p.maxLife);
+            ctx2d.save();
+            ctx2d.globalAlpha = a;
+            if (p.isDebris) {
+                // 細長い破片
+                ctx2d.translate(p.x, p.y);
+                ctx2d.rotate(Math.atan2(p.vy, p.vx));
+                const grad = ctx2d.createLinearGradient(-p.size * 2, 0, p.size * 2, 0);
+                grad.addColorStop(0, 'transparent');
+                grad.addColorStop(0.5, p.color);
+                grad.addColorStop(1, 'transparent');
+                ctx2d.fillStyle = grad;
+                ctx2d.fillRect(-p.size * 2, -p.size * 0.3, p.size * 4, p.size * 0.6);
+            } else {
+                // 丸い火の粉（グロー付き）
+                const grd = ctx2d.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+                grd.addColorStop(0, '#ffffff');
+                grd.addColorStop(0.3, p.color);
+                grd.addColorStop(1, 'transparent');
+                ctx2d.fillStyle = grd;
+                ctx2d.beginPath();
+                ctx2d.arc(p.x, p.y, p.size * (1 + (1 - a) * 0.5), 0, Math.PI * 2);
+                ctx2d.fill();
+            }
+            ctx2d.restore();
+        });
+
+        if (progress < 1) {
+            requestAnimationFrame(animParticles);
+        } else {
+            ctx2d.clearRect(0, 0, exCanvas.width, exCanvas.height);
+        }
+    }
+    requestAnimationFrame(animParticles);
+
+    // テキストフェードアウト
+    setTimeout(() => {
+        msg.style.transition = 'opacity 0.5s';
+        msg.style.opacity = '0';
+    }, 1100);
+
+    // 後片付け
+    setTimeout(() => {
+        overlay.style.display = 'none';
+        msg.style.transition = msg.style.transform = '';
+        msg.style.opacity = '0';
+        flash.style.transition = '';
+        flash.style.opacity = '0';
+    }, 1700);
+
+    // 爆発後にリスポーン
+    setTimeout(() => {
+        if (bombModeEnabled) respawnBomb();
+        bombExploding = false;
+    }, 1800);
+}
+
+// ボム・ボールのリスポーン（爆発したボム1個を再配置）
+function respawnBomb() {
+    if (!bombBall) return;
+    const pos = findSafeBombPosition();
+    bombBall.mesh.position.set(pos.x, BALL_R, pos.z);
+    bombBall.vx = 0; bombBall.vz = 0;
+    bombBall.spinX = 0; bombBall.spinY = 0;
+    bombBall.active = true;
+    bombBall.isMoving = false;
+    if (bombBall.labelEl) bombBall.labelEl.style.display = 'block';
+    bombBall = null;
+}
+
+// ボム・ボールのラベルの位置更新（毎フレーム・全ボム対応）
+function projectBombLabel() {
+    bombBalls.forEach(b => {
+        if (!b.active || !b.labelEl) { if(b.labelEl) b.labelEl.style.display = 'none'; return; }
+        const wp = new THREE.Vector3();
+        b.mesh.getWorldPosition(wp);
+        b.camDistance = camera.position.distanceTo(wp);
+        wp.y += BALL_R * 1.3;
+        wp.project(camera);
+        if (wp.z > 1) { b.labelEl.style.display = 'none'; return; }
+        const x = (wp.x * .5 + .5) * window.innerWidth;
+        const y = (-(wp.y * .5) + .5) * window.innerHeight;
+        b.labelEl.style.display = 'block';
+        b.labelEl.style.left = x + 'px';
+        b.labelEl.style.top  = y + 'px';
+    });
+}
+
+// ===== ボム・プール ロジック END =====
+
+function updatePhysicsSingleStep(dtFactor, skipVisualUpdate = false) {
+    // 各ボールの個別物理移動（静止球は内部でアーリーリターン）
+    balls.forEach(b => {
+        if (b.update) {
+            b.update(dtFactor, skipVisualUpdate);
+        } else if (b.isBomb && b.active && !b.isFalling) {
+            // ボム・ボール簡易物理（摩擦・移動）
+            const speed = Math.hypot(b.vx, b.vz);
+            if (speed > 0) {
+                b.mesh.position.x += b.vx * dtFactor;
+                b.mesh.position.z += b.vz * dtFactor;
+                b.vx *= Math.pow(0.985, dtFactor);
+                b.vz *= Math.pow(0.985, dtFactor);
+                b.isMoving = true;
+                if (speed < STOP_THRESHOLD) { b.vx = 0; b.vz = 0; b.isMoving = false; }
+            } else {
+                b.isMoving = false;
+            }
+        }
+    });
     
     // ① ボール同士の衝突判定
     for (let i = 0; i < balls.length; i++) {
-        if (!balls[i].active || balls[i].isFalling) continue;
+        let b1 = balls[i];
+        if (!b1.active || b1.isFalling) continue;
+        
         for (let j = i + 1; j < balls.length; j++) {
-            if (!balls[j].active || balls[j].isFalling) continue;
-            let b1 = balls[i], b2 = balls[j];
+            let b2 = balls[j];
+            if (!b2.active || b2.isFalling) continue;
+            
+            // ★高速化：両方の球が止まっている場合は衝突計算そのものをスキップ
+            if (!b1.isMoving && !b2.isMoving) continue;
+            
             let dx = b2.mesh.position.x - b1.mesh.position.x;
             let dz = b2.mesh.position.z - b1.mesh.position.z;
             let dist = Math.hypot(dx, dz);
             
             if (dist < BALL_R * 2) {
-                if (shotInProgress && !firstHitBall) {
-                    if (b1.isCue && b2.num > 0) firstHitBall = b2;
-                    else if (b2.isCue && b1.num > 0) firstHitBall = b1;
+                if (shotInProgress) {
+                    // ===== ボム衝突判定 =====
+                    if (bombModeEnabled && !bombExploding) {
+                        const cueHitsBomb = (b1.isCue && b2.isBomb) || (b2.isCue && b1.isBomb);
+                        const targetHitsBomb = (!b1.isCue && !b1.isBomb && b2.isBomb) ||
+                                               (!b2.isCue && !b2.isBomb && b1.isBomb);
+
+                        if (cueHitsBomb) {
+                            // 手玉がボムに当たった → firstHitBallがまだ無ければ自爆ファウル
+                            const isFoulBomb = (firstHitBall === null);
+                            const hitBomb = b1.isBomb ? b1 : b2;
+                            triggerExplosion(isFoulBomb, hitBomb);
+                        } else if (targetHitsBomb) {
+                            const hitBomb = b1.isBomb ? b1 : b2;
+                            triggerExplosion(false, hitBomb); // 的球→ボム = 爆発（ファウルなし）
+                        }
+                    }
+                    // 通常のfirstHitBall記録（ボムへの接触は除外）
+                    if (!firstHitBall) {
+                        if (b1.isCue && !b2.isBomb && b2.num >= 0 && !b2.isCue) firstHitBall = b2;
+                        else if (b2.isCue && !b1.isBomb && b1.num >= 0 && !b1.isCue) firstHitBall = b1;
+                    }
                 }
 
                 let overlap = (BALL_R * 2) - dist;
@@ -1115,11 +2221,9 @@ function updatePhysicsSingleStep(dtFactor) {
                 
                 let kx = b1.vx - b2.vx, kz = b1.vz - b2.vz;
                 
-                // --- 【調整】正面衝突時の手球エネルギー伝達率を向上 ---
-                // バックスピンがかかっている際、前進力（弾性エネルギー）をきれいに的球へ逃がすことで、その場でスピンだけを残しやすくします
                 let currentRestitution = RESTITUTION;
                 if((b1.isCue || b2.isCue) && Math.abs(nx * kx + nz * kz) > 0.1) {
-                    currentRestitution = 0.985; // 吸収率を微調整
+                    currentRestitution = 0.985;
                 }
                 let p = (nx * kx + nz * kz) * currentRestitution;
                 
@@ -1141,9 +2245,14 @@ function updatePhysicsSingleStep(dtFactor) {
                     b2.vz = b2.vz + p * nz + nz * clusterPop;
                 }
                 
-                // スピンの相互伝達（バックスピンが完全に死なないように適度に残す）
                 let tX = b1.spinX; b1.spinX = b2.spinX * 0.2; b2.spinX = tX * 0.2;
-                let tY = b1.spinY; b1.spinY = b2.spinY * 0.25; b2.spinY = tY * 0.45; // 手球のスピンが的球に食われすぎないよう比率を調整
+                let tY = b1.spinY; b1.spinY = b2.spinY * 0.25; b2.spinY = tY * 0.45;
+                
+                // 衝突音（相対速度に応じた音量）
+                const collideSpeed = Math.hypot(b1.vx - b2.vx, b1.vz - b2.vz);
+                if (collideSpeed > 0.05) soundBallCollideThrottled(collideSpeed);
+                b1.isMoving = true;
+                b2.isMoving = true;
             }
         }
     }
@@ -1151,7 +2260,7 @@ function updatePhysicsSingleStep(dtFactor) {
     // ② クッション反射判定
     tableWalls.forEach(w => {
         balls.forEach(b => {
-            if (!b.active || b.isFalling) return;
+            if (!b.active || b.isFalling || !b.isMoving) return;
             
             let segX = w.x2 - w.x1; let segZ = w.z2 - w.z1;
             let lenSq = segX * segX + segZ * segZ;
@@ -1178,50 +2287,118 @@ function updatePhysicsSingleStep(dtFactor) {
                     b.vx += nz * b.spinX * 0.12; 
                     b.vz -= nx * b.spinX * 0.12;
                     b.spinX *= 0.5;
-                    
-                    // クッション衝突時、縦スピンは反転（押し球がクッションで跳ね返ると引き球方向になる特性を擬似再現）
                     b.spinY *= -0.6;
+                    // クッション音
+                    soundCushionThrottled(Math.abs(dot));
                 }
             }
         });
     });
     
+    // ②-2 障害物（山・バンパー・壁）衝突判定
+    if (obstacles.length > 0) {
+        obstacles.forEach(o => {
+            balls.forEach(b => {
+                if (!b.active || b.isFalling || !b.isMoving) return;
+
+                if (o.type === 'wall') {
+                    let segX = o.x2 - o.x1; let segZ = o.z2 - o.z1;
+                    let lenSq = segX * segX + segZ * segZ;
+                    if (lenSq === 0) return;
+                    let t = ((b.mesh.position.x - o.x1) * segX + (b.mesh.position.z - o.z1) * segZ) / lenSq;
+                    t = Math.max(0, Math.min(1, t));
+                    let closestX = o.x1 + t * segX; let closestZ = o.z1 + t * segZ;
+                    let dist = Math.hypot(b.mesh.position.x - closestX, b.mesh.position.z - closestZ);
+                    if (dist < BALL_R && dist > 0.0001) {
+                        let nx = (b.mesh.position.x - closestX) / dist;
+                        let nz = (b.mesh.position.z - closestZ) / dist;
+                        b.mesh.position.x = closestX + nx * BALL_R;
+                        b.mesh.position.z = closestZ + nz * BALL_R;
+                        let dot = b.vx * nx + b.vz * nz;
+                        if (dot < 0) {
+                            b.vx = (b.vx - 2 * dot * nx) * RESTITUTION;
+                            b.vz = (b.vz - 2 * dot * nz) * RESTITUTION;
+                            soundCushionThrottled(Math.abs(dot));
+                        }
+                    }
+                } else {
+                    // 山（mountain）・バンパー（bumper）は円形の障害物として扱う
+                    let dx = b.mesh.position.x - o.x;
+                    let dz = b.mesh.position.z - o.z;
+                    let dist = Math.hypot(dx, dz);
+                    let minDist = BALL_R + o.radius;
+                    if (dist < minDist && dist > 0.0001) {
+                        let nx = dx / dist, nz = dz / dist;
+                        let overlap = minDist - dist;
+                        b.mesh.position.x += nx * overlap;
+                        b.mesh.position.z += nz * overlap;
+                        let dot = b.vx * nx + b.vz * nz;
+                        if (dot < 0) {
+                            // バンパーは弾き飛ばし、山は勢いを少し吸収する
+                            let bounceFactor = o.type === 'bumper' ? 1.2 : 0.8;
+                            b.vx = (b.vx - 2 * dot * nx) * bounceFactor;
+                            b.vz = (b.vz - 2 * dot * nz) * bounceFactor;
+                            b.isMoving = true;
+                            soundCushionThrottled(Math.abs(dot));
+                        }
+                    }
+                }
+            });
+        });
+    }
+
     // ③ ポケット処理
     pockets.forEach((p, pIdx) => {
         balls.forEach(b => {
-            if (!b.active) return;
+            if (!b.active || !b.isMoving) return;
+            // ボム・ボールはポケットに落ちない（爆発処理で除去）
+            if (b.isBomb) return;
+
             let distToPocket = Math.hypot(b.mesh.position.x - p.x, b.mesh.position.z - p.z);
             
             if (distToPocket < POCKET_RADIUS) {
                 b.active = false;
+                b.isMoving = false;
                 if (!b.isCue && shotInProgress) {
                     pocketedBallsThisTurn.push({ ball: b, pocketIdx: pIdx });
                 }
                 
                 if (b.isCue) {
                     cueBallPocketed = true;
-                    b.mesh.position.set(0, -100, 0); 
+                    b.mesh.position.set(0, -100, 0);
+                    soundPocketIn(true);
                 } else {
-                    scene.remove(b.mesh); 
+                    scene.remove(b.mesh);
+                    soundPocketIn(false);
                 }
             }
         });
     });
 }
 
-function updatePhysics() {
+function updatePhysics(skipVisualUpdate = false) {
     const subSteps = 8; 
     const dtFactor = 1.0 / subSteps;
     for (let step = 0; step < subSteps; step++) {
-        updatePhysicsSingleStep(dtFactor);
+        updatePhysicsSingleStep(dtFactor, skipVisualUpdate);
     }
 }
 
+// 高速スキップ処理の最適化
 function fastForwardPhysics() {
-    // 完全にすべての球が止まるまで、制限なしで物理演算をループさせます
-    while (!areBallsStopped()) { 
-        updatePhysics(); 
+    let limit = 5000; 
+    // ★ループ内では skipVisualUpdate = true にしてメッシュ回転やHTMLラベルの更新を一切遮断
+    while(!areBallsStopped() && limit > 0) { 
+        updatePhysics(true); 
+        limit--; 
     }
+    
+    // ★完全に停止処理が終わった最後の1回だけ、全ビジュアルの同期とラベル同期を走らせる
+    balls.forEach(b => {
+        if (b.active && b.updateLabelVisuals) {
+            b.updateLabelVisuals();
+        }
+    });
 }
 
 function onWindowResize() {
@@ -1230,6 +2407,298 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+
+// ===== サウンドシステム =====
+let audioCtx = null;
+
+function getAudioCtx() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+}
+
+// マスターボリューム（0.0 〜 1.0）
+let masterVolume = 0.7;
+
+function playSound(fn) {
+    try { fn(getAudioCtx()); } catch(e) {}
+}
+
+// キュー射撃音（パチっとした木のクリック）
+function soundCueHit(power) {
+    playSound(ctx => {
+        const vol = Math.min(1.0, power / 30) * masterVolume;
+        const t = ctx.currentTime;
+
+        // ノイズバースト（クリック感）
+        const bufLen = ctx.sampleRate * 0.04;
+        const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufLen; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufLen * 0.12));
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+
+        // バンドパスフィルタ（木の打撃音域）
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = 1800;
+        bp.Q.value = 1.2;
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(vol * 1.4, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+
+        src.connect(bp); bp.connect(gain); gain.connect(ctx.destination);
+        src.start(t);
+    });
+}
+
+// 球同士の衝突音（象牙っぽいカチン音）
+function soundBallCollide(speed) {
+    playSound(ctx => {
+        const vol = Math.min(1.0, speed / 0.8) * masterVolume * 0.9;
+        if (vol < 0.05) return;
+        const t = ctx.currentTime;
+
+        // 短いノイズクリック
+        const bufLen = Math.floor(ctx.sampleRate * 0.025);
+        const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufLen; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufLen * 0.08));
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+
+        // 高めのハイパスで象牙の硬質感
+        const hp = ctx.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.value = 2500;
+
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = 4000 + speed * 200;
+        bp.Q.value = 2.0;
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(vol, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+
+        src.connect(hp); hp.connect(bp); bp.connect(gain); gain.connect(ctx.destination);
+        src.start(t);
+    });
+}
+
+// クッション反射音（ゴムっぽい低めのポン）
+function soundCushion(speed) {
+    playSound(ctx => {
+        const vol = Math.min(1.0, speed / 0.6) * masterVolume * 0.65;
+        if (vol < 0.04) return;
+        const t = ctx.currentTime;
+
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(180 + speed * 60, t);
+        osc.frequency.exponentialRampToValueAtTime(80, t + 0.12);
+
+        const bufLen = Math.floor(ctx.sampleRate * 0.03);
+        const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufLen; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufLen * 0.2));
+        }
+        const noiseSrc = ctx.createBufferSource();
+        noiseSrc.buffer = buf;
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(vol * 0.3, t);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(vol * 0.7, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+
+        osc.connect(gain); gain.connect(ctx.destination);
+        noiseSrc.connect(noiseGain); noiseGain.connect(ctx.destination);
+        osc.start(t); osc.stop(t + 0.15);
+        noiseSrc.start(t);
+    });
+}
+
+// ポケットイン音（コロコロ落ちる感じ）
+function soundPocketIn(isCue) {
+    playSound(ctx => {
+        const vol = masterVolume * (isCue ? 0.5 : 0.85);
+        const t = ctx.currentTime;
+
+        // 落下感：ピッチが下がるコロコロ
+        for (let i = 0; i < 3; i++) {
+            const osc = ctx.createOscillator();
+            osc.type = 'sine';
+            const baseFreq = isCue ? 300 : 420;
+            osc.frequency.setValueAtTime(baseFreq - i * 60, t + i * 0.07);
+            osc.frequency.exponentialRampToValueAtTime((baseFreq - i * 60) * 0.5, t + i * 0.07 + 0.12);
+
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(0, t + i * 0.07);
+            gain.gain.linearRampToValueAtTime(vol * (1 - i * 0.25), t + i * 0.07 + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.07 + 0.15);
+
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(t + i * 0.07); osc.stop(t + i * 0.07 + 0.2);
+        }
+
+        // 低音のゴトン
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 300;
+        const bufLen = Math.floor(ctx.sampleRate * 0.15);
+        const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufLen; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufLen * 0.3));
+        }
+        const nsrc = ctx.createBufferSource();
+        nsrc.buffer = buf;
+        const ngain = ctx.createGain();
+        ngain.gain.setValueAtTime(vol * 0.6, t + 0.05);
+        ngain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+        nsrc.connect(lp); lp.connect(ngain); ngain.connect(ctx.destination);
+        nsrc.start(t + 0.05);
+    });
+}
+
+// 爆発音（ボム用）
+function soundExplosion() {
+    playSound(ctx => {
+        const vol = masterVolume;
+        const t = ctx.currentTime;
+
+        // 低周波ドーン
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(80, t);
+        osc.frequency.exponentialRampToValueAtTime(20, t + 0.6);
+
+        const distortion = ctx.createWaveShaper();
+        const curve = new Float32Array(256);
+        for (let i = 0; i < 256; i++) {
+            const x = (i * 2) / 256 - 1;
+            curve[i] = (Math.PI + 400) * x / (Math.PI + 400 * Math.abs(x));
+        }
+        distortion.curve = curve;
+
+        const oscGain = ctx.createGain();
+        oscGain.gain.setValueAtTime(vol * 1.2, t);
+        oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+
+        osc.connect(distortion); distortion.connect(oscGain); oscGain.connect(ctx.destination);
+        osc.start(t); osc.stop(t + 0.8);
+
+        // ホワイトノイズバースト
+        const bufLen = Math.floor(ctx.sampleRate * 1.0);
+        const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufLen; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufLen * 0.25));
+        }
+        const nsrc = ctx.createBufferSource();
+        nsrc.buffer = buf;
+
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 1200;
+
+        const ngain = ctx.createGain();
+        ngain.gain.setValueAtTime(vol * 1.5, t);
+        ngain.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
+
+        nsrc.connect(lp); lp.connect(ngain); ngain.connect(ctx.destination);
+        nsrc.start(t);
+
+        // クラック（鋭い高音）
+        const bufLen2 = Math.floor(ctx.sampleRate * 0.05);
+        const buf2 = ctx.createBuffer(1, bufLen2, ctx.sampleRate);
+        const data2 = buf2.getChannelData(0);
+        for (let i = 0; i < bufLen2; i++) {
+            data2[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufLen2 * 0.05));
+        }
+        const csrc = ctx.createBufferSource();
+        csrc.buffer = buf2;
+        const cgain = ctx.createGain();
+        cgain.gain.setValueAtTime(vol * 2.0, t);
+        cgain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+        csrc.connect(cgain); cgain.connect(ctx.destination);
+        csrc.start(t);
+    });
+}
+
+// ファウル警告音（ビー、という不協和音）
+function soundFoul() {
+    playSound(ctx => {
+        const vol = masterVolume * 0.55;
+        const t = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(2000, t);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(vol, t + 0.015);
+        gain.gain.setValueAtTime(vol, t + 0.55);
+        gain.gain.linearRampToValueAtTime(0, t + 0.62);
+
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(t); osc.stop(t + 0.65);
+    });
+}
+
+// ビクトリー音（ポン、ポン、ポーン）
+function soundVictory() {
+    playSound(ctx => {
+        const vol = masterVolume * 0.7;
+        const t = ctx.currentTime;
+        [523, 659, 784, 1047].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            const gain = ctx.createGain();
+            const st = t + i * 0.13;
+            gain.gain.setValueAtTime(0, st);
+            gain.gain.linearRampToValueAtTime(vol * (i === 3 ? 1.0 : 0.7), st + 0.03);
+            gain.gain.exponentialRampToValueAtTime(0.001, st + (i === 3 ? 0.6 : 0.18));
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(st); osc.stop(st + 0.7);
+        });
+    });
+}
+
+// 衝突音の連打防止（同一フレームで大量に鳴らさない）
+let lastCollideSound = 0;
+let lastCushionSound = 0;
+const SOUND_COOLDOWN_COLLIDE = 40;  // ms
+const SOUND_COOLDOWN_CUSHION = 60;  // ms
+
+function soundBallCollideThrottled(speed) {
+    const now = performance.now();
+    if (now - lastCollideSound > SOUND_COOLDOWN_COLLIDE) {
+        lastCollideSound = now;
+        soundBallCollide(speed);
+    }
+}
+
+function soundCushionThrottled(speed) {
+    const now = performance.now();
+    if (now - lastCushionSound > SOUND_COOLDOWN_CUSHION) {
+        lastCushionSound = now;
+        soundCushion(speed);
+    }
+}
+
+// ===== サウンドシステム END =====
 function animate() {
     requestAnimationFrame(animate);
     
@@ -1240,6 +2709,7 @@ function animate() {
         camera.position.set(0, 50, 20); camera.lookAt(0, 0, -10); 
         renderer.render(scene, camera);
         balls.forEach(b => { if(b.labelEl) b.labelEl.style.display = 'none'; });
+        bombBalls.forEach(b => { if(b.labelEl) b.labelEl.style.display = 'none'; });
         return;
     }
 
@@ -1262,8 +2732,12 @@ function animate() {
 
     let maxSpeed = 0;
     balls.forEach(b => { if(b.active) maxSpeed = Math.max(maxSpeed, Math.hypot(b.vx, b.vz)); });
-    if (maxSpeed > 0 && maxSpeed < STOP_THRESHOLD) fastForwardPhysics();
-    else updatePhysics();
+    
+    if (maxSpeed > 0 && maxSpeed < STOP_THRESHOLD) {
+        fastForwardPhysics();
+    } else {
+        updatePhysics(false);
+    }
 
     if (shotInProgress && areBallsStopped()) {
         shotInProgress = false;
@@ -1310,7 +2784,8 @@ function animate() {
         });
     }
 
-    balls.forEach(b => b.projectLabelPosition());
+    balls.forEach(b => { if (!b.isBomb && b.projectLabelPosition) b.projectLabelPosition(); });
+    projectBombLabel();
     updateLabelsDepthOrder();
 
     if (viewMode === 'AIMING' && areBallsStopped()) {
