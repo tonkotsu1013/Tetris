@@ -134,11 +134,15 @@
 <body>
 
 <div id="start-overlay">
+<div id="start-content" style="display:flex; flex-direction:column; align-items:center; transform-origin: center center;">
     <h1 style="font-size: 36px; margin-bottom: 5px; color: #4CAF50;">3D BILLIARDS</h1>
     <p style="color: #aaa; margin-bottom: 20px;">ゲームモードを選択してください</p>
 
+    <!-- ボム・プール & 変則テーブル 設定（横並び） -->
+    <div style="display:flex; flex-direction:row; gap:14px; align-items:flex-start; margin-bottom:20px;">
+
     <!-- ボム・プール設定 -->
-    <div style="background: rgba(255,80,0,0.15); border: 2px solid #ff6600; border-radius: 10px; padding: 14px 24px; margin-bottom: 20px; width: 240px; text-align:left;">
+    <div style="background: rgba(255,80,0,0.15); border: 2px solid #ff6600; border-radius: 10px; padding: 14px 24px; width: 240px; text-align:left;">
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
             <input type="checkbox" id="bomb-mode-toggle" style="width:18px;height:18px;cursor:pointer; accent-color:#ff6600;">
             <label for="bomb-mode-toggle" style="color:#ff9933; font-weight:bold; font-size:16px; cursor:pointer;">💣 ボム・プール モード</label>
@@ -177,7 +181,7 @@
     </div>
 
     <!-- 変則テーブル設定 -->
-    <div style="background: rgba(33,150,243,0.12); border: 2px solid #2196F3; border-radius: 10px; padding: 14px 24px; margin-bottom: 20px; width: 240px; text-align:left;">
+    <div style="background: rgba(33,150,243,0.12); border: 2px solid #2196F3; border-radius: 10px; padding: 14px 24px; width: 240px; text-align:left;">
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
             <input type="checkbox" id="variant-mode-toggle" style="width:18px;height:18px;cursor:pointer; accent-color:#2196F3;" onchange="onVariantToggleChange()">
             <label for="variant-mode-toggle" style="color:#64b5f6; font-weight:bold; font-size:16px; cursor:pointer;">🔷 変則テーブル モード</label>
@@ -192,6 +196,7 @@
                 <button type="button" class="variant-shape-btn" data-shape="OCTAGON" onclick="selectVariantShape('OCTAGON')">八角形</button>
                 <button type="button" class="variant-shape-btn" data-shape="STAR" onclick="selectVariantShape('STAR')">星形</button>
             </div>
+            <button type="button" class="variant-shape-btn" data-shape="NONE" onclick="selectVariantShape('NONE')" style="margin-top:2px;">形状なし（通常テーブル・障害物のみ）</button>
             <div style="color:#ccc; font-size:11px; line-height:1.5; margin-top:6px; border-top:1px solid #1e3a52; padding-top:6px;">
                 障害物（山・バンパー・壁）をスライダーで追加できます。
             </div>
@@ -219,8 +224,11 @@
         </div>
     </div>
 
+    </div>
+
     <button class="menu-btn" onclick="startGame('9BALL')">9-Ball</button>
     <button class="menu-btn" onclick="startGame('8BALL')">8-Ball</button>
+</div>
 
     <!-- スタート画面の歯車ボタン -->
     <div style="position:absolute; top:16px; right:16px; width:38px; height:38px; background:rgba(255,255,255,0.1); border:1px solid #555; border-radius:8px; color:#ccc; font-size:22px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background 0.2s;" onclick="openSettings()" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'" title="設定">⚙️</div>
@@ -240,6 +248,14 @@
                     oninput="masterVolume=parseFloat(this.value); document.getElementById('volume-val').textContent=Math.round(this.value*100)+'%';">
                 <span id="volume-val" style="color:#fff; width:36px; text-align:right;">70%</span>
             </div>
+            <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
+                <span style="white-space:nowrap;">🕳️ ポケットの大きさ</span>
+                <input type="range" id="pocket-size-slider-ingame" min="0.6" max="1.6" step="0.05" value="1.0"
+                    style="flex:1; accent-color:#aaa; cursor:pointer;"
+                    oninput="document.getElementById('pocket-size-val-ingame').textContent=Math.round(this.value*100)+'%';">
+                <span id="pocket-size-val-ingame" style="color:#fff; width:38px; text-align:right;">100%</span>
+            </div>
+            <div style="color:#999; font-size:11px; margin-top:-6px;">※ポケットの大きさは次のゲーム開始時から反映されます</div>
             <div class="toggle-container">
                 <input type="checkbox" id="turn-switch" checked style="cursor:pointer;">
                 <label for="turn-switch">ユーザー交代: <span id="turn-switch-status" style="font-weight:bold; color:#4CAF50;">ON</span></label>
@@ -332,7 +348,10 @@ const BALL_R = 0.7;
 const SPIN_FRICTION_X = 0.95;  
 const SPIN_FRICTION_Y = 0.996; 
 const RESTITUTION = 0.975;     
-const POCKET_RADIUS = 1.95;   
+const MOUNTAIN_CLIMB_SPEED = 0.55; // この速度以上でぶつかると山を登り切れる
+const MOUNTAIN_HEIGHT = 1.1;       // 山の高さ（フォールバック値）。登っている間ボールを盛り上げる
+const POCKET_RADIUS_BASE = 1.95;
+let POCKET_RADIUS = 1.95;   
 const STOP_THRESHOLD = 0.005; 
 
 // 空気抵抗係数
@@ -405,6 +424,7 @@ let OBSTACLE_COUNTS = { mountain: 0, bumper: 0, wall: 0 };
 let obstacles = [];                // 現在の障害物リスト {type, x, z, radius} or {type, x1,z1,x2,z2}
 let obstacleMeshes = [];
 let currentTablePolygon = null;   // 変則テーブルの外周ポリゴン（当たり判定・配置判定用）
+let currentTablePolygonExpanded = null; // 安全装置（テーブル外に出た球の強制ポケット処理）用の拡張ポリゴン
 
 // 変則テーブルの形状定義（単位:1unit = 15）
 // 各ポリゴンは時計回り/反時計回りいずれでも可。凸頂点に自動でポケットが配置される。
@@ -475,6 +495,7 @@ const VARIANT_SHAPES = {
 function onVariantToggleChange() {
     variantModeEnabled = document.getElementById('variant-mode-toggle').checked;
     document.getElementById('variant-shape-select').style.display = variantModeEnabled ? 'flex' : 'none';
+    fitStartScreen();
 }
 function selectVariantShape(key) {
     variantShapeKey = key;
@@ -482,6 +503,26 @@ function selectVariantShape(key) {
         btn.classList.toggle('selected', btn.dataset.shape === key);
     });
 }
+
+// スタート画面の内容を画面サイズに収まるよう自動的に拡大縮小する
+function fitStartScreen() {
+    const el = document.getElementById('start-content');
+    if (!el) return;
+    const availW = window.innerWidth * 0.96;
+    const availH = window.innerHeight * 0.96;
+    const natW = el.offsetWidth;
+    const natH = el.offsetHeight;
+    if (!natW || !natH) return;
+    const scale = Math.min(1, availW / natW, availH / natH);
+    el.style.transform = `scale(${scale})`;
+}
+window.addEventListener('resize', fitStartScreen);
+window.addEventListener('DOMContentLoaded', fitStartScreen);
+if (typeof ResizeObserver !== 'undefined') {
+    const __startContentEl = document.getElementById('start-content');
+    if (__startContentEl) new ResizeObserver(fitStartScreen).observe(__startContentEl);
+}
+fitStartScreen(); // このscriptはbody末尾にあるためDOMは既に読み込み済み。ここで即時実行する
 
 // 設定モーダル開閉
 function openSettings() {
@@ -766,8 +807,12 @@ function startGame(mode) {
     gameMode = mode;
     bombModeEnabled = document.getElementById('bomb-mode-toggle').checked;
 
-    // 変則テーブル設定の確定
-    ACTIVE_VARIANT_SHAPE = variantModeEnabled ? variantShapeKey : null;
+    // ポケットの大きさを確定（壁・クッションの位置や長さはPOCKET_RADIUSを元に自動計算される）
+    const pocketScale = parseFloat(document.getElementById('pocket-size-slider-ingame').value) || 1.0;
+    POCKET_RADIUS = POCKET_RADIUS_BASE * pocketScale;
+
+    // 変則テーブル設定の確定（「形状なし」を選んだ場合は通常の長方形テーブルのまま障害物だけ追加する）
+    ACTIVE_VARIANT_SHAPE = (variantModeEnabled && variantShapeKey !== 'NONE') ? variantShapeKey : null;
     OBSTACLE_COUNTS = {
         mountain: parseInt(document.getElementById('obstacle-mountain').value) || 0,
         bumper: parseInt(document.getElementById('obstacle-bumper').value) || 0,
@@ -778,7 +823,11 @@ function startGame(mode) {
     
     let modeTitle = mode === '9BALL' ? '9-BALL MODE' : '8-BALL MODE';
     if (bombModeEnabled) modeTitle += '  💣';
-    if (ACTIVE_VARIANT_SHAPE) modeTitle += '  🔷' + VARIANT_SHAPES[ACTIVE_VARIANT_SHAPE].label;
+    if (ACTIVE_VARIANT_SHAPE) {
+        modeTitle += '  🔷' + VARIANT_SHAPES[ACTIVE_VARIANT_SHAPE].label;
+    } else if (variantModeEnabled && (OBSTACLE_COUNTS.mountain + OBSTACLE_COUNTS.bumper + OBSTACLE_COUNTS.wall) > 0) {
+        modeTitle += '  🪨障害物';
+    }
     document.getElementById('game-mode-title').innerText = modeTitle;
 
     // ゲーム内ボムトグルの初期化
@@ -971,6 +1020,7 @@ function createTable3D() {
 
     // 通常の長方形テーブル（変則テーブル関連の状態をリセット）
     currentTablePolygon = null;
+    currentTablePolygonExpanded = null;
     obstacles = [];
     obstacleMeshes.forEach(m => scene.remove(m));
     obstacleMeshes = [];
@@ -1120,6 +1170,16 @@ function createTable3D() {
         { x1: -xOuter, z1: -zOuter, x2: -xOuter, z2: zOuter }, 
         { x1: xOuter,  z1: -zOuter, x2: xOuter,  z2: zOuter }  
     ];
+
+    // 変則テーブルで形状を選ばず「障害物のみ」ONにした場合、通常の長方形テーブルに障害物を追加する
+    if (variantModeEnabled) {
+        const rectPoly = [
+            { x: -TABLE_W/2, z: -TABLE_L/2 }, { x: TABLE_W/2, z: -TABLE_L/2 },
+            { x: TABLE_W/2,  z:  TABLE_L/2 }, { x: -TABLE_W/2, z:  TABLE_L/2 }
+        ];
+        generateObstacles(rectPoly, pockets, { x: 0, apexZ: -15, cueZ: 15 });
+        createObstacles3D();
+    }
 }
 
 // ===== 変則テーブル 生成システム =====
@@ -1156,8 +1216,21 @@ function pointInPolygon(x, z, poly) {
     return inside;
 }
 
-// 頂点の内角に応じて、ポケット口が塞がれないようクッションの切り欠き距離を動的に計算する
-// （星形の先端のように角度が鋭い場所ほど、大きく切り欠かないとポケットの口が塞がってしまう）
+// 安全装置用：本来の外周から少し外側まで広げたポリゴン（誤検知防止のマージン）
+function buildExpandedPolygon(poly, margin) {
+    let cx = 0, cz = 0;
+    poly.forEach(p => { cx += p.x; cz += p.z; });
+    cx /= poly.length; cz /= poly.length;
+    return poly.map(p => {
+        const dx = p.x - cx, dz = p.z - cz;
+        const len = Math.hypot(dx, dz) || 1;
+        return { x: p.x + dx / len * margin, z: p.z + dz / len * margin };
+    });
+}
+
+// 頂点の内角に応じて、クッションの切り欠き距離を「ポケット円に接するクッション線」として
+// 正しく計算する（頂点から接点までの距離は R / tan(内角/2) が幾何学的に正しい）。
+// あわせて、鈍角の頂点でも球が確実に通れるだけの最低限の口の広さを確保する。
 function computeTrimDistance(poly, i) {
     const n = poly.length;
     const prev = poly[(i - 1 + n) % n];
@@ -1170,10 +1243,18 @@ function computeTrimDistance(poly, i) {
     let cosA = (ax * bx + az * bz) / (la * lb);
     cosA = Math.max(-1, Math.min(1, cosA));
     const angle = Math.acos(cosA); // 頂点の内角
-    const sinHalf = Math.max(Math.sin(angle / 2), 0.15);
-    let d = (POCKET_RADIUS * 1.5) / sinHalf;
+    const sinHalf = Math.max(Math.sin(angle / 2), 0.05);
+    const tanHalf = Math.max(Math.tan(angle / 2), 0.05);
+
+    // ポケット円に接する位置（正しい幾何学：接点までの距離 = R / tan(θ/2)）
+    const dTangent = POCKET_RADIUS / tanHalf;
+    // 球が確実に通れる最低限の開口幅を保証する（鈍角の頂点では接線位置だけでは狭すぎる場合がある）
+    const minMouth = BALL_R * 2 + 1.2;
+    const dBallSafety = minMouth / (2 * sinHalf);
+
+    let d = Math.max(dTangent, dBallSafety);
     d = Math.min(d, la * 0.45, lb * 0.45);
-    return Math.max(d, POCKET_RADIUS);
+    return Math.max(d, POCKET_RADIUS * 0.5);
 }
 
 // ポリゴンの各辺からポケット分だけ切り欠いたクッション線分を生成
@@ -1200,6 +1281,7 @@ function createVariantTable3D(shapeKey) {
     const cfg = VARIANT_SHAPES[shapeKey];
     const poly = cfg.polygon;
     currentTablePolygon = poly;
+    currentTablePolygonExpanded = buildExpandedPolygon(poly, 3.0);
 
     // 凸頂点を検出してポケットとして登録し、頂点ごとの切り欠き距離も計算する
     const area = polygonSignedArea(poly);
@@ -1299,7 +1381,9 @@ function generateObstacles(poly, pocketList, rackInfo) {
             const x = minX + margin + Math.random() * (maxX - minX - margin * 2);
             const z = minZ + margin + Math.random() * (maxZ - minZ - margin * 2);
             if (isSafeSpot(x, z, radius)) {
-                obstacles.push({ type, x, z, radius });
+                const entry = { type, x, z, radius };
+                if (type === 'mountain') entry.height = radius * 0.5;
+                obstacles.push(entry);
                 return;
             }
         }
@@ -1325,19 +1409,46 @@ function generateObstacles(poly, pocketList, rackInfo) {
     for (let i = 0; i < OBSTACLE_COUNTS.wall; i++) placeWallObstacle();
 }
 
+function createMountainGeometry(radius, seed) {
+    const height = radius * 0.5; // なだらかな傾斜（登れる高さ）
+    const radialSegments = 9;
+    const heightSegments = 4;
+    const geo = new THREE.ConeGeometry(radius, height, radialSegments, heightSegments, false);
+    const pos = geo.attributes.position;
+    function rand(n) {
+        const x = Math.sin(n * 12.9898 + seed * 78.233) * 43758.5453;
+        return x - Math.floor(x);
+    }
+    for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+        const r = Math.hypot(x, z);
+        if (r > 0.01) {
+            const angle = Math.atan2(z, x);
+            // 稜線ごとにでこぼこさせて岩山らしいシルエットに
+            const bump = 1 + (rand(Math.round((angle + Math.PI) * 6)) - 0.5) * 0.4;
+            const yJitter = (rand(i * 3.7) - 0.5) * height * 0.22;
+            pos.setXYZ(i, x * bump, y + yJitter, z * bump);
+        } else {
+            // 頂上をわずかにずらして単調な円錐感をなくす
+            pos.setXYZ(i, x + (rand(seed) - 0.5) * radius * 0.15, y, z + (rand(seed + 1) - 0.5) * radius * 0.15);
+        }
+    }
+    geo.computeVertexNormals();
+    return { geo, height };
+}
+
 function createObstacles3D() {
     obstacleMeshes.forEach(m => scene.remove(m));
     obstacleMeshes = [];
 
     obstacles.forEach(o => {
         if (o.type === 'mountain') {
-            const cone = new THREE.Mesh(
-                new THREE.ConeGeometry(o.radius, 1.6, 20),
-                new THREE.MeshStandardMaterial({ color: 0x6b5847, roughness: 0.9 })
-            );
-            cone.position.set(o.x, 0.8, o.z);
-            cone.castShadow = true; cone.receiveShadow = true;
-            scene.add(cone); obstacleMeshes.push(cone);
+            const seed = Math.abs(o.x * 13.1 + o.z * 7.7);
+            const { geo, height } = createMountainGeometry(o.radius, seed);
+            const rock = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x6f5a45, roughness: 0.95, flatShading: true }));
+            rock.position.set(o.x, height / 2, o.z);
+            rock.castShadow = true; rock.receiveShadow = true;
+            scene.add(rock); obstacleMeshes.push(rock);
         } else if (o.type === 'bumper') {
             const cyl = new THREE.Mesh(
                 new THREE.CylinderGeometry(o.radius, o.radius, 1.1, 24),
@@ -1535,12 +1646,33 @@ function onMouseDown(e) {
         const intersects = raycaster.intersectObject(tableCloth);
         if (intersects.length > 0) {
             let pt = intersects[0].point;
-            let targetX = Math.max(-BOUNDS_X, Math.min(BOUNDS_X, pt.x));
-            let targetZ = Math.max(-BOUNDS_Z, Math.min(BOUNDS_Z, pt.z));
+            let targetX, targetZ;
+            if (currentTablePolygon) {
+                // 変則テーブルでは、テーブルクロス自体が実際の形（ポリゴン）通りに作られているため
+                // レイキャストで得た点をそのまま使う（矩形クランプは行わない）
+                targetX = pt.x;
+                targetZ = pt.z;
+            } else {
+                targetX = Math.max(-BOUNDS_X, Math.min(BOUNDS_X, pt.x));
+                targetZ = Math.max(-BOUNDS_Z, Math.min(BOUNDS_Z, pt.z));
+            }
             
             let collision = balls.some(b => b !== cueBall && b.active && Math.hypot(b.mesh.position.x - targetX, b.mesh.position.z - targetZ) < BALL_R * 2.1);
             let insideTable = currentTablePolygon ? pointInPolygon(targetX, targetZ, currentTablePolygon) : true;
-            if (!collision && insideTable) {
+            let onObstacle = obstacles.some(o => {
+                if (o.type === 'wall') {
+                    const segX = o.x2 - o.x1, segZ = o.z2 - o.z1;
+                    const lenSq = segX * segX + segZ * segZ;
+                    if (lenSq === 0) return false;
+                    let t = ((targetX - o.x1) * segX + (targetZ - o.z1) * segZ) / lenSq;
+                    t = Math.max(0, Math.min(1, t));
+                    const cx = o.x1 + t * segX, cz = o.z1 + t * segZ;
+                    return Math.hypot(targetX - cx, targetZ - cz) < BALL_R + 0.6;
+                }
+                const oR = o.radius || 2;
+                return Math.hypot(o.x - targetX, o.z - targetZ) < oR + BALL_R + 0.3;
+            });
+            if (!collision && insideTable && !onObstacle) {
                 cueBall.mesh.position.set(targetX, BALL_R, targetZ);
                 cueBall.isFalling = false;
                 cueBall.mesh.position.y = BALL_R;
@@ -1897,6 +2029,20 @@ function findSafeBombPosition() {
         const x = (Math.random() * 2 - 1) * maxX;
         const z = (Math.random() * 2 - 1) * maxZ;
 
+        // 変則テーブルの場合は、テーブルの形（ポリゴン）の内側かどうかも確認する
+        if (currentTablePolygon && !pointInPolygon(x, z, currentTablePolygon)) continue;
+
+        // 壁（クッション）に寄りすぎていないか
+        if (tableWalls.some(w => {
+            const segX = w.x2 - w.x1, segZ = w.z2 - w.z1;
+            const lenSq = segX * segX + segZ * segZ;
+            if (lenSq === 0) return false;
+            let t = ((x - w.x1) * segX + (z - w.z1) * segZ) / lenSq;
+            t = Math.max(0, Math.min(1, t));
+            const cx = w.x1 + t * segX, cz = w.z1 + t * segZ;
+            return Math.hypot(x - cx, z - cz) < BALL_R + 1.5;
+        })) continue;
+
         // 他のボールと重ならないか
         const overlapsball = balls.some(b => {
             if (!b.active || b.isBomb) return false;
@@ -1910,10 +2056,30 @@ function findSafeBombPosition() {
         );
         if (overlapsPocket) continue;
 
+        // 障害物（山・バンパー・壁）の上に置かれないか
+        const overlapsObstacle = obstacles.some(o => {
+            if (o.type === 'wall') {
+                const segX = o.x2 - o.x1, segZ = o.z2 - o.z1;
+                const lenSq = segX * segX + segZ * segZ;
+                if (lenSq === 0) return false;
+                let t = ((x - o.x1) * segX + (z - o.z1) * segZ) / lenSq;
+                t = Math.max(0, Math.min(1, t));
+                const cx = o.x1 + t * segX, cz = o.z1 + t * segZ;
+                return Math.hypot(x - cx, z - cz) < BALL_R + 1.0;
+            }
+            const oR = o.radius || 2;
+            return Math.hypot(o.x - x, o.z - z) < oR + BALL_R + 0.8;
+        });
+        if (overlapsObstacle) continue;
+
         return { x, z };
     }
-    // フォールバック（中央付近）
-    return { x: 5, z: 5 };
+    // フォールバック（テーブル中央付近。変則テーブルではラック基準位置を使う）
+    if (ACTIVE_VARIANT_SHAPE) {
+        const r = VARIANT_SHAPES[ACTIVE_VARIANT_SHAPE].rack;
+        return { x: r.x, z: 0 };
+    }
+    return { x: 0, z: 0 };
 }
 
 // ボム爆発メイン関数（targetBomb: 爆発するボムオブジェクト）
@@ -2297,11 +2463,14 @@ function updatePhysicsSingleStep(dtFactor, skipVisualUpdate = false) {
     
     // ②-2 障害物（山・バンパー・壁）衝突判定
     if (obstacles.length > 0) {
-        obstacles.forEach(o => {
-            balls.forEach(b => {
-                if (!b.active || b.isFalling || !b.isMoving) return;
+        balls.forEach(b => {
+            if (!b.active || b.isFalling) return;
 
+            let climbHeight = 0; // 山の斜面に乗っている場合の盛り上がり量（見た目）
+
+            obstacles.forEach(o => {
                 if (o.type === 'wall') {
+                    if (!b.isMoving) return;
                     let segX = o.x2 - o.x1; let segZ = o.z2 - o.z1;
                     let lenSq = segX * segX + segZ * segZ;
                     if (lenSq === 0) return;
@@ -2321,8 +2490,8 @@ function updatePhysicsSingleStep(dtFactor, skipVisualUpdate = false) {
                             soundCushionThrottled(Math.abs(dot));
                         }
                     }
-                } else {
-                    // 山（mountain）・バンパー（bumper）は円形の障害物として扱う
+                } else if (o.type === 'bumper') {
+                    if (!b.isMoving) return;
                     let dx = b.mesh.position.x - o.x;
                     let dz = b.mesh.position.z - o.z;
                     let dist = Math.hypot(dx, dz);
@@ -2334,16 +2503,38 @@ function updatePhysicsSingleStep(dtFactor, skipVisualUpdate = false) {
                         b.mesh.position.z += nz * overlap;
                         let dot = b.vx * nx + b.vz * nz;
                         if (dot < 0) {
-                            // バンパーは弾き飛ばし、山は勢いを少し吸収する
-                            let bounceFactor = o.type === 'bumper' ? 1.2 : 0.8;
-                            b.vx = (b.vx - 2 * dot * nx) * bounceFactor;
-                            b.vz = (b.vz - 2 * dot * nz) * bounceFactor;
+                            // バンパーは勢いよく弾き飛ばす
+                            b.vx = (b.vx - 2 * dot * nx) * 1.2;
+                            b.vz = (b.vz - 2 * dot * nz) * 1.2;
                             b.isMoving = true;
                             soundCushionThrottled(Math.abs(dot));
                         }
                     }
+                } else if (o.type === 'mountain') {
+                    // 山：常に登って乗り越えられる。山頂に近いほど坂の抵抗で減速する（跳ね返しはしない）
+                    let dx = b.mesh.position.x - o.x;
+                    let dz = b.mesh.position.z - o.z;
+                    let dist = Math.hypot(dx, dz);
+                    const minDist = BALL_R + o.radius;
+                    const mHeight = o.height || MOUNTAIN_HEIGHT;
+
+                    if (dist < minDist) {
+                        const t = 1 - dist / minDist; // 0(裾野)~1(山頂付近)
+                        climbHeight = Math.max(climbHeight, t * mHeight);
+                        if (b.isMoving) {
+                            // 1フレームあたりの減速率を基準にdtFactorでスケーリングし、
+                            // サブステップ数に依存した急停止（過剰な減速）を防ぐ
+                            const retain = 1 - t * 0.05;
+                            const drag = Math.pow(Math.max(retain, 0.4), dtFactor);
+                            b.vx *= drag;
+                            b.vz *= drag;
+                        }
+                    }
                 }
             });
+
+            // 山の斜面を登っている間はボールの高さを盛り上げ、離れたら元の高さに戻す
+            b.mesh.position.y = BALL_R + climbHeight;
         });
     }
 
@@ -2373,6 +2564,39 @@ function updatePhysicsSingleStep(dtFactor, skipVisualUpdate = false) {
                 }
             }
         });
+    });
+    // ④ 安全装置：何らかの原因（バグ等）でテーブルの外に出てしまった球は、強制的にポケットに入ったものとして扱う
+    balls.forEach(b => {
+        if (!b.active || !b.isMoving || b.isBomb) return;
+        const bx = b.mesh.position.x, bz = b.mesh.position.z;
+        let outOfBounds;
+        if (currentTablePolygonExpanded) {
+            outOfBounds = !pointInPolygon(bx, bz, currentTablePolygonExpanded);
+        } else {
+            outOfBounds = Math.abs(bx) > TABLE_W / 2 + 3 || Math.abs(bz) > TABLE_L / 2 + 3;
+        }
+        if (!outOfBounds) return;
+
+        // 一番近いポケットに落ちたものとして処理する
+        let nearestIdx = 0, nearestDist = Infinity;
+        pockets.forEach((p, idx) => {
+            const d = Math.hypot(p.x - bx, p.z - bz);
+            if (d < nearestDist) { nearestDist = d; nearestIdx = idx; }
+        });
+
+        b.active = false;
+        b.isMoving = false;
+        if (!b.isCue && shotInProgress) {
+            pocketedBallsThisTurn.push({ ball: b, pocketIdx: nearestIdx });
+        }
+        if (b.isCue) {
+            cueBallPocketed = true;
+            b.mesh.position.set(0, -100, 0);
+            soundPocketIn(true);
+        } else {
+            scene.remove(b.mesh);
+            soundPocketIn(false);
+        }
     });
 }
 
